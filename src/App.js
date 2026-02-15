@@ -34,7 +34,7 @@ function parseItalianDate(dateStr, timeStr) {
     }
   }
   // DD/MM/YYYY
-  m = s.match(/(\d{1,2})[/-.](\d{1,2})[/-.](\d{4})/);
+  m = s.match(/(\d{1,2})[-/.](\d{1,2})[-/.](\d{4})/);
   if (m) {
     const t = timeStr ? String(timeStr).trim().match(/(\d{1,2})[:.](\d{2})/) : null;
     return new Date(parseInt(m[3]), parseInt(m[2])-1, parseInt(m[1]), t?parseInt(t[1]):0, t?parseInt(t[2]):0);
