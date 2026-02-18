@@ -38,12 +38,17 @@ export default function ComparisonTab({ data, filtered, selectedBrand: topSelect
   // If a brand is selected in the top bar, highlight it in comparisons
   const highlightBrand = topSelectedBrand !== 'all' ? topSelectedBrand : null;
 
+  // Stats of the highlighted brand (for brand-vs-genre comparison)
+  const highlightBrandStats = useMemo(() => {
+    if (!highlightBrand) return null;
+    return allBrandStats.find(b => b.brand === highlightBrand) || null;
+  }, [highlightBrand, allBrandStats]);
+
   // Auto-detect genre of highlighted brand for genre comparison
   const highlightGenres = useMemo(() => {
-    if (!highlightBrand) return [];
-    const brandInfo = allBrandStats.find(b => b.brand === highlightBrand);
-    return brandInfo?.genres || [];
-  }, [highlightBrand, allBrandStats]);
+    if (!highlightBrandStats) return [];
+    return highlightBrandStats.genres || [];
+  }, [highlightBrandStats]);
 
   // Auto-detect location of highlighted brand
   const highlightLocation = useMemo(() => {
@@ -140,7 +145,7 @@ export default function ComparisonTab({ data, filtered, selectedBrand: topSelect
 
       {/* Content */}
       {view === 'genre' && !selectedGenre && (
-        <GenreComparison genreStats={genreStats} onSelectGenre={handleSelectGenre} highlightGenres={highlightGenres} highlightBrand={highlightBrand} />
+        <GenreComparison genreStats={genreStats} onSelectGenre={handleSelectGenre} highlightGenres={highlightGenres} highlightBrand={highlightBrand} highlightBrandStats={highlightBrandStats} />
       )}
 
       {view === 'brand' && (
