@@ -31,6 +31,7 @@ export default function ClubAnalytics() {
   const [utentiData, setUtentiData] = useState([]);
   const [selectedCategory, setSelectedCategory] = useState("all");
   const [selectedBrand, setSelectedBrand] = useState("all");
+  const [selectedEdition, setSelectedEdition] = useState("all");
   const [cloudStatus, setCloudStatus] = useState("idle"); // idle | saving | saved | error
   const [savedDatasets, setSavedDatasets] = useState([]);
   const [graphHeights, setGraphHeights] = useState({
@@ -195,8 +196,9 @@ export default function ClubAnalytics() {
     let d = data;
     if (selectedCategory !== "all") d = d.filter(r => r.category === selectedCategory);
     if (selectedBrand !== "all") d = d.filter(r => r.brand === selectedBrand);
+    if (selectedEdition !== "all") d = d.filter(r => r.editionLabel === selectedEdition);
     return d;
-  }, [data, selectedCategory, selectedBrand]);
+  }, [data, selectedCategory, selectedBrand, selectedEdition]);
 
   // Analytics
   const analytics = useMemo(() => {
@@ -245,6 +247,18 @@ export default function ClubAnalytics() {
     if (selectedCategory !== "all") d = d.filter(r => r.category === selectedCategory);
     return [...new Set(d.map(r => r.brand))].filter(Boolean).sort();
   }, [data, selectedCategory]);
+
+  // Available editions when a brand is selected
+  const availableEditions = useMemo(() => {
+    if (selectedBrand === "all") return [];
+    const editions = [...new Set(data.filter(r => r.brand === selectedBrand).map(r => r.editionLabel))].filter(Boolean);
+    // Sort by event date
+    return editions.sort((a, b) => {
+      const aRow = data.find(r => r.brand === selectedBrand && r.editionLabel === a);
+      const bRow = data.find(r => r.brand === selectedBrand && r.editionLabel === b);
+      return (aRow?.eventDate || 0) - (bRow?.eventDate || 0);
+    });
+  }, [data, selectedBrand]);
 
   // Tab definitions
   const tabs = [
@@ -318,13 +332,13 @@ export default function ClubAnalytics() {
 
         {/* Category filter */}
         <div style={{ display: "flex", gap: 4, marginLeft: 16 }}>
-          <button onClick={() => { setSelectedCategory("all"); setSelectedBrand("all"); }} style={{
+          <button onClick={() => { setSelectedCategory("all"); setSelectedBrand("all"); setSelectedEdition("all"); }} style={{
             padding: "4px 10px", borderRadius: 6, fontSize: 10, border: "none", cursor: "pointer",
             background: selectedCategory === "all" ? "#8b5cf6" : "#334155",
             color: selectedCategory === "all" ? "#fff" : "#94a3b8",
           }}>Tutti</button>
           {categories.map(c => (
-            <button key={c} onClick={() => { setSelectedCategory(c); setSelectedBrand("all"); }} style={{
+            <button key={c} onClick={() => { setSelectedCategory(c); setSelectedBrand("all"); setSelectedEdition("all"); }} style={{
               padding: "4px 10px", borderRadius: 6, fontSize: 10, border: "none", cursor: "pointer",
               background: selectedCategory === c ? "#8b5cf6" : "#334155",
               color: selectedCategory === c ? "#fff" : "#94a3b8", textTransform: "capitalize",
@@ -335,7 +349,7 @@ export default function ClubAnalytics() {
         {/* Brand filter */}
         <select
           value={selectedBrand}
-          onChange={e => setSelectedBrand(e.target.value)}
+          onChange={e => { setSelectedBrand(e.target.value); setSelectedEdition("all"); }}
           style={{
             background: "#334155", border: "1px solid #475569", borderRadius: 6,
             color: "#f1f5f9", fontSize: 11, padding: "4px 8px", outline: "none",
@@ -354,6 +368,38 @@ export default function ClubAnalytics() {
           <Database size={11} /> Gestisci dati
         </button>
       </div>
+
+      {/* Edition selector - shown when a brand with multiple editions is selected */}
+      {selectedBrand !== "all" && availableEditions.length > 1 && (
+        <div style={{
+          display: "flex", gap: 4, padding: "8px 20px",
+          background: "#1e293b80", borderBottom: "1px solid #334155",
+          alignItems: "center", overflowX: "auto",
+        }}>
+          <span style={{ fontSize: 10, color: "#64748b", marginRight: 4, whiteSpace: "nowrap" }}>Edizione:</span>
+          <button
+            onClick={() => setSelectedEdition("all")}
+            style={{
+              padding: "3px 10px", borderRadius: 6, fontSize: 10, border: "none", cursor: "pointer",
+              background: selectedEdition === "all" ? "#8b5cf6" : "#334155",
+              color: selectedEdition === "all" ? "#fff" : "#94a3b8",
+              whiteSpace: "nowrap",
+            }}
+          >Tutte ({availableEditions.length})</button>
+          {availableEditions.map(ed => (
+            <button
+              key={ed}
+              onClick={() => setSelectedEdition(ed)}
+              style={{
+                padding: "3px 10px", borderRadius: 6, fontSize: 10, border: "none", cursor: "pointer",
+                background: selectedEdition === ed ? "#8b5cf6" : "#334155",
+                color: selectedEdition === ed ? "#fff" : "#94a3b8",
+                whiteSpace: "nowrap",
+              }}
+            >{ed}</button>
+          ))}
+        </div>
+      )}
 
       {/* KPI Row */}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 10, padding: "16px 20px" }}>

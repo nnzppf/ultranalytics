@@ -3,6 +3,9 @@ import Section from '../shared/Section';
 import { COLORS, TOOLTIP_STYLE } from '../../config/constants';
 
 export default function TrendsTab({ trendData, trendByGroup, multiEvent }) {
+  // Show line chart if there are multiple groups (brands or editions)
+  const hasMultipleGroups = trendByGroup && trendByGroup.groups && trendByGroup.groups.length > 1;
+
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
       <Section title="Trend giornaliero registrazioni">
@@ -18,8 +21,8 @@ export default function TrendsTab({ trendData, trendByGroup, multiEvent }) {
         </ResponsiveContainer>
       </Section>
 
-      {multiEvent && trendByGroup && (
-        <Section title="Trend per brand">
+      {hasMultipleGroups && (
+        <Section title={multiEvent ? "Trend per brand" : "Trend per edizione"}>
           <ResponsiveContainer width="100%" height={300}>
             <LineChart data={trendByGroup.data}>
               <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
