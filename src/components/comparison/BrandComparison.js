@@ -4,7 +4,7 @@ import { DeltaBadge, GenreBadge } from '../shared/Badge';
 import { COLORS, TOOLTIP_STYLE } from '../../config/constants';
 import { GENRE_LABELS } from '../../config/eventConfig';
 
-export default function BrandComparison({ brandStats, onSelectBrand }) {
+export default function BrandComparison({ brandStats, onSelectBrand, highlightBrand }) {
   if (!brandStats || !brandStats.length) return null;
 
   return (
@@ -18,62 +18,79 @@ export default function BrandComparison({ brandStats, onSelectBrand }) {
             <YAxis dataKey="brand" type="category" tick={{ fill: "#f1f5f9", fontSize: 11 }} width={140} />
             <Tooltip {...TOOLTIP_STYLE} />
             <Bar dataKey="totalRegistrations" name="Registrazioni" radius={[0, 6, 6, 0]} maxBarSize={28}>
-              {brandStats.map((_, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}
+              {brandStats.map((b, i) => (
+                <Cell
+                  key={i}
+                  fill={b.brand === highlightBrand ? "#8b5cf6" : COLORS[i % COLORS.length]}
+                  opacity={highlightBrand && b.brand !== highlightBrand ? 0.4 : 1}
+                />
+              ))}
             </Bar>
             <Bar dataKey="totalAttended" name="Presenze" radius={[0, 4, 4, 0]} maxBarSize={28} fill="#334155" />
           </BarChart>
         </ResponsiveContainer>
       </Section>
 
-      {/* Cards */}
+      {/* Cards - put highlighted brand first */}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))", gap: 12 }}>
-        {brandStats.map((b, i) => (
-          <div
-            key={b.brand}
-            onClick={() => onSelectBrand && onSelectBrand(b.brand)}
-            style={{
-              background: "#1e293b", borderRadius: 12, padding: 16,
-              border: "1px solid #334155", cursor: onSelectBrand ? "pointer" : "default",
-              transition: "border-color 0.2s",
-            }}
-            onMouseEnter={e => { if (onSelectBrand) e.currentTarget.style.borderColor = "#8b5cf6"; }}
-            onMouseLeave={e => { e.currentTarget.style.borderColor = "#334155"; }}
-          >
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 10 }}>
-              <div>
-                <div style={{ fontSize: 15, fontWeight: 700, color: "#f1f5f9" }}>{b.brand}</div>
-                <div style={{ display: "flex", gap: 4, marginTop: 4, flexWrap: "wrap" }}>
-                  {b.genres.map(g => (
-                    <GenreBadge key={g} genre={GENRE_LABELS[g]?.label || g} color={GENRE_LABELS[g]?.color} />
-                  ))}
+        {[...brandStats]
+          .sort((a, b) => {
+            if (a.brand === highlightBrand) return -1;
+            if (b.brand === highlightBrand) return 1;
+            return b.totalRegistrations - a.totalRegistrations;
+          })
+          .map((b, i) => {
+            const isHL = b.brand === highlightBrand;
+            return (
+              <div
+                key={b.brand}
+                onClick={() => onSelectBrand && onSelectBrand(b.brand)}
+                style={{
+                  background: isHL ? "rgba(139,92,246,0.08)" : "#1e293b",
+                  borderRadius: 12, padding: 16,
+                  border: isHL ? "2px solid #8b5cf6" : "1px solid #334155",
+                  cursor: onSelectBrand ? "pointer" : "default",
+                  transition: "border-color 0.2s",
+                }}
+                onMouseEnter={e => { if (onSelectBrand) e.currentTarget.style.borderColor = "#8b5cf6"; }}
+                onMouseLeave={e => { e.currentTarget.style.borderColor = isHL ? "#8b5cf6" : "#334155"; }}
+              >
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 10 }}>
+                  <div>
+                    <div style={{ fontSize: 15, fontWeight: 700, color: isHL ? "#8b5cf6" : "#f1f5f9" }}>{b.brand}</div>
+                    <div style={{ display: "flex", gap: 4, marginTop: 4, flexWrap: "wrap" }}>
+                      {b.genres.map(g => (
+                        <GenreBadge key={g} genre={GENRE_LABELS[g]?.label || g} color={GENRE_LABELS[g]?.color} />
+                      ))}
+                    </div>
+                  </div>
+                  <div style={{
+                    background: "#0f172a", borderRadius: 8, padding: "4px 10px",
+                    fontSize: 11, color: "#94a3b8",
+                  }}>
+                    {b.editionCount} ediz.
+                  </div>
                 </div>
-              </div>
-              <div style={{
-                background: "#0f172a", borderRadius: 8, padding: "4px 10px",
-                fontSize: 11, color: "#94a3b8",
-              }}>
-                {b.editionCount} ediz.
-              </div>
-            </div>
 
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8, marginTop: 10 }}>
-              <div>
-                <div style={{ fontSize: 10, color: "#64748b" }}>Media/ediz.</div>
-                <div style={{ fontSize: 16, fontWeight: 700, color: "#f1f5f9" }}>{b.avgPerEdition}</div>
-              </div>
-              <div>
-                <div style={{ fontSize: 10, color: "#64748b" }}>Conversione</div>
-                <div style={{ fontSize: 16, fontWeight: 700, color: "#10b981" }}>{b.avgConversion}%</div>
-              </div>
-              <div>
-                <div style={{ fontSize: 10, color: "#64748b" }}>Crescita</div>
-                <div style={{ fontSize: 16, fontWeight: 700 }}>
-                  {b.growth !== null ? <DeltaBadge value={b.growth} /> : <span style={{ color: "#64748b" }}>-</span>}
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8, marginTop: 10 }}>
+                  <div>
+                    <div style={{ fontSize: 10, color: "#64748b" }}>Media/ediz.</div>
+                    <div style={{ fontSize: 16, fontWeight: 700, color: "#f1f5f9" }}>{b.avgPerEdition}</div>
+                  </div>
+                  <div>
+                    <div style={{ fontSize: 10, color: "#64748b" }}>Conversione</div>
+                    <div style={{ fontSize: 16, fontWeight: 700, color: "#10b981" }}>{b.avgConversion}%</div>
+                  </div>
+                  <div>
+                    <div style={{ fontSize: 10, color: "#64748b" }}>Crescita</div>
+                    <div style={{ fontSize: 16, fontWeight: 700 }}>
+                      {b.growth !== null ? <DeltaBadge value={b.growth} /> : <span style={{ color: "#64748b" }}>-</span>}
+                    </div>
+                  </div>
                 </div>
               </div>
-            </div>
-          </div>
-        ))}
+            );
+          })}
       </div>
     </div>
   );

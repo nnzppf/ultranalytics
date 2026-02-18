@@ -7,26 +7,50 @@ import LocationComparison from '../comparison/LocationComparison';
 import { compareBrands, compareGenres, compareLocations, computeWhereAreWeNow, getBrandsWithMultipleEditions } from '../../utils/comparisonEngine';
 import { GENRE_LABELS } from '../../config/eventConfig';
 
-export default function ComparisonTab({ data }) {
+export default function ComparisonTab({ data, filtered, selectedBrand: topSelectedBrand, selectedCategory }) {
   const [view, setView] = useState('genre'); // genre | brand | location | tracker
   const [selectedGenre, setSelectedGenre] = useState(null);
   const [selectedBrand, setSelectedBrand] = useState(null);
   const [selectedEdition, setSelectedEdition] = useState(null);
 
-  const genreStats = useMemo(() => compareGenres(data), [data]);
-  const allBrandStats = useMemo(() => compareBrands(data), [data]);
-  const locationStats = useMemo(() => compareLocations(data), [data]);
-  const multiEditionBrands = useMemo(() => getBrandsWithMultipleEditions(data), [data]);
+  // Use all non-senior data for comparisons (so we always have something to compare against)
+  const baseData = useMemo(() => data.filter(d => d.category !== 'senior'), [data]);
+
+  // Genre stats: always from full data, highlight the selected brand's genre
+  const genreStats = useMemo(() => compareGenres(baseData), [baseData]);
+
+  // Brand stats: filter by genre if drilled down, always from full data
+  const allBrandStats = useMemo(() => compareBrands(baseData), [baseData]);
 
   const filteredBrandStats = useMemo(() => {
     if (!selectedGenre) return allBrandStats;
     return allBrandStats.filter(b => b.genres?.includes(selectedGenre));
   }, [allBrandStats, selectedGenre]);
 
+  const locationStats = useMemo(() => compareLocations(baseData), [baseData]);
+  const multiEditionBrands = useMemo(() => getBrandsWithMultipleEditions(baseData), [baseData]);
+
   const trackerData = useMemo(() => {
     if (!selectedBrand || !selectedEdition) return null;
-    return computeWhereAreWeNow(data, selectedBrand, selectedEdition);
-  }, [data, selectedBrand, selectedEdition]);
+    return computeWhereAreWeNow(baseData, selectedBrand, selectedEdition);
+  }, [baseData, selectedBrand, selectedEdition]);
+
+  // If a brand is selected in the top bar, highlight it in comparisons
+  const highlightBrand = topSelectedBrand !== 'all' ? topSelectedBrand : null;
+
+  // Auto-detect genre of highlighted brand for genre comparison
+  const highlightGenres = useMemo(() => {
+    if (!highlightBrand) return [];
+    const brandInfo = allBrandStats.find(b => b.brand === highlightBrand);
+    return brandInfo?.genres || [];
+  }, [highlightBrand, allBrandStats]);
+
+  // Auto-detect location of highlighted brand
+  const highlightLocation = useMemo(() => {
+    if (!highlightBrand) return null;
+    const brandRow = baseData.find(d => d.brand === highlightBrand);
+    return brandRow?.location || null;
+  }, [highlightBrand, baseData]);
 
   const breadcrumb = [];
   breadcrumb.push({ label: 'Confronti', action: () => { setSelectedGenre(null); setSelectedBrand(null); setSelectedEdition(null); } });
@@ -66,6 +90,20 @@ export default function ComparisonTab({ data }) {
 
   return (
     <div>
+      {/* Context banner when a brand is selected in top bar */}
+      {highlightBrand && (
+        <div style={{
+          background: "linear-gradient(90deg, rgba(139,92,246,0.15), rgba(236,72,153,0.1))",
+          borderRadius: 10, padding: "10px 16px", marginBottom: 14,
+          border: "1px solid rgba(139,92,246,0.3)",
+          display: "flex", alignItems: "center", gap: 8, fontSize: 12,
+        }}>
+          <span style={{ color: "#94a3b8" }}>Confronti in evidenza per</span>
+          <span style={{ color: "#8b5cf6", fontWeight: 700 }}>{highlightBrand}</span>
+          <span style={{ color: "#64748b" }}>vs tutti i brand</span>
+        </div>
+      )}
+
       {/* Sub-tabs */}
       <div style={{ display: "flex", gap: 6, marginBottom: 16, flexWrap: "wrap" }}>
         {tabs.map(t => (
@@ -102,20 +140,19 @@ export default function ComparisonTab({ data }) {
 
       {/* Content */}
       {view === 'genre' && !selectedGenre && (
-        <GenreComparison genreStats={genreStats} onSelectGenre={handleSelectGenre} />
+        <GenreComparison genreStats={genreStats} onSelectGenre={handleSelectGenre} highlightGenres={highlightGenres} highlightBrand={highlightBrand} />
       )}
 
       {view === 'brand' && (
-        <BrandComparison brandStats={filteredBrandStats} onSelectBrand={handleSelectBrand} />
+        <BrandComparison brandStats={filteredBrandStats} onSelectBrand={handleSelectBrand} highlightBrand={highlightBrand} />
       )}
 
       {view === 'location' && (
-        <LocationComparison locationStats={locationStats} />
+        <LocationComparison locationStats={locationStats} highlightLocation={highlightLocation} highlightBrand={highlightBrand} />
       )}
 
       {view === 'tracker' && (
         <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-          {/* Edition / brand selector for tracker */}
           {!selectedBrand && (
             <div>
               <div style={{ fontSize: 12, color: "#94a3b8", marginBottom: 8 }}>
@@ -124,8 +161,10 @@ export default function ComparisonTab({ data }) {
               <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
                 {multiEditionBrands.map(b => (
                   <button key={b.brand} onClick={() => handleSelectBrand(b.brand)} style={{
-                    padding: "8px 16px", borderRadius: 8, fontSize: 12, border: "1px solid #334155",
-                    cursor: "pointer", background: "#1e293b", color: "#f1f5f9",
+                    padding: "8px 16px", borderRadius: 8, fontSize: 12,
+                    border: b.brand === highlightBrand ? "2px solid #8b5cf6" : "1px solid #334155",
+                    cursor: "pointer", background: b.brand === highlightBrand ? "rgba(139,92,246,0.1)" : "#1e293b",
+                    color: "#f1f5f9",
                   }}>
                     {b.brand} <span style={{ color: "#64748b" }}>({b.editions.length} edizioni)</span>
                   </button>

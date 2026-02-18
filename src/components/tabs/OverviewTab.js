@@ -11,6 +11,9 @@ export default function OverviewTab({ analytics, graphHeights, setGraphHeights }
 
   const { hourlyReg, hourlyRegByEvent, hourlyPeak, dowData, daysBeforeData, multiEvent } = analytics;
 
+  // Show stacked if multiple brands OR single brand with multiple editions (groups in byEvent data)
+  const hasStackableData = multiEvent || (hourlyRegByEvent && hourlyRegByEvent.groups && hourlyRegByEvent.groups.length > 1);
+
   const granButtons = [
     { key: 'hourly', label: 'Oraria' },
     { key: '30min', label: '30min' },
@@ -31,7 +34,7 @@ export default function OverviewTab({ analytics, graphHeights, setGraphHeights }
                 color: timeGranularity === b.key ? "#fff" : "#94a3b8",
               }}>{b.label}</button>
             ))}
-            {multiEvent && (
+            {hasStackableData && (
               <button onClick={() => setStackedView(v => !v)} style={{
                 padding: "3px 10px", borderRadius: 6, fontSize: 10, border: "none", cursor: "pointer",
                 background: stackedView ? "#8b5cf6" : "#334155",

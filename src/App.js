@@ -210,7 +210,9 @@ export default function ClubAnalytics() {
     const eventStats = getEventStats(filtered);
 
     const hourlyReg = getHourlyData(filtered);
-    const hourlyRegByEvent = getHourlyDataByGroup(filtered, 'brand');
+    // If a single brand is selected, group by edition; otherwise group by brand
+    const groupKey = selectedBrand !== "all" ? 'editionLabel' : 'brand';
+    const hourlyRegByEvent = getHourlyDataByGroup(filtered, groupKey);
     const hourlyPeak = hourlyReg.reduce((max, h) => h.registrazioni > (max?.registrazioni || 0) ? h : max, null);
 
     return {
@@ -226,20 +228,20 @@ export default function ClubAnalytics() {
       convByFascia: getConversionByFascia(filtered),
       heatmapGrid: getHeatmapData(filtered),
       trendData: getTrendData(filtered),
-      trendByGroup: getTrendDataByGroup(filtered, 'brand'),
+      trendByGroup: getTrendDataByGroup(filtered, groupKey),
       userStats: getUserStats(filtered),
       multiEvent: brands.length > 1,
     };
-  }, [filtered]);
+  }, [filtered, selectedBrand]);
 
-  // Available categories and brands for filters
+  // Available categories and brands for filters (exclude senior)
   const categories = useMemo(() => {
-    const cats = [...new Set(data.map(d => d.category))].filter(c => c && c !== 'unknown');
+    const cats = [...new Set(data.map(d => d.category))].filter(c => c && c !== 'unknown' && c !== 'senior');
     return cats;
   }, [data]);
 
   const availableBrands = useMemo(() => {
-    let d = data;
+    let d = data.filter(r => r.category !== 'senior');
     if (selectedCategory !== "all") d = d.filter(r => r.category === selectedCategory);
     return [...new Set(d.map(r => r.brand))].filter(Boolean).sort();
   }, [data, selectedCategory]);
@@ -409,7 +411,7 @@ export default function ClubAnalytics() {
         )}
 
         {activeTab === "confronti" && (
-          <ComparisonTab data={filtered} />
+          <ComparisonTab data={data} filtered={filtered} selectedBrand={selectedBrand} selectedCategory={selectedCategory} />
         )}
 
         {activeTab === "utenti" && (
