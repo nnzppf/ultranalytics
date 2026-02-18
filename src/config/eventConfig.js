@@ -66,7 +66,7 @@ export const BRAND_REGISTRY = {
       { edition: "24.01.26", patterns: ["24 gennaio 2026 - 2000 mania"] },
     ]
   },
-  "SALTACODA": {
+  "JE SUIS MIMÌ": {
     category: "standard",
     genres: ["commerciale"],
     matchPatterns: [

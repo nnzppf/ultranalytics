@@ -33,7 +33,7 @@ const BRAND_REGISTRY = {
   'POLPETTE': { category: 'standard', genres: ['elettronica', 'aperitivo'], matchPatterns: ['polpette'] },
   'AMARCORD': { category: 'standard', genres: ['commerciale'], matchPatterns: ['amarcord'] },
   'VISION': { category: 'standard', genres: ['elettronica'], matchPatterns: ['vision'] },
-  'SALTACODA': { category: 'standard', genres: ['commerciale'], matchPatterns: ['saltacoda'] },
+  'JE SUIS MIMÌ': { category: 'standard', genres: ['commerciale'], matchPatterns: ['saltacoda', 'je suis mimi'] },
   'DOBLE SOUND': { category: 'standard', genres: ['commerciale'], matchPatterns: ['doble sound', 'doble'] },
   'SUNDAYS X GG': { category: 'standard', genres: ['commerciale', 'aperitivo'], matchPatterns: ['sundays', 'gg'] },
   'LOVE by Polpette': { category: 'standard', genres: ['elettronica'], matchPatterns: ['love by polpette', 'love polpette'] },
