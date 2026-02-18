@@ -2,9 +2,186 @@ import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContai
 import { DeltaBadge } from '../shared/Badge';
 import { COLORS, TOOLTIP_STYLE } from '../../config/constants';
 
-export default function WhereAreWeNow({ comparisonData }) {
-  if (!comparisonData) return null;
+// Cross-brand comparison view
+function CrossBrandView({ comparisonData }) {
+  const { brandA, brandB, statsA, aggA, aggB, overlayData, allEditionLabels, allStats } = comparisonData;
 
+  const deltaReg = aggA.avgPerEdition - aggB.avgPerEdition;
+  const deltaConv = parseFloat((aggA.avgConversion - aggB.avgConversion).toFixed(1));
+
+  // Table data: all editions of both brands
+  const tableData = allStats
+    .sort((a, b) => (a.eventDate || 0) - (b.eventDate || 0))
+    .map(s => ({
+      ...s,
+      isBrandA: s.brand === brandA,
+    }));
+
+  return (
+    <div style={{ background: "#1e293b", borderRadius: 16, padding: 20, border: "1px solid #334155" }}>
+      {/* Header */}
+      <div style={{ marginBottom: 16 }}>
+        <div style={{ fontSize: 11, color: "#94a3b8", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 4 }}>
+          Confronto brand
+        </div>
+        <div style={{ fontSize: 20, fontWeight: 700, color: "#f1f5f9" }}>
+          <span style={{ color: "#8b5cf6" }}>{brandA}</span>
+          <span style={{ color: "#64748b", margin: "0 8px", fontSize: 14 }}>vs</span>
+          <span style={{ color: "#ec4899" }}>{brandB}</span>
+        </div>
+      </div>
+
+      {/* KPI comparison */}
+      <div style={{ display: "grid", gridTemplateColumns: "1fr auto 1fr", gap: 12, marginBottom: 20 }}>
+        {/* Brand A stats */}
+        <div style={{ background: "rgba(139,92,246,0.08)", borderRadius: 12, padding: 16, border: "1px solid rgba(139,92,246,0.3)" }}>
+          <div style={{ fontSize: 12, fontWeight: 700, color: "#8b5cf6", marginBottom: 10 }}>{brandA}</div>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+            <div>
+              <div style={{ fontSize: 9, color: "#64748b" }}>Edizioni</div>
+              <div style={{ fontSize: 18, fontWeight: 800, color: "#f1f5f9" }}>{aggA.editionCount}</div>
+            </div>
+            <div>
+              <div style={{ fontSize: 9, color: "#64748b" }}>Totale reg.</div>
+              <div style={{ fontSize: 18, fontWeight: 800, color: "#f1f5f9" }}>{aggA.totalRegistrations}</div>
+            </div>
+            <div>
+              <div style={{ fontSize: 9, color: "#64748b" }}>Media/ediz.</div>
+              <div style={{ fontSize: 18, fontWeight: 800, color: "#8b5cf6" }}>{aggA.avgPerEdition}</div>
+            </div>
+            <div>
+              <div style={{ fontSize: 9, color: "#64748b" }}>Conversione</div>
+              <div style={{ fontSize: 18, fontWeight: 800, color: "#10b981" }}>{aggA.avgConversion}%</div>
+            </div>
+          </div>
+        </div>
+
+        {/* Delta center */}
+        <div style={{ display: "flex", flexDirection: "column", justifyContent: "center", alignItems: "center", gap: 8 }}>
+          <div style={{ fontSize: 9, color: "#64748b" }}>Delta reg.</div>
+          <div style={{
+            fontSize: 16, fontWeight: 800,
+            color: deltaReg > 0 ? "#10b981" : deltaReg < 0 ? "#ef4444" : "#94a3b8",
+          }}>
+            {deltaReg > 0 ? "+" : ""}{deltaReg}
+          </div>
+          <div style={{ fontSize: 9, color: "#64748b" }}>Delta conv.</div>
+          <div style={{
+            fontSize: 16, fontWeight: 800,
+            color: deltaConv > 0 ? "#10b981" : deltaConv < 0 ? "#ef4444" : "#94a3b8",
+          }}>
+            {deltaConv > 0 ? "+" : ""}{deltaConv}%
+          </div>
+        </div>
+
+        {/* Brand B stats */}
+        <div style={{ background: "rgba(236,72,153,0.08)", borderRadius: 12, padding: 16, border: "1px solid rgba(236,72,153,0.3)" }}>
+          <div style={{ fontSize: 12, fontWeight: 700, color: "#ec4899", marginBottom: 10 }}>{brandB}</div>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+            <div>
+              <div style={{ fontSize: 9, color: "#64748b" }}>Edizioni</div>
+              <div style={{ fontSize: 18, fontWeight: 800, color: "#f1f5f9" }}>{aggB.editionCount}</div>
+            </div>
+            <div>
+              <div style={{ fontSize: 9, color: "#64748b" }}>Totale reg.</div>
+              <div style={{ fontSize: 18, fontWeight: 800, color: "#f1f5f9" }}>{aggB.totalRegistrations}</div>
+            </div>
+            <div>
+              <div style={{ fontSize: 9, color: "#64748b" }}>Media/ediz.</div>
+              <div style={{ fontSize: 18, fontWeight: 800, color: "#ec4899" }}>{aggB.avgPerEdition}</div>
+            </div>
+            <div>
+              <div style={{ fontSize: 9, color: "#64748b" }}>Conversione</div>
+              <div style={{ fontSize: 18, fontWeight: 800, color: "#10b981" }}>{aggB.avgConversion}%</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Editions table */}
+      <div style={{ marginBottom: 16 }}>
+        <div style={{ fontSize: 11, color: "#94a3b8", marginBottom: 8, textTransform: "uppercase" }}>
+          Tutte le edizioni
+        </div>
+        <div style={{ overflowX: "auto" }}>
+          <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
+            <thead>
+              <tr style={{ borderBottom: "1px solid #334155" }}>
+                <th style={{ textAlign: "left", padding: "6px 8px", color: "#94a3b8", fontWeight: 500 }}>Brand</th>
+                <th style={{ textAlign: "left", padding: "6px 8px", color: "#94a3b8", fontWeight: 500 }}>Edizione</th>
+                <th style={{ textAlign: "center", padding: "6px 8px", color: "#94a3b8", fontWeight: 500 }}>Registrazioni</th>
+                <th style={{ textAlign: "center", padding: "6px 8px", color: "#94a3b8", fontWeight: 500 }}>Presenze</th>
+                <th style={{ textAlign: "center", padding: "6px 8px", color: "#94a3b8", fontWeight: 500 }}>Conv.</th>
+              </tr>
+            </thead>
+            <tbody>
+              {tableData.map((s, i) => (
+                <tr key={i} style={{ borderBottom: "1px solid #1e293b" }}>
+                  <td style={{
+                    padding: "8px", fontWeight: 600,
+                    color: s.isBrandA ? "#8b5cf6" : "#ec4899",
+                  }}>{s.brand}</td>
+                  <td style={{ padding: "8px", color: "#f1f5f9" }}>{s.editionLabel}</td>
+                  <td style={{ padding: "8px", color: "#f1f5f9", textAlign: "center", fontWeight: 600 }}>{s.totalRegistrations}</td>
+                  <td style={{ padding: "8px", color: "#94a3b8", textAlign: "center" }}>{s.totalAttended}</td>
+                  <td style={{ padding: "8px", color: "#10b981", textAlign: "center" }}>{s.conversion}%</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {/* Overlay chart */}
+      {overlayData.length > 0 && (
+        <div>
+          <div style={{ fontSize: 11, color: "#94a3b8", marginBottom: 8, textTransform: "uppercase" }}>
+            Curve cumulative registrazioni (giorni prima dell'evento)
+          </div>
+          <ResponsiveContainer width="100%" height={300}>
+            <AreaChart data={overlayData}>
+              <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
+              <XAxis dataKey="label" tick={{ fill: "#94a3b8", fontSize: 10 }} />
+              <YAxis tick={{ fill: "#94a3b8", fontSize: 10 }} />
+              <Tooltip {...TOOLTIP_STYLE} />
+              {allEditionLabels.map((label, i) => {
+                const stat = allStats.find(s => s.displayLabel === label);
+                const isBrandA = stat?.brand === brandA;
+                return (
+                  <Area
+                    key={label}
+                    type="monotone"
+                    dataKey={label}
+                    stroke={isBrandA ? "#8b5cf6" : "#ec4899"}
+                    fill={isBrandA ? "rgba(139,92,246,0.08)" : "rgba(236,72,153,0.08)"}
+                    strokeWidth={2}
+                    strokeDasharray={i < statsA.length ? "" : "5 5"}
+                    dot={false}
+                    connectNulls
+                  />
+                );
+              })}
+            </AreaChart>
+          </ResponsiveContainer>
+          {/* Legend */}
+          <div style={{ display: "flex", gap: 16, justifyContent: "center", marginTop: 8, fontSize: 11 }}>
+            <span style={{ display: "flex", alignItems: "center", gap: 4 }}>
+              <span style={{ width: 16, height: 3, background: "#8b5cf6", display: "inline-block", borderRadius: 2 }} />
+              <span style={{ color: "#94a3b8" }}>{brandA}</span>
+            </span>
+            <span style={{ display: "flex", alignItems: "center", gap: 4 }}>
+              <span style={{ width: 16, height: 3, background: "#ec4899", display: "inline-block", borderRadius: 2, borderBottom: "1px dashed #ec4899" }} />
+              <span style={{ color: "#94a3b8" }}>{brandB}</span>
+            </span>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// Original single-brand tracker view
+function SingleBrandView({ comparisonData }) {
   const {
     brand, edition, eventDate, currentDaysBefore, currentRegistrations,
     comparisons, avgAtSamePoint, avgProjectedFinal,
@@ -157,4 +334,15 @@ export default function WhereAreWeNow({ comparisonData }) {
       )}
     </div>
   );
+}
+
+// Main component - routes to correct view
+export default function WhereAreWeNow({ comparisonData }) {
+  if (!comparisonData) return null;
+
+  if (comparisonData.isCrossBrand) {
+    return <CrossBrandView comparisonData={comparisonData} />;
+  }
+
+  return <SingleBrandView comparisonData={comparisonData} />;
 }

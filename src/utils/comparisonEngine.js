@@ -138,6 +138,85 @@ export function computeWhereAreWeNow(allData, targetBrand, targetEdition) {
 }
 
 /**
+ * Cross-brand comparison: compare brandA editions vs brandB editions.
+ * Shows all editions of both brands on the same cumulative chart,
+ * with summary stats for each brand.
+ */
+export function computeCrossBrandComparison(allData, brandA, brandB) {
+  const dataA = allData.filter(d => d.brand === brandA);
+  const dataB = allData.filter(d => d.brand === brandB);
+
+  if (!dataA.length || !dataB.length) return null;
+
+  const editionsA = [...new Set(dataA.map(d => d.editionLabel))].filter(Boolean);
+  const editionsB = [...new Set(dataB.map(d => d.editionLabel))].filter(Boolean);
+
+  // Build edition stats for each brand
+  function buildEditionStats(rows, editions, brandName) {
+    return editions.map(ed => {
+      const edRows = rows.filter(r => r.editionLabel === ed);
+      const attended = edRows.filter(r => r.attended).length;
+      const eventDate = edRows[0]?.eventDate;
+      const cumulative = buildCumulativeCurve(edRows);
+      return {
+        brand: brandName,
+        editionLabel: ed,
+        displayLabel: `${brandName} ${ed}`,
+        totalRegistrations: edRows.length,
+        totalAttended: attended,
+        conversion: edRows.length > 0 ? parseFloat(((attended / edRows.length) * 100).toFixed(1)) : 0,
+        eventDate,
+        cumulative,
+      };
+    }).sort((a, b) => (a.eventDate || 0) - (b.eventDate || 0));
+  }
+
+  const statsA = buildEditionStats(dataA, editionsA, brandA);
+  const statsB = buildEditionStats(dataB, editionsB, brandB);
+  const allStats = [...statsA, ...statsB];
+
+  // Brand-level aggregates
+  function brandAgg(rows, editions) {
+    const attended = rows.filter(r => r.attended).length;
+    return {
+      totalRegistrations: rows.length,
+      avgPerEdition: editions.length > 0 ? Math.round(rows.length / editions.length) : 0,
+      totalAttended: attended,
+      avgConversion: rows.length > 0 ? parseFloat(((attended / rows.length) * 100).toFixed(1)) : 0,
+      editionCount: editions.length,
+    };
+  }
+
+  const aggA = brandAgg(dataA, editionsA);
+  const aggB = brandAgg(dataB, editionsB);
+
+  // Build overlay chart: all editions of both brands on same x-axis (days-before)
+  const maxDaysAll = Math.max(
+    ...allStats.map(s => Math.max(...Object.keys(s.cumulative).map(Number), 0)),
+    0
+  );
+
+  const overlayData = [];
+  for (let d = maxDaysAll; d >= 0; d--) {
+    const point = { daysBefore: d, label: d === 0 ? 'Evento' : `-${d}` };
+    for (const s of allStats) {
+      point[s.displayLabel] = s.cumulative[d] || null;
+    }
+    overlayData.push(point);
+  }
+
+  return {
+    brandA, brandB,
+    statsA, statsB,
+    aggA, aggB,
+    overlayData,
+    allEditionLabels: allStats.map(s => s.displayLabel),
+    allStats,
+    isCrossBrand: true,
+  };
+}
+
+/**
  * Compare brands (aggregated across all their editions).
  */
 export function compareBrands(allData, brandNames = null) {
