@@ -48,7 +48,6 @@ const SENIOR_PATTERNS = [
   'mamma mia', 'mammamia', 'io&te', 'io & te',
   'red carpet exclusive party', 'il natale ai gelsi',
   'il capodanno gelsi', 'pompon cartoon carnival',
-  'deco 90', 'decò 90',
 ];
 
 function matchBrand(rawName) {
@@ -61,7 +60,7 @@ function matchBrand(rawName) {
 
   // Check senior
   for (const p of SENIOR_PATTERNS) {
-    if (lower.includes(p)) return { brand: 'DECÒ 90', category: 'senior', genres: ['commerciale'], editionLabel: rawName };
+    if (lower.includes(p)) return { brand: 'SENIOR', category: 'senior', genres: ['commerciale'], editionLabel: rawName };
   }
 
   // Match brands

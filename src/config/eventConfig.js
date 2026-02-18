@@ -161,5 +161,4 @@ export const SENIOR_EVENTS = [
   "il natale ai gelsi",
   "il capodanno gelsi",
   "pompon cartoon carnival",
-  "dec\u00f2 90",
 ];
