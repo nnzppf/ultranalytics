@@ -1,5 +1,5 @@
-import { useState, useMemo } from 'react';
-import { Gift, ChevronLeft, ChevronRight, Phone, Mail, MessageCircle } from 'lucide-react';
+import { useState, useMemo, useCallback } from 'react';
+import { Gift, ChevronLeft, ChevronRight, Phone, Mail, MessageCircle, X, Edit3, Send, ChevronDown } from 'lucide-react';
 import Section from '../shared/Section';
 import { SegmentBadge } from '../shared/Badge';
 
@@ -7,19 +7,282 @@ import { SegmentBadge } from '../shared/Badge';
 function formatWhatsAppUrl(phone, message) {
   if (!phone) return null;
   let num = phone.replace(/[\s\-()./]/g, '');
-  // If starts with +, remove it
   if (num.startsWith('+')) num = num.slice(1);
-  // If starts with 00, remove it
   if (num.startsWith('00')) num = num.slice(2);
-  // If starts with 3 (Italian mobile without prefix), add 39
   if (num.startsWith('3') && num.length === 10) num = '39' + num;
   const encoded = encodeURIComponent(message);
   return `https://wa.me/${num}?text=${encoded}`;
 }
 
-function buildBirthdayMessage(userName) {
+// {nome} placeholder gets replaced with user's first name
+const MESSAGE_TEMPLATES = [
+  {
+    id: 'auguri_promo',
+    label: 'Auguri + Promo 3x2',
+    icon: '🎁',
+    text: `Ciao {nome}! 🎂🥳
+
+Tanti auguri di buon compleanno da parte di tutto lo staff!
+
+Per festeggiare insieme abbiamo una promozione esclusiva per te: prenota un tavolo per il prossimo evento e con l'acquisto di 2 bottiglie, la terza te la offriamo noi! 🍾🍾🍾
+
+Scrivici per prenotare, ti aspettiamo! 🎉`,
+  },
+  {
+    id: 'auguri_semplice',
+    label: 'Auguri semplici',
+    icon: '🎂',
+    text: `Ciao {nome}! 🎂
+
+Tanti auguri di buon compleanno da parte di tutto lo staff! 🥳🎉
+
+Ti aspettiamo presto per festeggiare insieme!`,
+  },
+  {
+    id: 'auguri_tavolo',
+    label: 'Auguri + Tavolo VIP',
+    icon: '🥂',
+    text: `Ciao {nome}! 🎂🥳
+
+Tantissimi auguri di buon compleanno!
+
+Per il tuo giorno speciale ti riserviamo un trattamento VIP: prenota un tavolo per il prossimo evento e riceverai un upgrade gratuito con area riservata! 🥂✨
+
+Scrivici per prenotare il tuo tavolo birthday! 🎉`,
+  },
+  {
+    id: 'auguri_lista',
+    label: 'Auguri + Lista omaggio',
+    icon: '🎟️',
+    text: `Ciao {nome}! 🎂
+
+Tanti auguri di buon compleanno da tutto lo staff! 🥳
+
+Per festeggiare ti offriamo l'ingresso omaggio + un drink di benvenuto al prossimo evento! 🍸🎉
+
+Scrivici il tuo nome per la lista birthday!`,
+  },
+];
+
+function applyTemplate(template, userName) {
   const firstName = userName ? userName.split(' ')[0] : '';
-  return `Ciao ${firstName}! 🎂 Tanti auguri di buon compleanno da parte di tutto lo staff! 🥳🎉 Ti aspettiamo presto per festeggiare insieme!`;
+  return template.replace(/{nome}/g, firstName);
+}
+
+// ---- WhatsApp Message Modal ----
+function WhatsAppModal({ user, onClose }) {
+  const [selectedTemplateId, setSelectedTemplateId] = useState('auguri_promo');
+  const [isEditing, setIsEditing] = useState(false);
+  const [customText, setCustomText] = useState('');
+  const [showTemplateList, setShowTemplateList] = useState(false);
+
+  const selectedTemplate = MESSAGE_TEMPLATES.find(t => t.id === selectedTemplateId);
+  const firstName = user.name ? user.name.split(' ')[0] : '';
+
+  // The message to display/send: custom if editing, otherwise from template
+  const currentMessage = isEditing
+    ? customText
+    : applyTemplate(selectedTemplate?.text || '', user.name);
+
+  const handleSelectTemplate = (tpl) => {
+    setSelectedTemplateId(tpl.id);
+    setIsEditing(false);
+    setCustomText('');
+    setShowTemplateList(false);
+  };
+
+  const handleStartEditing = () => {
+    setCustomText(currentMessage);
+    setIsEditing(true);
+  };
+
+  const handleSend = () => {
+    const url = formatWhatsAppUrl(user.phone, currentMessage);
+    if (url) window.open(url, '_blank');
+  };
+
+  return (
+    <div style={{
+      position: "fixed", inset: 0, background: "rgba(0,0,0,0.7)",
+      display: "flex", alignItems: "center", justifyContent: "center",
+      zIndex: 9999, padding: 20,
+    }} onClick={onClose}>
+      <div
+        onClick={e => e.stopPropagation()}
+        style={{
+          background: "#1e293b", borderRadius: 16, width: "100%", maxWidth: 520,
+          border: "1px solid #334155", overflow: "hidden",
+          boxShadow: "0 20px 60px rgba(0,0,0,0.5)",
+        }}
+      >
+        {/* Header */}
+        <div style={{
+          background: "#25D366", padding: "14px 20px",
+          display: "flex", justifyContent: "space-between", alignItems: "center",
+        }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            <MessageCircle size={20} color="#fff" />
+            <div>
+              <div style={{ fontSize: 14, fontWeight: 700, color: "#fff" }}>
+                WhatsApp a {firstName}
+              </div>
+              <div style={{ fontSize: 11, color: "rgba(255,255,255,0.8)" }}>
+                {user.phone}
+              </div>
+            </div>
+          </div>
+          <button onClick={onClose} style={{
+            background: "rgba(255,255,255,0.2)", border: "none", borderRadius: 8,
+            padding: 6, cursor: "pointer", display: "flex",
+          }}>
+            <X size={16} color="#fff" />
+          </button>
+        </div>
+
+        <div style={{ padding: 20 }}>
+          {/* Template selector */}
+          <div style={{ marginBottom: 16 }}>
+            <div style={{ fontSize: 11, color: "#94a3b8", textTransform: "uppercase", marginBottom: 8, fontWeight: 600 }}>
+              Scegli messaggio
+            </div>
+
+            {/* Current template button (dropdown toggle) */}
+            <button
+              onClick={() => setShowTemplateList(!showTemplateList)}
+              style={{
+                width: "100%", padding: "10px 14px", borderRadius: 10,
+                background: "#0f172a", border: "1px solid #334155",
+                cursor: "pointer", display: "flex", justifyContent: "space-between", alignItems: "center",
+                color: "#f1f5f9", fontSize: 13, fontWeight: 600,
+              }}
+            >
+              <span>{selectedTemplate?.icon} {selectedTemplate?.label}</span>
+              <ChevronDown size={16} color="#64748b" style={{
+                transform: showTemplateList ? "rotate(180deg)" : "none",
+                transition: "transform 0.2s",
+              }} />
+            </button>
+
+            {/* Template list dropdown */}
+            {showTemplateList && (
+              <div style={{
+                marginTop: 4, borderRadius: 10, overflow: "hidden",
+                border: "1px solid #334155", background: "#0f172a",
+              }}>
+                {MESSAGE_TEMPLATES.map(tpl => (
+                  <button
+                    key={tpl.id}
+                    onClick={() => handleSelectTemplate(tpl)}
+                    style={{
+                      width: "100%", padding: "10px 14px",
+                      background: tpl.id === selectedTemplateId ? "rgba(139,92,246,0.15)" : "transparent",
+                      border: "none", borderBottom: "1px solid #1e293b",
+                      cursor: "pointer", display: "flex", alignItems: "center", gap: 10,
+                      color: tpl.id === selectedTemplateId ? "#8b5cf6" : "#f1f5f9",
+                      fontSize: 12, textAlign: "left",
+                    }}
+                    onMouseEnter={e => { if (tpl.id !== selectedTemplateId) e.currentTarget.style.background = "#1e293b"; }}
+                    onMouseLeave={e => { if (tpl.id !== selectedTemplateId) e.currentTarget.style.background = "transparent"; }}
+                  >
+                    <span style={{ fontSize: 18 }}>{tpl.icon}</span>
+                    <div>
+                      <div style={{ fontWeight: 600 }}>{tpl.label}</div>
+                      <div style={{ fontSize: 10, color: "#64748b", marginTop: 2 }}>
+                        {applyTemplate(tpl.text, user.name).substring(0, 60)}...
+                      </div>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Message preview / editor */}
+          <div style={{ marginBottom: 16 }}>
+            <div style={{
+              display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8,
+            }}>
+              <span style={{ fontSize: 11, color: "#94a3b8", textTransform: "uppercase", fontWeight: 600 }}>
+                {isEditing ? "Modifica messaggio" : "Anteprima messaggio"}
+              </span>
+              {!isEditing && (
+                <button
+                  onClick={handleStartEditing}
+                  style={{
+                    background: "none", border: "1px solid #334155", borderRadius: 6,
+                    padding: "3px 10px", cursor: "pointer",
+                    display: "flex", alignItems: "center", gap: 4,
+                    color: "#8b5cf6", fontSize: 10, fontWeight: 600,
+                  }}
+                >
+                  <Edit3 size={10} /> Personalizza
+                </button>
+              )}
+              {isEditing && (
+                <button
+                  onClick={() => { setIsEditing(false); setCustomText(''); }}
+                  style={{
+                    background: "none", border: "1px solid #334155", borderRadius: 6,
+                    padding: "3px 10px", cursor: "pointer",
+                    color: "#94a3b8", fontSize: 10,
+                  }}
+                >
+                  Annulla modifiche
+                </button>
+              )}
+            </div>
+
+            {isEditing ? (
+              <textarea
+                value={customText}
+                onChange={e => setCustomText(e.target.value)}
+                style={{
+                  width: "100%", minHeight: 180, padding: 14, borderRadius: 10,
+                  background: "#0f172a", border: "1px solid #8b5cf6",
+                  color: "#f1f5f9", fontSize: 13, lineHeight: 1.6,
+                  resize: "vertical", outline: "none", fontFamily: "inherit",
+                }}
+                placeholder="Scrivi il tuo messaggio personalizzato..."
+              />
+            ) : (
+              <div style={{
+                background: "#0f172a", borderRadius: 10, padding: 14,
+                border: "1px solid #334155", fontSize: 13, color: "#e2e8f0",
+                lineHeight: 1.6, whiteSpace: "pre-wrap", maxHeight: 220,
+                overflowY: "auto",
+              }}>
+                {currentMessage}
+              </div>
+            )}
+
+            {isEditing && (
+              <div style={{ fontSize: 10, color: "#64748b", marginTop: 6 }}>
+                Il nome "{firstName}" viene inserito automaticamente tramite il template. Se modifichi il testo, assicurati di includere il nome dove vuoi.
+              </div>
+            )}
+          </div>
+
+          {/* Send button */}
+          <button
+            onClick={handleSend}
+            disabled={!user.phone || !currentMessage.trim()}
+            style={{
+              width: "100%", padding: "12px 20px", borderRadius: 10,
+              background: !user.phone || !currentMessage.trim() ? "#334155" : "#25D366",
+              border: "none", cursor: !user.phone || !currentMessage.trim() ? "default" : "pointer",
+              color: "#fff", fontSize: 14, fontWeight: 700,
+              display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
+              transition: "opacity 0.2s",
+            }}
+            onMouseEnter={e => { if (user.phone && currentMessage.trim()) e.currentTarget.style.opacity = "0.9"; }}
+            onMouseLeave={e => { e.currentTarget.style.opacity = "1"; }}
+          >
+            <Send size={16} /> Invia su WhatsApp
+          </button>
+        </div>
+      </div>
+    </div>
+  );
 }
 
 const MESI_NOMI = [
@@ -34,7 +297,8 @@ export default function BirthdaysTab({ data, userStats }) {
   const [viewMonth, setViewMonth] = useState(today.getMonth());
   const [viewYear, setViewYear] = useState(today.getFullYear());
   const [selectedDay, setSelectedDay] = useState(null);
-  const [timeRange, setTimeRange] = useState('week'); // week | month | custom
+  const [timeRange, setTimeRange] = useState('week');
+  const [whatsappUser, setWhatsappUser] = useState(null); // user for modal
 
   // Build birthday lookup: { "MM-DD": [users] }
   const birthdayMap = useMemo(() => {
@@ -53,7 +317,6 @@ export default function BirthdaysTab({ data, userStats }) {
 
       if (!map[bdKey]) map[bdKey] = [];
 
-      // Find user stats if available
       const stats = userStats?.find(u => (u.email && u.email === d.email) || u.name === d.fullName);
 
       map[bdKey].push({
@@ -99,19 +362,16 @@ export default function BirthdaysTab({ data, userStats }) {
     return upcoming;
   }, [birthdayMap, timeRange, today]);
 
-  // Total users with birthdays
   const totalWithBirthday = useMemo(() => {
     return Object.values(birthdayMap).reduce((sum, arr) => sum + arr.length, 0);
   }, [birthdayMap]);
 
-  // Calendar data for the selected month
   const calendarDays = useMemo(() => {
     const firstDay = new Date(viewYear, viewMonth, 1);
     const lastDay = new Date(viewYear, viewMonth + 1, 0);
-    const startPad = firstDay.getDay(); // 0=Sun
+    const startPad = firstDay.getDay();
     const days = [];
 
-    // Padding for start
     for (let i = 0; i < startPad; i++) days.push(null);
 
     for (let d = 1; d <= lastDay.getDate(); d++) {
@@ -136,11 +396,19 @@ export default function BirthdaysTab({ data, userStats }) {
     else setViewMonth(m => m + 1);
   };
 
-  // Users for selected day
   const selectedUsers = selectedDay ? (birthdayMap[selectedDay] || []) : [];
+
+  const openWhatsApp = useCallback((user) => {
+    setWhatsappUser(user);
+  }, []);
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
+      {/* WhatsApp Modal */}
+      {whatsappUser && (
+        <WhatsAppModal user={whatsappUser} onClose={() => setWhatsappUser(null)} />
+      )}
+
       {/* KPI Row */}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 10 }}>
         <div style={{ background: "#1e293b", borderRadius: 12, padding: "14px 16px", border: "1px solid #334155" }}>
@@ -167,7 +435,6 @@ export default function BirthdaysTab({ data, userStats }) {
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
         {/* Calendar */}
         <Section title="Calendario compleanni">
-          {/* Month navigation */}
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
             <button onClick={prevMonth} style={{ background: "none", border: "none", cursor: "pointer", padding: 4 }}>
               <ChevronLeft size={18} color="#94a3b8" />
@@ -180,14 +447,12 @@ export default function BirthdaysTab({ data, userStats }) {
             </button>
           </div>
 
-          {/* Day headers */}
           <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: 2, marginBottom: 4 }}>
             {GIORNI_NOMI.map(g => (
               <div key={g} style={{ textAlign: "center", fontSize: 10, color: "#64748b", padding: 4 }}>{g}</div>
             ))}
           </div>
 
-          {/* Calendar grid */}
           <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: 2 }}>
             {calendarDays.map((cell, i) => {
               if (!cell) return <div key={`pad-${i}`} />;
@@ -268,7 +533,7 @@ export default function BirthdaysTab({ data, userStats }) {
                     </span>
                   </div>
                   {group.users.map((u, ui) => (
-                    <UserBirthdayCard key={ui} user={u} compact />
+                    <UserBirthdayCard key={ui} user={u} compact onWhatsApp={openWhatsApp} />
                   ))}
                 </div>
               ))}
@@ -282,7 +547,7 @@ export default function BirthdaysTab({ data, userStats }) {
         <Section title={`Compleanni il ${selectedDay.split('-').reverse().join('/')}`}>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(300px, 1fr))", gap: 10 }}>
             {selectedUsers.map((u, i) => (
-              <UserBirthdayCard key={i} user={u} />
+              <UserBirthdayCard key={i} user={u} onWhatsApp={openWhatsApp} />
             ))}
           </div>
         </Section>
@@ -291,7 +556,7 @@ export default function BirthdaysTab({ data, userStats }) {
   );
 }
 
-function UserBirthdayCard({ user, compact }) {
+function UserBirthdayCard({ user, compact, onWhatsApp }) {
   if (compact) {
     return (
       <div style={{
@@ -311,18 +576,18 @@ function UserBirthdayCard({ user, compact }) {
         </div>
         <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
           {user.phone && (
-            <a
-              href={formatWhatsAppUrl(user.phone, buildBirthdayMessage(user.name))}
-              target="_blank" rel="noopener noreferrer"
+            <button
+              onClick={() => onWhatsApp(user)}
               style={{
                 background: "#25D366", borderRadius: 6, padding: "3px 8px",
                 display: "flex", alignItems: "center", gap: 4,
-                textDecoration: "none", color: "#fff", fontSize: 10, fontWeight: 600,
+                border: "none", cursor: "pointer",
+                color: "#fff", fontSize: 10, fontWeight: 600,
               }}
-              title="Invia auguri su WhatsApp"
+              title="Scegli messaggio WhatsApp"
             >
               <MessageCircle size={12} /> WhatsApp
-            </a>
+            </button>
           )}
           {user.phone && (
             <a href={`tel:${user.phone}`} style={{ color: "#8b5cf6" }} title={user.phone}>
@@ -370,18 +635,18 @@ function UserBirthdayCard({ user, compact }) {
           </a>
         )}
         {user.phone && (
-          <a
-            href={formatWhatsAppUrl(user.phone, buildBirthdayMessage(user.name))}
-            target="_blank" rel="noopener noreferrer"
+          <button
+            onClick={() => onWhatsApp(user)}
             style={{
               background: "#25D366", borderRadius: 6, padding: "4px 10px",
               display: "flex", alignItems: "center", gap: 4,
-              textDecoration: "none", color: "#fff", fontSize: 11, fontWeight: 600,
+              border: "none", cursor: "pointer",
+              color: "#fff", fontSize: 11, fontWeight: 600,
             }}
-            title="Invia auguri su WhatsApp"
+            title="Scegli messaggio WhatsApp"
           >
             <MessageCircle size={13} /> Auguri WhatsApp
-          </a>
+          </button>
         )}
       </div>
 
