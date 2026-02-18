@@ -183,13 +183,14 @@ export function compareBrands(allData, brandNames = null) {
 /**
  * Compare genres (aggregated).
  */
-export function compareGenres(allData) {
+export function compareGenres(allData, excludeBrand = null) {
   const genreSet = new Set();
   allData.forEach(d => d.genres?.forEach(g => genreSet.add(g)));
   const genres = [...genreSet];
 
   return genres.map(genre => {
-    const rows = allData.filter(d => d.genres?.includes(genre));
+    // Exclude the selected brand from genre stats so comparisons are fair
+    const rows = allData.filter(d => d.genres?.includes(genre) && (!excludeBrand || d.brand !== excludeBrand));
     const brands = [...new Set(rows.map(d => d.brand))];
     const attended = rows.filter(r => r.attended).length;
 

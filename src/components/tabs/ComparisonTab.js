@@ -16,8 +16,11 @@ export default function ComparisonTab({ data, filtered, selectedBrand: topSelect
   // Use all non-senior data for comparisons (so we always have something to compare against)
   const baseData = useMemo(() => data.filter(d => d.category !== 'senior'), [data]);
 
-  // Genre stats: always from full data, highlight the selected brand's genre
-  const genreStats = useMemo(() => compareGenres(baseData), [baseData]);
+  // If a brand is selected in the top bar, highlight it in comparisons
+  const highlightBrand = topSelectedBrand !== 'all' ? topSelectedBrand : null;
+
+  // Genre stats: exclude selected brand so comparisons are fair
+  const genreStats = useMemo(() => compareGenres(baseData, highlightBrand), [baseData, highlightBrand]);
 
   // Brand stats: filter by genre if drilled down, always from full data
   const allBrandStats = useMemo(() => compareBrands(baseData), [baseData]);
@@ -34,9 +37,6 @@ export default function ComparisonTab({ data, filtered, selectedBrand: topSelect
     if (!selectedBrand || !selectedEdition) return null;
     return computeWhereAreWeNow(baseData, selectedBrand, selectedEdition);
   }, [baseData, selectedBrand, selectedEdition]);
-
-  // If a brand is selected in the top bar, highlight it in comparisons
-  const highlightBrand = topSelectedBrand !== 'all' ? topSelectedBrand : null;
 
   // Stats of the highlighted brand (for brand-vs-genre comparison)
   const highlightBrandStats = useMemo(() => {
