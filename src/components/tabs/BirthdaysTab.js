@@ -410,50 +410,50 @@ export default function BirthdaysTab({ data, userStats }) {
       )}
 
       {/* KPI Row */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 10 }}>
-        <div style={{ background: "#1e293b", borderRadius: 12, padding: "14px 16px", border: "1px solid #334155" }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 4 }}>
-            <Gift size={14} color="#ec4899" />
-            <span style={{ fontSize: 11, color: "#94a3b8", textTransform: "uppercase" }}>Utenti con compleanno</span>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 12 }}>
+        <div style={{ background: "#1e293b", borderRadius: 14, padding: "18px 20px", border: "1px solid #334155" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
+            <Gift size={18} color="#ec4899" />
+            <span style={{ fontSize: 12, color: "#94a3b8", textTransform: "uppercase", fontWeight: 500 }}>Utenti con compleanno</span>
           </div>
-          <div style={{ fontSize: 22, fontWeight: 700, color: "#f1f5f9" }}>{totalWithBirthday}</div>
+          <div style={{ fontSize: 28, fontWeight: 700, color: "#f1f5f9" }}>{totalWithBirthday}</div>
         </div>
-        <div style={{ background: "#1e293b", borderRadius: 12, padding: "14px 16px", border: "1px solid #334155" }}>
-          <div style={{ fontSize: 11, color: "#94a3b8", textTransform: "uppercase", marginBottom: 4 }}>Prossimi 7 giorni</div>
-          <div style={{ fontSize: 22, fontWeight: 700, color: "#ec4899" }}>
+        <div style={{ background: "#1e293b", borderRadius: 14, padding: "18px 20px", border: "1px solid #334155" }}>
+          <div style={{ fontSize: 12, color: "#94a3b8", textTransform: "uppercase", marginBottom: 6, fontWeight: 500 }}>Prossimi 7 giorni</div>
+          <div style={{ fontSize: 28, fontWeight: 700, color: "#ec4899" }}>
             {upcomingBirthdays.filter(u => u.daysFromNow < 7).reduce((s, u) => s + u.users.length, 0)}
           </div>
         </div>
-        <div style={{ background: "#1e293b", borderRadius: 12, padding: "14px 16px", border: "1px solid #334155" }}>
-          <div style={{ fontSize: 11, color: "#94a3b8", textTransform: "uppercase", marginBottom: 4 }}>Oggi</div>
-          <div style={{ fontSize: 22, fontWeight: 700, color: "#f59e0b" }}>
+        <div style={{ background: "#1e293b", borderRadius: 14, padding: "18px 20px", border: "1px solid #334155" }}>
+          <div style={{ fontSize: 12, color: "#94a3b8", textTransform: "uppercase", marginBottom: 6, fontWeight: 500 }}>Oggi</div>
+          <div style={{ fontSize: 28, fontWeight: 700, color: "#f59e0b" }}>
             {upcomingBirthdays.filter(u => u.daysFromNow === 0).reduce((s, u) => s + u.users.length, 0)}
           </div>
         </div>
       </div>
 
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 20 }}>
         {/* Calendar */}
         <Section title="Calendario compleanni">
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
-            <button onClick={prevMonth} style={{ background: "none", border: "none", cursor: "pointer", padding: 4 }}>
-              <ChevronLeft size={18} color="#94a3b8" />
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+            <button onClick={prevMonth} style={{ background: "#0f172a", border: "1px solid #334155", borderRadius: 8, cursor: "pointer", padding: "6px 10px", display: "flex" }}>
+              <ChevronLeft size={20} color="#94a3b8" />
             </button>
-            <span style={{ fontSize: 14, fontWeight: 600, color: "#f1f5f9" }}>
+            <span style={{ fontSize: 18, fontWeight: 700, color: "#f1f5f9", letterSpacing: "0.02em" }}>
               {MESI_NOMI[viewMonth]} {viewYear}
             </span>
-            <button onClick={nextMonth} style={{ background: "none", border: "none", cursor: "pointer", padding: 4 }}>
-              <ChevronRight size={18} color="#94a3b8" />
+            <button onClick={nextMonth} style={{ background: "#0f172a", border: "1px solid #334155", borderRadius: 8, cursor: "pointer", padding: "6px 10px", display: "flex" }}>
+              <ChevronRight size={20} color="#94a3b8" />
             </button>
           </div>
 
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: 2, marginBottom: 4 }}>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: 4, marginBottom: 6 }}>
             {GIORNI_NOMI.map(g => (
-              <div key={g} style={{ textAlign: "center", fontSize: 10, color: "#64748b", padding: 4 }}>{g}</div>
+              <div key={g} style={{ textAlign: "center", fontSize: 12, color: "#64748b", padding: "6px 0", fontWeight: 600 }}>{g}</div>
             ))}
           </div>
 
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: 2 }}>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: 4 }}>
             {calendarDays.map((cell, i) => {
               if (!cell) return <div key={`pad-${i}`} />;
               const isSelected = selectedDay === cell.bdKey;
@@ -462,22 +462,23 @@ export default function BirthdaysTab({ data, userStats }) {
                   key={i}
                   onClick={() => cell.count > 0 && setSelectedDay(isSelected ? null : cell.bdKey)}
                   style={{
-                    position: "relative", textAlign: "center", padding: "6px 2px",
-                    borderRadius: 6, cursor: cell.count > 0 ? "pointer" : "default",
+                    position: "relative", textAlign: "center", padding: "10px 4px",
+                    borderRadius: 8, cursor: cell.count > 0 ? "pointer" : "default",
                     background: isSelected ? "#8b5cf6" : cell.isToday ? "#334155" : "transparent",
-                    border: cell.isToday ? "1px solid #8b5cf6" : "1px solid transparent",
+                    border: cell.isToday ? "2px solid #8b5cf6" : "2px solid transparent",
                     transition: "all 0.15s",
+                    minHeight: 48,
                   }}
                   onMouseEnter={e => { if (cell.count > 0 && !isSelected) e.currentTarget.style.background = "#334155"; }}
                   onMouseLeave={e => { if (!isSelected && !cell.isToday) e.currentTarget.style.background = "transparent"; }}
                 >
-                  <div style={{ fontSize: 12, color: isSelected ? "#fff" : cell.isToday ? "#8b5cf6" : "#f1f5f9" }}>
+                  <div style={{ fontSize: 15, fontWeight: 500, color: isSelected ? "#fff" : cell.isToday ? "#8b5cf6" : "#f1f5f9" }}>
                     {cell.day}
                   </div>
                   {cell.count > 0 && (
                     <div style={{
-                      fontSize: 8, fontWeight: 700, color: isSelected ? "#fff" : "#ec4899",
-                      marginTop: 1,
+                      fontSize: 10, fontWeight: 700, color: isSelected ? "#fff" : "#ec4899",
+                      marginTop: 2,
                     }}>
                       {cell.count} 🎂
                     </div>
@@ -492,42 +493,43 @@ export default function BirthdaysTab({ data, userStats }) {
         <Section
           title="Prossimi compleanni"
           extra={
-            <div style={{ display: "flex", gap: 4 }}>
+            <div style={{ display: "flex", gap: 6 }}>
               {[
                 { key: 'week', label: '7 giorni' },
                 { key: 'month', label: '30 giorni' },
               ].map(t => (
                 <button key={t.key} onClick={() => setTimeRange(t.key)} style={{
-                  padding: "3px 10px", borderRadius: 6, fontSize: 10, border: "none", cursor: "pointer",
+                  padding: "5px 14px", borderRadius: 8, fontSize: 11, border: "none", cursor: "pointer",
                   background: timeRange === t.key ? "#8b5cf6" : "#334155",
                   color: timeRange === t.key ? "#fff" : "#94a3b8",
+                  fontWeight: 600,
                 }}>{t.label}</button>
               ))}
             </div>
           }
         >
           {upcomingBirthdays.length === 0 ? (
-            <div style={{ textAlign: "center", color: "#64748b", fontSize: 12, padding: 20 }}>
+            <div style={{ textAlign: "center", color: "#64748b", fontSize: 13, padding: 30 }}>
               Nessun compleanno nei prossimi {timeRange === 'week' ? '7' : '30'} giorni
             </div>
           ) : (
-            <div style={{ display: "flex", flexDirection: "column", gap: 8, maxHeight: 400, overflowY: "auto" }}>
+            <div style={{ display: "flex", flexDirection: "column", gap: 10, maxHeight: 520, overflowY: "auto" }}>
               {upcomingBirthdays.map((group, gi) => (
                 <div key={gi}>
                   <div style={{
                     display: "flex", justifyContent: "space-between", alignItems: "center",
-                    marginBottom: 6,
+                    marginBottom: 8, paddingBottom: 6, borderBottom: "1px solid #334155",
                   }}>
                     <span style={{
-                      fontSize: 11, fontWeight: 600,
-                      color: group.daysFromNow === 0 ? "#f59e0b" : "#94a3b8",
+                      fontSize: 13, fontWeight: 600,
+                      color: group.daysFromNow === 0 ? "#f59e0b" : "#e2e8f0",
                     }}>
                       {group.dateStr}
                     </span>
                     <span style={{
-                      fontSize: 10, padding: "2px 8px", borderRadius: 6,
+                      fontSize: 11, padding: "3px 10px", borderRadius: 8,
                       background: group.daysFromNow === 0 ? "#f59e0b" : group.daysFromNow <= 2 ? "#ef4444" : "#334155",
-                      color: "#fff", fontWeight: 600,
+                      color: "#fff", fontWeight: 700,
                     }}>
                       {group.label}
                     </span>
@@ -561,16 +563,16 @@ function UserBirthdayCard({ user, compact, onWhatsApp }) {
     return (
       <div style={{
         display: "flex", alignItems: "center", justifyContent: "space-between",
-        padding: "8px 10px", background: "#0f172a", borderRadius: 8, marginBottom: 4,
+        padding: "10px 14px", background: "#0f172a", borderRadius: 10, marginBottom: 6,
       }}>
         <div style={{ flex: 1 }}>
-          <div style={{ fontSize: 12, fontWeight: 600, color: "#f1f5f9" }}>
+          <div style={{ fontSize: 13, fontWeight: 600, color: "#f1f5f9" }}>
             🎂 {user.name}
             {user.age > 0 && user.age < 100 && (
               <span style={{ color: "#64748b", fontWeight: 400 }}> — {user.age} anni</span>
             )}
           </div>
-          <div style={{ fontSize: 10, color: "#64748b", marginTop: 2 }}>
+          <div style={{ fontSize: 11, color: "#64748b", marginTop: 3 }}>
             {user.eventCount} eventi · {user.totalParticipated} presenze
           </div>
         </div>
