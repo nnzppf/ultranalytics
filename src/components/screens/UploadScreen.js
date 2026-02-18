@@ -1,6 +1,9 @@
-import { Upload, Plus, X } from 'lucide-react';
+import { Upload, Plus, X, Cloud, Trash2, RefreshCw } from 'lucide-react';
 
-export default function UploadScreen({ files, isDragging, onFilesAdded, onRemoveFile, onUpdateEventName, onAnalyze, onDragState }) {
+export default function UploadScreen({
+  files, isDragging, onFilesAdded, onRemoveFile, onUpdateEventName, onAnalyze, onDragState,
+  cloudStatus, savedDatasets, onReloadCloud, onDeleteDataset
+}) {
 
   const handleDrop = (e) => {
     e.preventDefault();
@@ -13,6 +16,8 @@ export default function UploadScreen({ files, isDragging, onFilesAdded, onRemove
     e.target.value = '';
   };
 
+  const hasSavedData = savedDatasets && savedDatasets.length > 0;
+
   return (
     <div style={{ minHeight: "100vh", background: "#0f172a", display: "flex", flexDirection: "column", alignItems: "center" }}>
       {/* Header */}
@@ -21,7 +26,7 @@ export default function UploadScreen({ files, isDragging, onFilesAdded, onRemove
         background: "linear-gradient(135deg, #7c3aed 0%, #ec4899 100%)",
       }}>
         <div style={{ fontSize: 28, fontWeight: 800, color: "#fff", letterSpacing: "-0.02em" }}>
-          Club Analytics
+          Ultranalytics
         </div>
         <div style={{ color: "rgba(255,255,255,0.7)", fontSize: 13, marginTop: 4 }}>
           Dashboard eventi &amp; registrazioni
@@ -29,6 +34,75 @@ export default function UploadScreen({ files, isDragging, onFilesAdded, onRemove
       </div>
 
       <div style={{ width: "100%", maxWidth: 520, padding: "32px 16px" }}>
+
+        {/* Saved datasets from Firebase */}
+        {hasSavedData && (
+          <div style={{ marginBottom: 24 }}>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                <Cloud size={14} color="#10b981" />
+                <span style={{ fontSize: 13, fontWeight: 600, color: "#f1f5f9" }}>Dati salvati nel cloud</span>
+              </div>
+              <button
+                onClick={onReloadCloud}
+                style={{
+                  background: "#334155", border: "none", borderRadius: 6,
+                  color: "#94a3b8", fontSize: 10, padding: "4px 10px", cursor: "pointer",
+                  display: "flex", alignItems: "center", gap: 4,
+                }}
+              >
+                <RefreshCw size={10} /> Ricarica
+              </button>
+            </div>
+
+            {savedDatasets.map(ds => (
+              <div key={ds.id} style={{
+                background: "#1e293b", borderRadius: 10, padding: "10px 14px",
+                border: "1px solid #334155", display: "flex", alignItems: "center", gap: 10,
+                marginBottom: 6,
+              }}>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontSize: 13, fontWeight: 500, color: "#f1f5f9" }}>{ds.fileName}</div>
+                  <div style={{ fontSize: 10, color: "#64748b", marginTop: 2 }}>
+                    {ds.fileType === 'utenti' ? '👤 Utenti' : '🎫 Biglietti'} — {ds.recordCount} record
+                    {ds.uploadedAt && ` — ${new Date(ds.uploadedAt.seconds * 1000).toLocaleDateString('it')}`}
+                  </div>
+                </div>
+                <button
+                  onClick={() => onDeleteDataset(ds.id)}
+                  style={{ background: "none", border: "none", cursor: "pointer", padding: 4 }}
+                  title="Elimina dataset"
+                >
+                  <Trash2 size={14} color="#ef4444" />
+                </button>
+              </div>
+            ))}
+
+            <button
+              onClick={onReloadCloud}
+              style={{
+                marginTop: 8, padding: "10px 0", borderRadius: 10, width: "100%",
+                background: "#10b981", color: "#fff", fontWeight: 600, fontSize: 13,
+                border: "none", cursor: "pointer",
+              }}
+            >
+              Apri dashboard con dati salvati
+            </button>
+          </div>
+        )}
+
+        {/* Separator */}
+        {hasSavedData && (
+          <div style={{
+            display: "flex", alignItems: "center", gap: 12, marginBottom: 24,
+            color: "#64748b", fontSize: 12,
+          }}>
+            <div style={{ flex: 1, height: 1, background: "#334155" }} />
+            <span>oppure carica nuovi dati</span>
+            <div style={{ flex: 1, height: 1, background: "#334155" }} />
+          </div>
+        )}
+
         {/* Drop zone */}
         <div
           onDragOver={e => { e.preventDefault(); onDragState(true); }}
@@ -95,8 +169,10 @@ export default function UploadScreen({ files, isDragging, onFilesAdded, onRemove
               background: "linear-gradient(135deg, #7c3aed, #ec4899)",
               color: "#fff", fontWeight: 600, fontSize: 14,
               border: "none", cursor: "pointer",
+              display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
             }}>
-              Analizza {files.length} file ({files.reduce((s, f) => s + f.rows.length, 0)} righe)
+              <Cloud size={16} />
+              Analizza e salva nel cloud ({files.length} file, {files.reduce((s, f) => s + f.rows.length, 0)} righe)
             </button>
           </div>
         )}

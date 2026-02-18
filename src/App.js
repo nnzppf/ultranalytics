@@ -1,11 +1,12 @@
-// Club Analytics v3.0 - Multi-level comparison dashboard
+// Club Analytics v3.0 - Multi-level comparison dashboard with Firebase persistence
 import { useState, useMemo, useEffect, useCallback } from "react";
 import Papa from "papaparse";
 import * as XLSX from "xlsx";
-import { Users, Check, TrendingUp, X, Calendar, Gift } from "lucide-react";
+import { Users, Check, TrendingUp, X, Calendar, Gift, Cloud, CloudOff, Loader, Database } from "lucide-react";
 
 import { processRawRows, isUtentiFormat, processUtentiRows } from "./utils/csvProcessor";
 import { getHourlyData, getHourlyDataByGroup, getDowData, getFasciaData, getDaysBeforeData, getTrendData, getTrendDataByGroup, getConversionByFascia, getHeatmapData, getUserStats, getEventStats } from "./utils/dataTransformers";
+import { saveDataset, loadAllData, deleteDataset, hasStoredData } from "./services/firebaseDataService";
 
 import KPI from "./components/shared/KPI";
 import UploadScreen from "./components/screens/UploadScreen";
@@ -22,14 +23,16 @@ function eventNameFromFile(filename) {
 }
 
 export default function ClubAnalytics() {
-  const [step, setStep] = useState("upload");
+  const [step, setStep] = useState("loading"); // loading | upload | dashboard
   const [files, setFiles] = useState([]);
   const [data, setData] = useState([]);
   const [activeTab, setActiveTab] = useState("overview");
   const [isDragging, setIsDragging] = useState(false);
   const [utentiData, setUtentiData] = useState([]);
-  const [selectedCategory, setSelectedCategory] = useState("all"); // all | standard | young
+  const [selectedCategory, setSelectedCategory] = useState("all");
   const [selectedBrand, setSelectedBrand] = useState("all");
+  const [cloudStatus, setCloudStatus] = useState("idle"); // idle | saving | saved | error
+  const [savedDatasets, setSavedDatasets] = useState([]);
   const [graphHeights, setGraphHeights] = useState({
     hourly: 250, dowData: 220, daysBeforeData: 220,
     fasciaData: 250, convByFascia: 220,
@@ -47,6 +50,30 @@ export default function ClubAnalytics() {
     try { localStorage.setItem("clubAnalytics_graphHeights", JSON.stringify(graphHeights)); } catch {}
   }, [graphHeights]);
 
+  // On mount: check Firebase for stored data
+  useEffect(() => {
+    async function checkCloud() {
+      try {
+        const hasData = await hasStoredData();
+        if (hasData) {
+          const { records, utenti, datasets } = await loadAllData();
+          if (records.length > 0 || utenti.length > 0) {
+            setData(records);
+            setUtentiData(utenti);
+            setSavedDatasets(datasets);
+            setCloudStatus("saved");
+            setStep("dashboard");
+            return;
+          }
+        }
+      } catch (e) {
+        console.warn("Firebase load failed, starting fresh:", e);
+      }
+      setStep("upload");
+    }
+    checkCloud();
+  }, []);
+
   // File processing
   const processFile = useCallback(async (file) => {
     const name = file.name.toLowerCase();
@@ -54,7 +81,7 @@ export default function ClubAnalytics() {
       if (name.endsWith('.csv') || name.endsWith('.tsv')) {
         Papa.parse(file, {
           header: true, skipEmptyLines: true,
-          complete: (r) => resolve({ name: file.name, eventName: eventNameFromFile(file.name), rows: r.data }),
+          complete: (r) => resolve({ name: file.name, file, eventName: eventNameFromFile(file.name), rows: r.data }),
           error: reject,
         });
       } else if (name.endsWith('.xlsx') || name.endsWith('.xls')) {
@@ -62,7 +89,7 @@ export default function ClubAnalytics() {
         reader.onload = (e) => {
           const wb = XLSX.read(e.target.result, { type: 'array' });
           const ws = wb.Sheets[wb.SheetNames[0]];
-          resolve({ name: file.name, eventName: eventNameFromFile(file.name), rows: XLSX.utils.sheet_to_json(ws) });
+          resolve({ name: file.name, file, eventName: eventNameFromFile(file.name), rows: XLSX.utils.sheet_to_json(ws) });
         };
         reader.onerror = reject;
         reader.readAsArrayBuffer(file);
@@ -82,22 +109,86 @@ export default function ClubAnalytics() {
   const removeFile = (idx) => setFiles(prev => prev.filter((_, i) => i !== idx));
   const updateEventName = (idx, name) => setFiles(prev => prev.map((f, i) => i === idx ? { ...f, eventName: name } : f));
 
-  const buildData = useCallback(() => {
+  // Build data from files + save to Firebase
+  const buildData = useCallback(async () => {
     const allRecords = [];
     const allUtenti = [];
+    setCloudStatus("saving");
+
     for (const f of files) {
       const keys = f.rows.length > 0 ? Object.keys(f.rows[0]) : [];
-      if (isUtentiFormat(keys)) {
-        allUtenti.push(...processUtentiRows(f.rows));
+      const isUtenti = isUtentiFormat(keys);
+
+      if (isUtenti) {
+        const users = processUtentiRows(f.rows);
+        allUtenti.push(...users);
+
+        // Save to Firebase
+        try {
+          await saveDataset({
+            fileName: f.name,
+            fileBlob: f.file,
+            records: [],
+            utenti: users,
+            fileType: 'utenti',
+          });
+        } catch (e) {
+          console.error("Firebase save failed for", f.name, e);
+        }
       } else {
-        allRecords.push(...processRawRows(f.rows, f.eventName));
+        const records = processRawRows(f.rows, f.eventName);
+        allRecords.push(...records);
+
+        // Save to Firebase
+        try {
+          await saveDataset({
+            fileName: f.name,
+            fileBlob: f.file,
+            records,
+            utenti: [],
+            fileType: 'biglietti',
+          });
+        } catch (e) {
+          console.error("Firebase save failed for", f.name, e);
+        }
       }
     }
-    setData(allRecords);
-    setUtentiData(allUtenti);
+
+    // Merge with existing data (if adding new files to existing datasets)
+    setData(prev => prev.length > 0 ? [...prev, ...allRecords] : allRecords);
+    setUtentiData(prev => prev.length > 0 ? [...prev, ...allUtenti] : allUtenti);
+    setCloudStatus("saved");
     setStep("dashboard");
     setActiveTab("overview");
   }, [files]);
+
+  // Reload from Firebase
+  const reloadFromCloud = useCallback(async () => {
+    setCloudStatus("saving");
+    try {
+      const { records, utenti, datasets } = await loadAllData();
+      setData(records);
+      setUtentiData(utenti);
+      setSavedDatasets(datasets);
+      setCloudStatus("saved");
+      if (records.length > 0 || utenti.length > 0) {
+        setStep("dashboard");
+      }
+    } catch (e) {
+      console.error("Reload failed:", e);
+      setCloudStatus("error");
+    }
+  }, []);
+
+  // Delete a dataset from Firebase
+  const handleDeleteDataset = useCallback(async (datasetId) => {
+    try {
+      await deleteDataset(datasetId);
+      await reloadFromCloud();
+    } catch (e) {
+      console.error("Delete failed:", e);
+    }
+  }, [reloadFromCloud]);
 
   // Filtered data based on category & brand selection
   const filtered = useMemo(() => {
@@ -164,6 +255,20 @@ export default function ClubAnalytics() {
     { key: "compleanni", label: "Compleanni", icon: Gift },
   ];
 
+  // Loading screen
+  if (step === "loading") {
+    return (
+      <div style={{
+        minHeight: "100vh", background: "#0f172a", display: "flex",
+        alignItems: "center", justifyContent: "center", flexDirection: "column", gap: 16,
+      }}>
+        <Loader size={32} color="#8b5cf6" style={{ animation: "spin 1s linear infinite" }} />
+        <div style={{ color: "#94a3b8", fontSize: 14 }}>Caricamento dati dal cloud...</div>
+        <style>{`@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }`}</style>
+      </div>
+    );
+  }
+
   if (step === "upload") {
     return (
       <UploadScreen
@@ -174,11 +279,28 @@ export default function ClubAnalytics() {
         onUpdateEventName={updateEventName}
         onAnalyze={buildData}
         onDragState={setIsDragging}
+        cloudStatus={cloudStatus}
+        savedDatasets={savedDatasets}
+        onReloadCloud={reloadFromCloud}
+        onDeleteDataset={handleDeleteDataset}
       />
     );
   }
 
   if (!analytics) return null;
+
+  // Cloud status indicator
+  const CloudIndicator = () => (
+    <div style={{ display: "flex", alignItems: "center", gap: 6, marginLeft: 8 }}>
+      {cloudStatus === "saving" && <Loader size={12} color="#f59e0b" style={{ animation: "spin 1s linear infinite" }} />}
+      {cloudStatus === "saved" && <Cloud size={12} color="#10b981" />}
+      {cloudStatus === "error" && <CloudOff size={12} color="#ef4444" />}
+      {cloudStatus === "idle" && <CloudOff size={12} color="#64748b" />}
+      <span style={{ fontSize: 9, color: cloudStatus === "saved" ? "#10b981" : cloudStatus === "error" ? "#ef4444" : "#64748b" }}>
+        {cloudStatus === "saving" ? "Salvando..." : cloudStatus === "saved" ? "Cloud sync" : cloudStatus === "error" ? "Errore sync" : "Locale"}
+      </span>
+    </div>
+  );
 
   return (
     <div style={{ minHeight: "100vh", background: "#0f172a", color: "#f1f5f9" }}>
@@ -188,8 +310,9 @@ export default function ClubAnalytics() {
         background: "#1e293b", borderBottom: "1px solid #334155", flexWrap: "wrap",
       }}>
         <div style={{ fontWeight: 800, fontSize: 16, background: "linear-gradient(135deg, #7c3aed, #ec4899)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>
-          Club Analytics
+          Ultranalytics
         </div>
+        <CloudIndicator />
 
         {/* Category filter */}
         <div style={{ display: "flex", gap: 4, marginLeft: 16 }}>
@@ -220,11 +343,13 @@ export default function ClubAnalytics() {
           {availableBrands.map(b => <option key={b} value={b}>{b}</option>)}
         </select>
 
-        <button onClick={() => { setStep("upload"); setData([]); setUtentiData([]); setFiles([]); }} style={{
+        {/* Add more data */}
+        <button onClick={() => { setStep("upload"); setFiles([]); }} style={{
           marginLeft: "auto", background: "#334155", border: "none", borderRadius: 6,
           color: "#94a3b8", fontSize: 11, padding: "5px 12px", cursor: "pointer",
+          display: "flex", alignItems: "center", gap: 4,
         }}>
-          Nuovo file
+          <Database size={11} /> Gestisci dati
         </button>
       </div>
 
