@@ -36,21 +36,24 @@ export default function ComparisonTab({ data, filtered, selectedBrand: topSelect
   const locationStats = useMemo(() => compareLocations(baseData), [baseData]);
   const multiEditionBrands = useMemo(() => getBrandsWithMultipleEditions(baseData), [baseData]);
 
-  // Cross-brand mode: when a brand is selected in top bar AND user picks a different brand in tracker
-  const isCrossBrandMode = highlightBrand && selectedBrand && selectedBrand !== highlightBrand;
+  // Cross-brand mode: user explicitly opted to compare against another brand
+  const [crossBrandTarget, setCrossBrandTarget] = useState(null);
+  const isCrossBrandMode = !!crossBrandTarget;
 
-  // Edition user lists (registered + retarget)
+  // Edition user lists (registered + retarget) — uses effectiveBrand
   const editionUsers = useMemo(() => {
-    if (!selectedBrand || !selectedEdition || isCrossBrandMode) return null;
-    return computeEditionUserLists(baseData, selectedBrand, selectedEdition);
-  }, [baseData, selectedBrand, selectedEdition, isCrossBrandMode]);
+    const brand = selectedBrand || highlightBrand;
+    if (!brand || !selectedEdition || isCrossBrandMode) return null;
+    return computeEditionUserLists(baseData, brand, selectedEdition);
+  }, [baseData, selectedBrand, highlightBrand, selectedEdition, isCrossBrandMode]);
 
   // User stats for segment badges in edition lists
   const userStatsForBrand = useMemo(() => {
-    if (!selectedBrand) return null;
-    const brandData = baseData.filter(d => d.brand === selectedBrand);
+    const brand = selectedBrand || highlightBrand;
+    if (!brand) return null;
+    const brandData = baseData.filter(d => d.brand === brand);
     return getUserStats(brandData);
-  }, [baseData, selectedBrand]);
+  }, [baseData, selectedBrand, highlightBrand]);
 
   // Scrape event links from creazionisrl.it (once, cached)
   const [eventLinks, setEventLinks] = useState([]);
@@ -60,20 +63,22 @@ export default function ComparisonTab({ data, filtered, selectedBrand: topSelect
 
   // Match current event link
   const currentEventLink = useMemo(() => {
-    if (!selectedBrand || !selectedEdition || !eventLinks.length) return 'https://www.creazionisrl.it';
-    return matchEventLink(eventLinks, selectedBrand, selectedEdition);
-  }, [eventLinks, selectedBrand, selectedEdition]);
+    const brand = selectedBrand || highlightBrand;
+    if (!brand || !selectedEdition || !eventLinks.length) return 'https://www.creazionisrl.it';
+    return matchEventLink(eventLinks, brand, selectedEdition);
+  }, [eventLinks, selectedBrand, highlightBrand, selectedEdition]);
 
   const trackerData = useMemo(() => {
-    if (!selectedBrand) return null;
-    // Cross-brand comparison
-    if (highlightBrand && selectedBrand !== highlightBrand) {
-      return computeCrossBrandComparison(baseData, highlightBrand, selectedBrand);
+    const brand = selectedBrand || (view === 'tracker' ? highlightBrand : null);
+    if (!brand) return null;
+    // Cross-brand comparison (explicitly selected)
+    if (crossBrandTarget) {
+      return computeCrossBrandComparison(baseData, brand, crossBrandTarget);
     }
     // Normal single-brand tracker (needs edition selected)
     if (!selectedEdition) return null;
-    return computeWhereAreWeNow(baseData, selectedBrand, selectedEdition);
-  }, [baseData, selectedBrand, selectedEdition, highlightBrand]);
+    return computeWhereAreWeNow(baseData, brand, selectedEdition);
+  }, [baseData, selectedBrand, highlightBrand, view, selectedEdition, crossBrandTarget]);
 
   // Stats of the highlighted brand (for brand-vs-genre comparison)
   const highlightBrandStats = useMemo(() => {
@@ -116,12 +121,32 @@ export default function ComparisonTab({ data, filtered, selectedBrand: topSelect
   const handleSelectBrand = (brand) => {
     setSelectedBrand(brand);
     setSelectedEdition(null);
+    setCrossBrandTarget(null);
     const brandInfo = multiEditionBrands.find(b => b.brand === brand);
     if (brandInfo && brandInfo.editions.length >= 2) {
       setSelectedEdition(brandInfo.editions[brandInfo.editions.length - 1]);
       setView('tracker');
     }
   };
+
+  // Auto-select the highlighted brand in tracker when it has multiple editions
+  const autoSelectedForTracker = useMemo(() => {
+    if (!highlightBrand) return false;
+    return !!multiEditionBrands.find(b => b.brand === highlightBrand);
+  }, [highlightBrand, multiEditionBrands]);
+
+  // The effective brand for the tracker: selectedBrand or auto from top bar
+  const effectiveBrand = selectedBrand || (view === 'tracker' && highlightBrand) || null;
+
+  // Auto-select latest edition when entering tracker with a brand from top bar
+  useEffect(() => {
+    if (view === 'tracker' && highlightBrand && !selectedBrand && !selectedEdition) {
+      const brandInfo = multiEditionBrands.find(b => b.brand === highlightBrand);
+      if (brandInfo && brandInfo.editions.length > 0) {
+        setSelectedEdition(brandInfo.editions[brandInfo.editions.length - 1]);
+      }
+    }
+  }, [view, highlightBrand, selectedBrand, selectedEdition, multiEditionBrands]);
 
   const tabs = [
     { key: 'genre', label: 'Per Genere' },
@@ -151,8 +176,10 @@ export default function ComparisonTab({ data, filtered, selectedBrand: topSelect
         {tabs.map(t => (
           <button key={t.key} onClick={() => {
             setView(t.key);
+            setCrossBrandTarget(null);
             if (t.key === 'genre') { setSelectedGenre(null); setSelectedBrand(null); setSelectedEdition(null); }
             if (t.key === 'brand') { setSelectedBrand(null); setSelectedEdition(null); }
+            if (t.key === 'tracker') { setSelectedBrand(null); setSelectedEdition(null); }
           }} style={{
             padding: "6px 14px", borderRadius: 8, fontSize: 12, border: "none", cursor: "pointer",
             background: view === t.key ? (t.highlight ? "linear-gradient(135deg, #7c3aed, #ec4899)" : "#8b5cf6") : "#1e293b",
@@ -195,75 +222,109 @@ export default function ComparisonTab({ data, filtered, selectedBrand: topSelect
 
       {view === 'tracker' && (
         <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-          {!selectedBrand && (
+          {/* Brand selector: only when no brand is selected (neither from top bar nor manually) */}
+          {!effectiveBrand && (
             <div>
               <div style={{ fontSize: 12, color: "#94a3b8", marginBottom: 8 }}>
-                {highlightBrand
-                  ? `Seleziona un brand da confrontare con ${highlightBrand}:`
-                  : "Seleziona un brand con più edizioni per vedere il Live Tracker:"}
+                Seleziona un brand con più edizioni per vedere il Live Tracker:
               </div>
               <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                {highlightBrand ? (
-                  // Cross-brand mode: show ALL brands except the highlighted one
-                  allBrandStats
-                    .filter(b => b.brand !== highlightBrand)
-                    .map(b => (
-                      <button key={b.brand} onClick={() => { setSelectedBrand(b.brand); setSelectedEdition(null); }} style={{
-                        padding: "8px 16px", borderRadius: 8, fontSize: 12,
-                        border: "1px solid #334155",
-                        cursor: "pointer", background: "#1e293b",
-                        color: "#f1f5f9",
-                      }}>
-                        {b.brand} <span style={{ color: "#64748b" }}>({b.editionCount} ediz.)</span>
-                      </button>
-                    ))
-                ) : (
-                  // Normal mode: only multi-edition brands
-                  multiEditionBrands.map(b => (
-                    <button key={b.brand} onClick={() => handleSelectBrand(b.brand)} style={{
-                      padding: "8px 16px", borderRadius: 8, fontSize: 12,
-                      border: "1px solid #334155",
-                      cursor: "pointer", background: "#1e293b",
-                      color: "#f1f5f9",
-                    }}>
-                      {b.brand} <span style={{ color: "#64748b" }}>({b.editions.length} edizioni)</span>
-                    </button>
-                  ))
-                )}
+                {multiEditionBrands.map(b => (
+                  <button key={b.brand} onClick={() => handleSelectBrand(b.brand)} style={{
+                    padding: "8px 16px", borderRadius: 8, fontSize: 12,
+                    border: "1px solid #334155",
+                    cursor: "pointer", background: "#1e293b",
+                    color: "#f1f5f9",
+                  }}>
+                    {b.brand} <span style={{ color: "#64748b" }}>({b.editions.length} edizioni)</span>
+                  </button>
+                ))}
               </div>
             </div>
           )}
 
-          {/* Edition selector: only in normal (non-cross-brand) mode */}
-          {selectedBrand && !isCrossBrandMode && (
-            <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 8 }}>
-              {(() => {
-                const brandInfo = multiEditionBrands.find(b => b.brand === selectedBrand);
-                if (!brandInfo) return null;
-                return brandInfo.editions.map(ed => (
-                  <button key={ed} onClick={() => setSelectedEdition(ed)} style={{
-                    padding: "5px 12px", borderRadius: 6, fontSize: 11, border: "none", cursor: "pointer",
-                    background: selectedEdition === ed ? "#8b5cf6" : "#334155",
-                    color: selectedEdition === ed ? "#fff" : "#94a3b8",
-                  }}>{ed}</button>
-                ));
-              })()}
+          {/* Edition selector + cross-brand option */}
+          {effectiveBrand && !isCrossBrandMode && (() => {
+            const brandInfo = multiEditionBrands.find(b => b.brand === effectiveBrand);
+            const editions = brandInfo?.editions || [];
+            // Auto-select latest edition if none selected
+            const activeEdition = selectedEdition || (editions.length > 0 ? editions[editions.length - 1] : null);
+            // Sync state if auto-selected
+            if (activeEdition && !selectedEdition) {
+              // Will be set via effect below
+            }
+            return (
+              <div>
+                {editions.length > 0 && (
+                  <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 8, alignItems: "center" }}>
+                    <span style={{ fontSize: 11, color: "#64748b", marginRight: 4 }}>Edizione:</span>
+                    {editions.map(ed => (
+                      <button key={ed} onClick={() => { setSelectedEdition(ed); setCrossBrandTarget(null); }} style={{
+                        padding: "5px 12px", borderRadius: 6, fontSize: 11, border: "none", cursor: "pointer",
+                        background: (selectedEdition || activeEdition) === ed ? "#8b5cf6" : "#334155",
+                        color: (selectedEdition || activeEdition) === ed ? "#fff" : "#94a3b8",
+                      }}>{ed}</button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            );
+          })()}
+
+          {/* Cross-brand comparison section */}
+          {effectiveBrand && isCrossBrandMode && (
+            <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
+              <span style={{ fontSize: 12, color: "#94a3b8" }}>
+                Confronto: <strong style={{ color: "#8b5cf6" }}>{effectiveBrand}</strong> vs <strong style={{ color: "#ec4899" }}>{crossBrandTarget}</strong>
+              </span>
+              <button onClick={() => setCrossBrandTarget(null)} style={{
+                padding: "3px 10px", borderRadius: 6, fontSize: 10, border: "1px solid #334155",
+                background: "transparent", color: "#94a3b8", cursor: "pointer",
+              }}>
+                Torna alle edizioni
+              </button>
             </div>
           )}
 
           {trackerData && <WhereAreWeNow comparisonData={trackerData} />}
 
-          {/* Edition user lists: registered + retarget */}
+          {/* Edition user lists: registered + retarget (single-brand mode only) */}
           {editionUsers && !isCrossBrandMode && (
             <EditionUserLists
               registered={editionUsers.registered}
               retarget={editionUsers.retarget}
-              brand={selectedBrand}
+              brand={effectiveBrand}
               edition={selectedEdition}
               eventDate={editionUsers.eventDate}
               eventLink={currentEventLink}
               userStats={userStatsForBrand}
             />
+          )}
+
+          {/* Cross-brand option: show only in single-brand mode with data loaded */}
+          {effectiveBrand && !isCrossBrandMode && trackerData && (
+            <div style={{
+              background: "#0f172a", borderRadius: 12, padding: 16,
+              border: "1px solid #334155",
+            }}>
+              <div style={{ fontSize: 11, color: "#94a3b8", textTransform: "uppercase", marginBottom: 10, fontWeight: 600 }}>
+                Confronta con altro brand
+              </div>
+              <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                {allBrandStats
+                  .filter(b => b.brand !== effectiveBrand)
+                  .map(b => (
+                    <button key={b.brand} onClick={() => setCrossBrandTarget(b.brand)} style={{
+                      padding: "6px 14px", borderRadius: 8, fontSize: 11,
+                      border: "1px solid #334155",
+                      cursor: "pointer", background: "#1e293b",
+                      color: "#f1f5f9",
+                    }}>
+                      {b.brand} <span style={{ color: "#64748b" }}>({b.editionCount} ediz.)</span>
+                    </button>
+                  ))}
+              </div>
+            </div>
           )}
         </div>
       )}
