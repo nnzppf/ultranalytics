@@ -1,7 +1,26 @@
 import { useState, useMemo } from 'react';
-import { Gift, ChevronLeft, ChevronRight, Phone, Mail } from 'lucide-react';
+import { Gift, ChevronLeft, ChevronRight, Phone, Mail, MessageCircle } from 'lucide-react';
 import Section from '../shared/Section';
 import { SegmentBadge } from '../shared/Badge';
+
+// Format phone for WhatsApp (Italian numbers: add 39 prefix)
+function formatWhatsAppUrl(phone, message) {
+  if (!phone) return null;
+  let num = phone.replace(/[\s\-()./]/g, '');
+  // If starts with +, remove it
+  if (num.startsWith('+')) num = num.slice(1);
+  // If starts with 00, remove it
+  if (num.startsWith('00')) num = num.slice(2);
+  // If starts with 3 (Italian mobile without prefix), add 39
+  if (num.startsWith('3') && num.length === 10) num = '39' + num;
+  const encoded = encodeURIComponent(message);
+  return `https://wa.me/${num}?text=${encoded}`;
+}
+
+function buildBirthdayMessage(userName) {
+  const firstName = userName ? userName.split(' ')[0] : '';
+  return `Ciao ${firstName}! 🎂 Tanti auguri di buon compleanno da parte di tutto lo staff! 🥳🎉 Ti aspettiamo presto per festeggiare insieme!`;
+}
 
 const MESI_NOMI = [
   'Gennaio', 'Febbraio', 'Marzo', 'Aprile', 'Maggio', 'Giugno',
@@ -290,7 +309,21 @@ function UserBirthdayCard({ user, compact }) {
             {user.eventCount} eventi · {user.totalParticipated} presenze
           </div>
         </div>
-        <div style={{ display: "flex", gap: 6 }}>
+        <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+          {user.phone && (
+            <a
+              href={formatWhatsAppUrl(user.phone, buildBirthdayMessage(user.name))}
+              target="_blank" rel="noopener noreferrer"
+              style={{
+                background: "#25D366", borderRadius: 6, padding: "3px 8px",
+                display: "flex", alignItems: "center", gap: 4,
+                textDecoration: "none", color: "#fff", fontSize: 10, fontWeight: 600,
+              }}
+              title="Invia auguri su WhatsApp"
+            >
+              <MessageCircle size={12} /> WhatsApp
+            </a>
+          )}
           {user.phone && (
             <a href={`tel:${user.phone}`} style={{ color: "#8b5cf6" }} title={user.phone}>
               <Phone size={14} />
@@ -325,7 +358,7 @@ function UserBirthdayCard({ user, compact }) {
       </div>
 
       {/* Contact */}
-      <div style={{ display: "flex", gap: 12, marginBottom: 10, fontSize: 11 }}>
+      <div style={{ display: "flex", gap: 12, marginBottom: 10, fontSize: 11, flexWrap: "wrap", alignItems: "center" }}>
         {user.phone && (
           <a href={`tel:${user.phone}`} style={{ color: "#8b5cf6", display: "flex", alignItems: "center", gap: 4, textDecoration: "none" }}>
             <Phone size={12} /> {user.phone}
@@ -334,6 +367,20 @@ function UserBirthdayCard({ user, compact }) {
         {user.email && (
           <a href={`mailto:${user.email}`} style={{ color: "#8b5cf6", display: "flex", alignItems: "center", gap: 4, textDecoration: "none" }}>
             <Mail size={12} /> {user.email}
+          </a>
+        )}
+        {user.phone && (
+          <a
+            href={formatWhatsAppUrl(user.phone, buildBirthdayMessage(user.name))}
+            target="_blank" rel="noopener noreferrer"
+            style={{
+              background: "#25D366", borderRadius: 6, padding: "4px 10px",
+              display: "flex", alignItems: "center", gap: 4,
+              textDecoration: "none", color: "#fff", fontSize: 11, fontWeight: 600,
+            }}
+            title="Invia auguri su WhatsApp"
+          >
+            <MessageCircle size={13} /> Auguri WhatsApp
           </a>
         )}
       </div>
