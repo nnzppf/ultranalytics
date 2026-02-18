@@ -3,7 +3,6 @@ export const BRAND_REGISTRY = {
     category: "standard",
     genres: ["commerciale"],
     matchPatterns: [
-      { edition: "Summer Tour", patterns: ["besame summer tour"] },
       { edition: "01.11.25", patterns: ["01.11.25 besame"] },
       { edition: "03.01.26", patterns: ["sabato 3 gennaio - besame"] },
     ]
@@ -151,6 +150,7 @@ export const CATEGORY_LABELS = {
 export const EXCLUDED_EVENTS = [
   "evento registrazione gratuita",
   "evento test scanner",
+  "besame summer tour",
 ];
 
 export const SENIOR_EVENTS = [

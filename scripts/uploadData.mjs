@@ -43,7 +43,7 @@ const BRAND_REGISTRY = {
   'Euphoria': { category: 'young', genres: ['student'], matchPatterns: ['euphoria'] },
 };
 
-const EXCLUDED_PATTERNS = ['test app', 'evento test', 'evento registrazione gratuita', 'evento test scanner'];
+const EXCLUDED_PATTERNS = ['test app', 'evento test', 'evento registrazione gratuita', 'evento test scanner', 'besame summer tour'];
 const SENIOR_PATTERNS = [
   'mamma mia', 'mammamia', 'io&te', 'io & te',
   'red carpet exclusive party', 'il natale ai gelsi',
