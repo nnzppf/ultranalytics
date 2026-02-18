@@ -5,8 +5,8 @@ import EditionUserLists from '../comparison/EditionUserLists';
 import BrandComparison from '../comparison/BrandComparison';
 import GenreComparison from '../comparison/GenreComparison';
 import LocationComparison from '../comparison/LocationComparison';
+import { Link2 } from 'lucide-react';
 import { compareBrands, compareGenres, compareLocations, computeWhereAreWeNow, computeCrossBrandComparison, getBrandsWithMultipleEditions, computeEditionUserLists } from '../../utils/comparisonEngine';
-import { fetchEventLinks, matchEventLink } from '../../utils/whatsapp';
 import { getUserStats } from '../../utils/dataTransformers';
 import { GENRE_LABELS } from '../../config/eventConfig';
 
@@ -55,18 +55,8 @@ export default function ComparisonTab({ data, filtered, selectedBrand: topSelect
     return getUserStats(brandData);
   }, [baseData, selectedBrand, highlightBrand]);
 
-  // Scrape event links from creazionisrl.it (once, cached)
-  const [eventLinks, setEventLinks] = useState([]);
-  useEffect(() => {
-    fetchEventLinks().then(links => setEventLinks(links));
-  }, []);
-
-  // Match current event link
-  const currentEventLink = useMemo(() => {
-    const brand = selectedBrand || highlightBrand;
-    if (!brand || !selectedEdition || !eventLinks.length) return 'https://www.creazionisrl.it';
-    return matchEventLink(eventLinks, brand, selectedEdition);
-  }, [eventLinks, selectedBrand, highlightBrand, selectedEdition]);
+  // Manual event link input — user pastes the registration URL
+  const [eventLinkInput, setEventLinkInput] = useState('');
 
   const trackerData = useMemo(() => {
     const brand = selectedBrand || (view === 'tracker' ? highlightBrand : null);
@@ -288,17 +278,56 @@ export default function ComparisonTab({ data, filtered, selectedBrand: topSelect
 
           {trackerData && <WhereAreWeNow comparisonData={trackerData} />}
 
-          {/* Edition user lists: registered + retarget (single-brand mode only) */}
+          {/* Event link input + Edition user lists (single-brand mode only) */}
           {editionUsers && !isCrossBrandMode && (
-            <EditionUserLists
-              registered={editionUsers.registered}
-              retarget={editionUsers.retarget}
-              brand={effectiveBrand}
-              edition={selectedEdition}
-              eventDate={editionUsers.eventDate}
-              eventLink={currentEventLink}
-              userStats={userStatsForBrand}
-            />
+            <>
+              {/* Event registration link input */}
+              <div style={{
+                background: "#1e293b", borderRadius: 12, padding: 16,
+                border: "1px solid #334155",
+              }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
+                  <Link2 size={14} color="#8b5cf6" />
+                  <span style={{ fontSize: 11, color: "#94a3b8", textTransform: "uppercase", fontWeight: 600 }}>
+                    Link registrazione evento
+                  </span>
+                </div>
+                <input
+                  type="url"
+                  placeholder="Incolla qui il link dell'evento (es. https://www.creazionisrl.it/toolate/...)"
+                  value={eventLinkInput}
+                  onChange={e => setEventLinkInput(e.target.value)}
+                  style={{
+                    width: "100%", padding: "8px 12px", borderRadius: 8,
+                    background: "#0f172a", border: "1px solid #334155",
+                    color: "#f1f5f9", fontSize: 12, outline: "none",
+                    fontFamily: "inherit",
+                  }}
+                  onFocus={e => { e.currentTarget.style.borderColor = "#8b5cf6"; }}
+                  onBlur={e => { e.currentTarget.style.borderColor = "#334155"; }}
+                />
+                {eventLinkInput && (
+                  <div style={{ fontSize: 10, color: "#10b981", marginTop: 6, display: "flex", alignItems: "center", gap: 4 }}>
+                    ✓ Il link verrà incluso nei messaggi WhatsApp di invito
+                  </div>
+                )}
+                {!eventLinkInput && (
+                  <div style={{ fontSize: 10, color: "#64748b", marginTop: 6 }}>
+                    Incolla il link dal sito per includerlo automaticamente nei messaggi WhatsApp
+                  </div>
+                )}
+              </div>
+
+              <EditionUserLists
+                registered={editionUsers.registered}
+                retarget={editionUsers.retarget}
+                brand={effectiveBrand}
+                edition={selectedEdition}
+                eventDate={editionUsers.eventDate}
+                eventLink={eventLinkInput || 'https://www.creazionisrl.it'}
+                userStats={userStatsForBrand}
+              />
+            </>
           )}
 
           {/* Cross-brand option: show only in single-brand mode with data loaded */}
