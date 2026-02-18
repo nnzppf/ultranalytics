@@ -2,10 +2,10 @@ import { createContext, useContext, useState, useEffect } from 'react';
 import { onAuthStateChanged, signInWithPopup, signOut } from 'firebase/auth';
 import { auth, googleProvider } from '../config/firebase';
 
-// Whitelist of allowed emails (add your email here)
+// Whitelist of allowed emails
 const ALLOWED_EMAILS = [
-  // Leave empty to allow any Google account
-  // Or add specific emails: 'you@gmail.com', 'partner@gmail.com'
+  'filzantrade@gmail.com',
+  'linopegoraro.dir@gmail.com',
 ];
 
 const AuthContext = createContext(null);
