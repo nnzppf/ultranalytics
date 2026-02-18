@@ -1,5 +1,30 @@
 import { useState, useMemo } from 'react';
+import { Phone, Mail, MessageCircle, Calendar } from 'lucide-react';
 import { SegmentBadge } from '../shared/Badge';
+
+// Format phone for WhatsApp (Italian numbers: add 39 prefix)
+function formatWhatsAppUrl(phone) {
+  if (!phone) return null;
+  let num = phone.replace(/[\s\-()./]/g, '');
+  if (num.startsWith('+')) num = num.slice(1);
+  if (num.startsWith('00')) num = num.slice(2);
+  if (num.startsWith('3') && num.length === 10) num = '39' + num;
+  return `https://api.whatsapp.com/send?phone=${num}`;
+}
+
+function formatBirthDate(d) {
+  if (!d || !(d instanceof Date)) return null;
+  return d.toLocaleDateString('it-IT', { day: '2-digit', month: 'long', year: 'numeric' });
+}
+
+function calculateAge(birthDate) {
+  if (!birthDate || !(birthDate instanceof Date)) return null;
+  const today = new Date();
+  let age = today.getFullYear() - birthDate.getFullYear();
+  const m = today.getMonth() - birthDate.getMonth();
+  if (m < 0 || (m === 0 && today.getDate() < birthDate.getDate())) age--;
+  return age;
+}
 
 export default function UsersTab({ userStats }) {
   const [searchTerm, setSearchTerm] = useState('');
@@ -140,6 +165,55 @@ export default function UsersTab({ userStats }) {
                 background: "#334155", border: "none", borderRadius: 8, padding: "6px 12px",
                 color: "#f1f5f9", cursor: "pointer", fontSize: 12,
               }}>Chiudi</button>
+            </div>
+
+            {/* Contact info */}
+            <div style={{ background: "#0f172a", borderRadius: 10, padding: 14, marginBottom: 16 }}>
+              <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                {selectedUser.phone && (
+                  <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                    <Phone size={14} color="#8b5cf6" />
+                    <span style={{ fontSize: 13, color: "#f1f5f9" }}>{selectedUser.phone}</span>
+                  </div>
+                )}
+                {selectedUser.email && (
+                  <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                    <Mail size={14} color="#8b5cf6" />
+                    <span style={{ fontSize: 13, color: "#f1f5f9" }}>{selectedUser.email}</span>
+                  </div>
+                )}
+                {selectedUser.birthDate && (
+                  <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                    <Calendar size={14} color="#8b5cf6" />
+                    <span style={{ fontSize: 13, color: "#f1f5f9" }}>
+                      {formatBirthDate(selectedUser.birthDate)}
+                      {calculateAge(selectedUser.birthDate) != null && (
+                        <span style={{ color: "#94a3b8", marginLeft: 6 }}>({calculateAge(selectedUser.birthDate)} anni)</span>
+                      )}
+                    </span>
+                  </div>
+                )}
+                {!selectedUser.phone && !selectedUser.email && !selectedUser.birthDate && (
+                  <div style={{ fontSize: 12, color: "#64748b", fontStyle: "italic" }}>Nessun dato di contatto disponibile</div>
+                )}
+              </div>
+
+              {/* WhatsApp button */}
+              {selectedUser.phone && (
+                <a
+                  href={formatWhatsAppUrl(selectedUser.phone)}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  style={{
+                    display: "inline-flex", alignItems: "center", gap: 8, marginTop: 12,
+                    background: "#25d366", color: "#fff", borderRadius: 10, padding: "8px 18px",
+                    fontSize: 13, fontWeight: 600, textDecoration: "none", border: "none", cursor: "pointer",
+                  }}
+                >
+                  <MessageCircle size={16} />
+                  Scrivi su WhatsApp
+                </a>
+              )}
             </div>
 
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", gap: 8, marginBottom: 16 }}>

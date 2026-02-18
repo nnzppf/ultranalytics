@@ -273,12 +273,18 @@ export function getUserStats(data) {
         name: d.fullName || d.name,
         email: d.email,
         phone: d.phone,
+        birthDate: d.birthDate || null,
         totalRegs: 0,
         totalParticipated: 0,
         events: {},
         lastReg: null,
       };
     }
+
+    // Keep most complete contact info across records
+    if (d.phone && !byUser[key].phone) byUser[key].phone = d.phone;
+    if (d.email && !byUser[key].email) byUser[key].email = d.email;
+    if (d.birthDate && !byUser[key].birthDate) byUser[key].birthDate = d.birthDate;
 
     byUser[key].totalRegs++;
     if (d.attended) byUser[key].totalParticipated++;
