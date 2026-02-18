@@ -1,9 +1,11 @@
-// Club Analytics v3.0 - Multi-level comparison dashboard with Firebase persistence
+// Ultranalytics v3.1 - Multi-level comparison dashboard with Firebase persistence & auth
 import { useState, useMemo, useEffect, useCallback } from "react";
 import Papa from "papaparse";
 import * as XLSX from "xlsx";
-import { Users, Check, TrendingUp, X, Calendar, Gift, Cloud, CloudOff, Loader, Database } from "lucide-react";
+import { Users, Check, TrendingUp, X, Calendar, Gift, Cloud, CloudOff, Loader, Database, LogOut } from "lucide-react";
 
+import { useAuth } from "./contexts/AuthContext";
+import LoginScreen from "./components/screens/LoginScreen";
 import { processRawRows, isUtentiFormat, processUtentiRows } from "./utils/csvProcessor";
 import { getHourlyData, getHourlyDataByGroup, getDowData, getFasciaData, getDaysBeforeData, getTrendData, getTrendDataByGroup, getConversionByFascia, getHeatmapData, getUserStats, getEventStats } from "./utils/dataTransformers";
 import { saveDataset, loadAllData, deleteDataset, hasStoredData } from "./services/firebaseDataService";
@@ -23,6 +25,30 @@ function eventNameFromFile(filename) {
 }
 
 export default function ClubAnalytics() {
+  const { isAuthenticated, loading: authLoading, user, logout } = useAuth();
+
+  // Show login screen if not authenticated
+  if (authLoading) {
+    return (
+      <div style={{
+        minHeight: "100vh", background: "#0f172a", display: "flex",
+        alignItems: "center", justifyContent: "center", flexDirection: "column", gap: 16,
+      }}>
+        <Loader size={32} color="#8b5cf6" style={{ animation: "spin 1s linear infinite" }} />
+        <div style={{ color: "#94a3b8", fontSize: 14 }}>Verifica autenticazione...</div>
+        <style>{`@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }`}</style>
+      </div>
+    );
+  }
+
+  if (!isAuthenticated) {
+    return <LoginScreen />;
+  }
+
+  return <AuthenticatedApp user={user} logout={logout} />;
+}
+
+function AuthenticatedApp({ user, logout }) {
   const [step, setStep] = useState("loading"); // loading | upload | dashboard
   const [files, setFiles] = useState([]);
   const [data, setData] = useState([]);
@@ -359,14 +385,32 @@ export default function ClubAnalytics() {
           {availableBrands.map(b => <option key={b} value={b}>{b}</option>)}
         </select>
 
-        {/* Add more data */}
-        <button onClick={() => { setStep("upload"); setFiles([]); }} style={{
-          marginLeft: "auto", background: "#334155", border: "none", borderRadius: 6,
-          color: "#94a3b8", fontSize: 11, padding: "5px 12px", cursor: "pointer",
-          display: "flex", alignItems: "center", gap: 4,
-        }}>
-          <Database size={11} /> Gestisci dati
-        </button>
+        {/* Right side: data management + user */}
+        <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 8 }}>
+          <button onClick={() => { setStep("upload"); setFiles([]); }} style={{
+            background: "#334155", border: "none", borderRadius: 6,
+            color: "#94a3b8", fontSize: 11, padding: "5px 12px", cursor: "pointer",
+            display: "flex", alignItems: "center", gap: 4,
+          }}>
+            <Database size={11} /> Gestisci dati
+          </button>
+
+          {/* User avatar + logout */}
+          <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+            {user?.photoURL && (
+              <img src={user.photoURL} alt="" style={{
+                width: 24, height: 24, borderRadius: "50%",
+                border: "1px solid #475569",
+              }} referrerPolicy="no-referrer" />
+            )}
+            <button onClick={logout} title="Esci" style={{
+              background: "none", border: "none", cursor: "pointer", padding: 4,
+              display: "flex", alignItems: "center",
+            }}>
+              <LogOut size={14} color="#64748b" />
+            </button>
+          </div>
+        </div>
       </div>
 
       {/* Edition selector - shown when a brand with multiple editions is selected */}
