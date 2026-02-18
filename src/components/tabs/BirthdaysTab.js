@@ -27,7 +27,9 @@ Tanti auguri di buon compleanno da parte di tutto lo staff!
 
 Per festeggiare insieme abbiamo una promozione esclusiva per te: prenota un tavolo per il prossimo evento e con l'acquisto di 2 bottiglie, la terza te la offriamo noi! 🍾🍾🍾
 
-Scrivici per prenotare, ti aspettiamo! 🎉`,
+Scrivici per prenotare, ti aspettiamo! 🎉
+
+— Studios Club & Co`,
   },
   {
     id: 'auguri_semplice',
@@ -37,7 +39,9 @@ Scrivici per prenotare, ti aspettiamo! 🎉`,
 
 Tanti auguri di buon compleanno da parte di tutto lo staff! 🥳🎉
 
-Ti aspettiamo presto per festeggiare insieme!`,
+Ti aspettiamo presto per festeggiare insieme!
+
+— Studios Club & Co`,
   },
   {
     id: 'auguri_tavolo',
@@ -49,7 +53,9 @@ Tantissimi auguri di buon compleanno!
 
 Per il tuo giorno speciale ti riserviamo un trattamento VIP: prenota un tavolo per il prossimo evento e riceverai un upgrade gratuito con area riservata! 🥂✨
 
-Scrivici per prenotare il tuo tavolo birthday! 🎉`,
+Scrivici per prenotare il tuo tavolo birthday! 🎉
+
+— Studios Club & Co`,
   },
   {
     id: 'auguri_lista',
@@ -61,7 +67,9 @@ Tanti auguri di buon compleanno da tutto lo staff! 🥳
 
 Per festeggiare ti offriamo l'ingresso omaggio + un drink di benvenuto al prossimo evento! 🍸🎉
 
-Scrivici il tuo nome per la lista birthday!`,
+Scrivici il tuo nome per la lista birthday!
+
+— Studios Club & Co`,
   },
 ];
 
