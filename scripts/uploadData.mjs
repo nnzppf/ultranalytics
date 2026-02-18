@@ -41,11 +41,15 @@ const BRAND_REGISTRY = {
   '-100 ALLA MATURITÀ': { category: 'young', genres: ['student'], matchPatterns: ['-100 alla maturit', '100 alla maturit', 'maturita'] },
   'GLOCKY': { category: 'young', genres: ['live', 'student'], matchPatterns: ['glocky'] },
   'Euphoria': { category: 'young', genres: ['student'], matchPatterns: ['euphoria'] },
-  'MAMMAMIA': { category: 'young', genres: ['commerciale'], matchPatterns: ['mammamia'] },
 };
 
-const EXCLUDED_PATTERNS = ['test app', 'evento test'];
-const SENIOR_PATTERNS = ['deco 90', 'decò 90'];
+const EXCLUDED_PATTERNS = ['test app', 'evento test', 'evento registrazione gratuita', 'evento test scanner'];
+const SENIOR_PATTERNS = [
+  'mamma mia', 'mammamia', 'io&te', 'io & te',
+  'red carpet exclusive party', 'il natale ai gelsi',
+  'il capodanno gelsi', 'pompon cartoon carnival',
+  'deco 90', 'decò 90',
+];
 
 function matchBrand(rawName) {
   const lower = rawName.toLowerCase().trim();
