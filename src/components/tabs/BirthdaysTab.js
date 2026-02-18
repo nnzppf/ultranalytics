@@ -2,18 +2,7 @@ import { useState, useMemo, useCallback } from 'react';
 import { Gift, ChevronLeft, ChevronRight, Phone, Mail, MessageCircle, X, Edit3, Send, ChevronDown } from 'lucide-react';
 import Section from '../shared/Section';
 import { SegmentBadge } from '../shared/Badge';
-
-// Format phone for WhatsApp (Italian numbers: add 39 prefix)
-function formatWhatsAppUrl(phone, message) {
-  if (!phone) return null;
-  let num = phone.replace(/[\s\-()./]/g, '');
-  if (num.startsWith('+')) num = num.slice(1);
-  if (num.startsWith('00')) num = num.slice(2);
-  if (num.startsWith('3') && num.length === 10) num = '39' + num;
-  // Use api.whatsapp.com/send for better emoji support across platforms
-  const encoded = encodeURIComponent(message);
-  return `https://api.whatsapp.com/send?phone=${num}&text=${encoded}`;
-}
+import { formatWhatsAppUrl } from '../../utils/whatsapp';
 
 // {nome} placeholder gets replaced with user's first name
 const MESSAGE_TEMPLATES = [

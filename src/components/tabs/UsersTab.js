@@ -1,16 +1,7 @@
 import { useState, useMemo } from 'react';
 import { Phone, Mail, MessageCircle, Calendar } from 'lucide-react';
 import { SegmentBadge } from '../shared/Badge';
-
-// Format phone for WhatsApp (Italian numbers: add 39 prefix)
-function formatWhatsAppUrl(phone) {
-  if (!phone) return null;
-  let num = phone.replace(/[\s\-()./]/g, '');
-  if (num.startsWith('+')) num = num.slice(1);
-  if (num.startsWith('00')) num = num.slice(2);
-  if (num.startsWith('3') && num.length === 10) num = '39' + num;
-  return `https://api.whatsapp.com/send?phone=${num}`;
-}
+import { formatWhatsAppUrl } from '../../utils/whatsapp';
 
 function formatBirthDate(d) {
   if (!d || !(d instanceof Date)) return null;

@@ -325,3 +325,80 @@ export function getBrandsWithMultipleEditions(allData) {
     .filter(([_, eds]) => eds.size >= 2)
     .map(([brand, eds]) => ({ brand, editions: [...eds] }));
 }
+
+/**
+ * Compute registered users and retarget users for a specific brand + edition.
+ * Registered = unique users in the target edition.
+ * Retarget = unique users from past editions of the same brand NOT in the target edition.
+ */
+export function computeEditionUserLists(allData, targetBrand, targetEdition) {
+  const brandData = allData.filter(d => d.brand === targetBrand);
+  const targetRows = brandData.filter(d => d.editionLabel === targetEdition);
+
+  if (!targetRows.length) return { registered: [], retarget: [], eventDate: null };
+
+  const eventDate = targetRows[0].eventDate;
+
+  // --- Registered users (current edition) ---
+  const regMap = {};
+  for (const d of targetRows) {
+    const key = (d.email || d.fullName || d.name || '').toLowerCase().trim();
+    if (!key) continue;
+    if (!regMap[key]) {
+      regMap[key] = {
+        fullName: d.fullName || d.name,
+        email: d.email,
+        phone: d.phone,
+        birthDate: d.birthDate || null,
+        attended: d.attended,
+      };
+    }
+    // Keep most complete contact info
+    if (d.phone && !regMap[key].phone) regMap[key].phone = d.phone;
+    if (d.email && !regMap[key].email) regMap[key].email = d.email;
+    if (d.attended) regMap[key].attended = true;
+  }
+  const registered = Object.values(regMap);
+
+  // --- Retarget users (past editions, not in current) ---
+  const currentKeys = new Set(Object.keys(regMap));
+  const retargetMap = {};
+
+  for (const d of brandData) {
+    if (d.editionLabel === targetEdition) continue;
+    const key = (d.email || d.fullName || d.name || '').toLowerCase().trim();
+    if (!key || currentKeys.has(key)) continue;
+
+    if (!retargetMap[key]) {
+      retargetMap[key] = {
+        fullName: d.fullName || d.name,
+        email: d.email,
+        phone: d.phone,
+        birthDate: d.birthDate || null,
+        pastEditions: new Set(),
+        lastEventDate: null,
+      };
+    }
+    if (d.phone && !retargetMap[key].phone) retargetMap[key].phone = d.phone;
+    if (d.email && !retargetMap[key].email) retargetMap[key].email = d.email;
+    retargetMap[key].pastEditions.add(d.editionLabel);
+    if (d.eventDate && (!retargetMap[key].lastEventDate || d.eventDate > retargetMap[key].lastEventDate)) {
+      retargetMap[key].lastEventDate = d.eventDate;
+    }
+  }
+
+  const retarget = Object.values(retargetMap).map(u => ({
+    ...u,
+    pastEditions: [...u.pastEditions],
+    pastEditionCount: u.pastEditions.size || u.pastEditions.length,
+  }));
+
+  // Sort: users with phone first (actionable), then by most recent event
+  retarget.sort((a, b) => {
+    if (a.phone && !b.phone) return -1;
+    if (!a.phone && b.phone) return 1;
+    return (b.lastEventDate || 0) - (a.lastEventDate || 0);
+  });
+
+  return { registered, retarget, eventDate };
+}

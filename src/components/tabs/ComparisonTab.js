@@ -1,10 +1,13 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { ChevronRight } from 'lucide-react';
 import WhereAreWeNow from '../comparison/WhereAreWeNow';
+import EditionUserLists from '../comparison/EditionUserLists';
 import BrandComparison from '../comparison/BrandComparison';
 import GenreComparison from '../comparison/GenreComparison';
 import LocationComparison from '../comparison/LocationComparison';
-import { compareBrands, compareGenres, compareLocations, computeWhereAreWeNow, computeCrossBrandComparison, getBrandsWithMultipleEditions } from '../../utils/comparisonEngine';
+import { compareBrands, compareGenres, compareLocations, computeWhereAreWeNow, computeCrossBrandComparison, getBrandsWithMultipleEditions, computeEditionUserLists } from '../../utils/comparisonEngine';
+import { fetchEventLinks, matchEventLink } from '../../utils/whatsapp';
+import { getUserStats } from '../../utils/dataTransformers';
 import { GENRE_LABELS } from '../../config/eventConfig';
 
 export default function ComparisonTab({ data, filtered, selectedBrand: topSelectedBrand, selectedCategory }) {
@@ -35,6 +38,31 @@ export default function ComparisonTab({ data, filtered, selectedBrand: topSelect
 
   // Cross-brand mode: when a brand is selected in top bar AND user picks a different brand in tracker
   const isCrossBrandMode = highlightBrand && selectedBrand && selectedBrand !== highlightBrand;
+
+  // Edition user lists (registered + retarget)
+  const editionUsers = useMemo(() => {
+    if (!selectedBrand || !selectedEdition || isCrossBrandMode) return null;
+    return computeEditionUserLists(baseData, selectedBrand, selectedEdition);
+  }, [baseData, selectedBrand, selectedEdition, isCrossBrandMode]);
+
+  // User stats for segment badges in edition lists
+  const userStatsForBrand = useMemo(() => {
+    if (!selectedBrand) return null;
+    const brandData = baseData.filter(d => d.brand === selectedBrand);
+    return getUserStats(brandData);
+  }, [baseData, selectedBrand]);
+
+  // Scrape event links from creazionisrl.it (once, cached)
+  const [eventLinks, setEventLinks] = useState([]);
+  useEffect(() => {
+    fetchEventLinks().then(links => setEventLinks(links));
+  }, []);
+
+  // Match current event link
+  const currentEventLink = useMemo(() => {
+    if (!selectedBrand || !selectedEdition || !eventLinks.length) return 'https://www.creazionisrl.it';
+    return matchEventLink(eventLinks, selectedBrand, selectedEdition);
+  }, [eventLinks, selectedBrand, selectedEdition]);
 
   const trackerData = useMemo(() => {
     if (!selectedBrand) return null;
@@ -224,6 +252,19 @@ export default function ComparisonTab({ data, filtered, selectedBrand: topSelect
           )}
 
           {trackerData && <WhereAreWeNow comparisonData={trackerData} />}
+
+          {/* Edition user lists: registered + retarget */}
+          {editionUsers && !isCrossBrandMode && (
+            <EditionUserLists
+              registered={editionUsers.registered}
+              retarget={editionUsers.retarget}
+              brand={selectedBrand}
+              edition={selectedEdition}
+              eventDate={editionUsers.eventDate}
+              eventLink={currentEventLink}
+              userStats={userStatsForBrand}
+            />
+          )}
         </div>
       )}
     </div>
