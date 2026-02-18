@@ -119,12 +119,6 @@ export default function ComparisonTab({ data, filtered, selectedBrand: topSelect
     }
   };
 
-  // Auto-select the highlighted brand in tracker when it has multiple editions
-  const autoSelectedForTracker = useMemo(() => {
-    if (!highlightBrand) return false;
-    return !!multiEditionBrands.find(b => b.brand === highlightBrand);
-  }, [highlightBrand, multiEditionBrands]);
-
   // The effective brand for the tracker: selectedBrand or auto from top bar
   const effectiveBrand = selectedBrand || (view === 'tracker' && highlightBrand) || null;
 
