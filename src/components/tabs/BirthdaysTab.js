@@ -139,7 +139,7 @@ function WhatsAppModal({ user, onClose }) {
 
   const handleSend = () => {
     const url = formatWhatsAppUrl(user.phone, currentMessage);
-    if (url) window.open(url, '_blank');
+    if (url) window.open(url, 'ultranalytics_whatsapp');
   };
 
   return (
