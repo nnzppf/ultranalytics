@@ -1,5 +1,5 @@
 import { useState, useMemo, useCallback } from 'react';
-import { Gift, ChevronLeft, ChevronRight, Phone, Mail, MessageCircle, X, Edit3, Send, ChevronDown, ChevronUp, Calendar, Save, RotateCcw } from 'lucide-react';
+import { Gift, ChevronLeft, ChevronRight, Phone, Mail, MessageCircle, X, Edit3, Send, ChevronDown, ChevronUp, Calendar, Save, RotateCcw, ChevronsUpDown } from 'lucide-react';
 import Section from '../shared/Section';
 import { SegmentBadge } from '../shared/Badge';
 import { formatWhatsAppUrl, openWhatsAppTab } from '../../utils/whatsapp';
@@ -374,6 +374,7 @@ export default function BirthdaysTab({ data, allData, userStats, selectedCategor
   const [timeRange, setTimeRange] = useState('week');
   const [whatsappUser, setWhatsappUser] = useState(null); // user for modal
   const [browseStartDate, setBrowseStartDate] = useState(null); // null = today
+  const [collapseKey, setCollapseKey] = useState(0); // increment to collapse all expanded cards
 
   // Build a lookup: for each user key -> count of participations in selected genre/category
   const filterRelevanceMap = useMemo(() => {
@@ -679,6 +680,15 @@ export default function BirthdaysTab({ data, allData, userStats, selectedCategor
                   <Calendar size={12} /> Torna a oggi
                 </button>
               )}
+              <button onClick={() => setCollapseKey(k => k + 1)} style={{
+                padding: "5px 12px", borderRadius: 8, fontSize: 11, border: "1px solid #334155", cursor: "pointer",
+                background: "transparent", color: "#94a3b8", fontWeight: 600,
+                display: "flex", alignItems: "center", gap: 4,
+              }}
+                title="Chiudi tutti gli utenti espansi"
+              >
+                <ChevronsUpDown size={12} /> Chiudi tutti
+              </button>
               {[
                 { key: 'week', label: '7 giorni' },
                 { key: 'month', label: '30 giorni' },
@@ -720,7 +730,7 @@ export default function BirthdaysTab({ data, allData, userStats, selectedCategor
                     </span>
                   </div>
                   {group.users.map((u, ui) => (
-                    <UserBirthdayCard key={ui} user={u} compact onWhatsApp={openWhatsApp} relevance={getRelevance(u)} activeFilter={activeFilterLabel} />
+                    <UserBirthdayCard key={`${ui}-${collapseKey}`} user={u} compact onWhatsApp={openWhatsApp} relevance={getRelevance(u)} activeFilter={activeFilterLabel} />
                   ))}
                 </div>
               ))}
@@ -734,7 +744,7 @@ export default function BirthdaysTab({ data, allData, userStats, selectedCategor
         <Section title={`Compleanni il ${selectedDay.split('-').reverse().join('/')}`}>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(300px, 1fr))", gap: 10 }}>
             {selectedUsers.map((u, i) => (
-              <UserBirthdayCard key={i} user={u} onWhatsApp={openWhatsApp} relevance={getRelevance(u)} activeFilter={activeFilterLabel} />
+              <UserBirthdayCard key={`sel-${i}-${collapseKey}`} user={u} onWhatsApp={openWhatsApp} relevance={getRelevance(u)} activeFilter={activeFilterLabel} />
             ))}
           </div>
         </Section>
