@@ -16,9 +16,9 @@ export function formatWhatsAppUrl(phone, message) {
   if (num.startsWith('3') && num.length === 10) num = '39' + num;
   if (message) {
     const encoded = encodeURIComponent(message);
-    return `https://web.whatsapp.com/send?phone=${num}&text=${encoded}`;
+    return `https://api.whatsapp.com/send?phone=${num}&text=${encoded}`;
   }
-  return `https://web.whatsapp.com/send?phone=${num}`;
+  return `https://api.whatsapp.com/send?phone=${num}`;
 }
 
 let waWindow = null;
