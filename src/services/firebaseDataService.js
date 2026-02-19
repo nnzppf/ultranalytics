@@ -6,6 +6,7 @@ import {
 import {
   ref, uploadBytes, getDownloadURL, deleteObject
 } from 'firebase/storage';
+import { BRAND_REGISTRY } from '../config/eventConfig';
 
 // Collection names
 const DATASETS_COL = 'datasets';      // metadata per dataset caricato
@@ -157,9 +158,27 @@ function serializeRecord(r) {
   };
 }
 
+function lookupBrandGenres(brand) {
+  if (!brand) return [];
+  // Direct match first
+  if (BRAND_REGISTRY[brand]) return BRAND_REGISTRY[brand].genres || [];
+  // Case-insensitive match
+  const lower = brand.toLowerCase();
+  for (const [key, config] of Object.entries(BRAND_REGISTRY)) {
+    if (key.toLowerCase() === lower) return config.genres || [];
+  }
+  return [];
+}
+
 function deserializeRecord(r) {
+  // Enrich with genres if missing (for records saved before genres were added)
+  let genres = r.genres;
+  if (!genres || !Array.isArray(genres) || genres.length === 0) {
+    genres = lookupBrandGenres(r.brand);
+  }
   return {
     ...r,
+    genres,
     purchaseDate: r.purchaseDate ? new Date(r.purchaseDate) : null,
     scanDate: r.scanDate ? new Date(r.scanDate) : null,
     eventDate: r.eventDate ? new Date(r.eventDate) : null,

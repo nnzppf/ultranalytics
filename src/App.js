@@ -10,6 +10,7 @@ import { processRawRows, isUtentiFormat, processUtentiRows } from "./utils/csvPr
 import { getHourlyData, getHourlyDataByGroup, getDowData, getFasciaData, getDaysBeforeData, getTrendData, getTrendDataByGroup, getConversionByFascia, getHeatmapData, getUserStats, getEventStats } from "./utils/dataTransformers";
 import { saveDataset, loadAllData, deleteDataset, hasStoredData } from "./services/firebaseDataService";
 
+import { GENRE_LABELS, BRAND_REGISTRY } from "./config/eventConfig";
 import KPI from "./components/shared/KPI";
 import UploadScreen from "./components/screens/UploadScreen";
 import OverviewTab from "./components/tabs/OverviewTab";
@@ -56,6 +57,7 @@ function AuthenticatedApp({ user, logout }) {
   const [isDragging, setIsDragging] = useState(false);
   const [utentiData, setUtentiData] = useState([]);
   const [selectedCategory, setSelectedCategory] = useState("all");
+  const [selectedGenre, setSelectedGenre] = useState("all");
   const [selectedBrand, setSelectedBrand] = useState("all");
   const [selectedEdition, setSelectedEdition] = useState("all");
   const [cloudStatus, setCloudStatus] = useState("idle"); // idle | saving | saved | error
@@ -217,14 +219,29 @@ function AuthenticatedApp({ user, logout }) {
     }
   }, [reloadFromCloud]);
 
-  // Filtered data based on category & brand selection
+  // Helper: get genres for a record (from record or BRAND_REGISTRY fallback)
+  const getRecordGenres = useCallback((r) => {
+    if (r.genres && Array.isArray(r.genres) && r.genres.length > 0) return r.genres;
+    const config = BRAND_REGISTRY[r.brand];
+    if (config?.genres) return config.genres;
+    if (r.brand) {
+      const lower = r.brand.toLowerCase();
+      for (const [key, cfg] of Object.entries(BRAND_REGISTRY)) {
+        if (key.toLowerCase() === lower) return cfg.genres || [];
+      }
+    }
+    return [];
+  }, []);
+
+  // Filtered data based on category, genre & brand selection
   const filtered = useMemo(() => {
     let d = data;
     if (selectedCategory !== "all") d = d.filter(r => r.category === selectedCategory);
+    if (selectedGenre !== "all") d = d.filter(r => getRecordGenres(r).includes(selectedGenre));
     if (selectedBrand !== "all") d = d.filter(r => r.brand === selectedBrand);
     if (selectedEdition !== "all") d = d.filter(r => r.editionLabel === selectedEdition);
     return d;
-  }, [data, selectedCategory, selectedBrand, selectedEdition]);
+  }, [data, selectedCategory, selectedGenre, selectedBrand, selectedEdition, getRecordGenres]);
 
   // Analytics
   const analytics = useMemo(() => {
@@ -271,8 +288,9 @@ function AuthenticatedApp({ user, logout }) {
   const availableBrands = useMemo(() => {
     let d = data.filter(r => r.category !== 'senior');
     if (selectedCategory !== "all") d = d.filter(r => r.category === selectedCategory);
+    if (selectedGenre !== "all") d = d.filter(r => getRecordGenres(r).includes(selectedGenre));
     return [...new Set(d.map(r => r.brand))].filter(Boolean).sort();
-  }, [data, selectedCategory]);
+  }, [data, selectedCategory, selectedGenre, getRecordGenres]);
 
   // Available editions when a brand is selected
   const availableEditions = useMemo(() => {
@@ -357,18 +375,30 @@ function AuthenticatedApp({ user, logout }) {
         <CloudIndicator />
 
         {/* Category filter */}
-        <div style={{ display: "flex", gap: 4, marginLeft: 16 }}>
-          <button onClick={() => { setSelectedCategory("all"); setSelectedBrand("all"); setSelectedEdition("all"); }} style={{
+        <div style={{ display: "flex", gap: 4, marginLeft: 16, alignItems: "center" }}>
+          <button onClick={() => { setSelectedCategory("all"); setSelectedGenre("all"); setSelectedBrand("all"); setSelectedEdition("all"); }} style={{
             padding: "4px 10px", borderRadius: 6, fontSize: 10, border: "none", cursor: "pointer",
-            background: selectedCategory === "all" ? "#8b5cf6" : "#334155",
-            color: selectedCategory === "all" ? "#fff" : "#94a3b8",
+            background: selectedCategory === "all" && selectedGenre === "all" ? "#8b5cf6" : "#334155",
+            color: selectedCategory === "all" && selectedGenre === "all" ? "#fff" : "#94a3b8",
           }}>Tutti</button>
           {categories.map(c => (
-            <button key={c} onClick={() => { setSelectedCategory(c); setSelectedBrand("all"); setSelectedEdition("all"); }} style={{
+            <button key={c} onClick={() => { setSelectedCategory(c); setSelectedGenre("all"); setSelectedBrand("all"); setSelectedEdition("all"); }} style={{
               padding: "4px 10px", borderRadius: 6, fontSize: 10, border: "none", cursor: "pointer",
-              background: selectedCategory === c ? "#8b5cf6" : "#334155",
-              color: selectedCategory === c ? "#fff" : "#94a3b8", textTransform: "capitalize",
+              background: selectedCategory === c && selectedGenre === "all" ? "#8b5cf6" : "#334155",
+              color: selectedCategory === c && selectedGenre === "all" ? "#fff" : "#94a3b8", textTransform: "capitalize",
             }}>{c}</button>
+          ))}
+        </div>
+
+        {/* Genre filter */}
+        <div style={{ display: "flex", gap: 4, alignItems: "center", borderLeft: "1px solid #475569", paddingLeft: 8 }}>
+          {Object.entries(GENRE_LABELS).map(([g, genreInfo]) => (
+            <button key={g} onClick={() => { setSelectedGenre(g); setSelectedCategory("all"); setSelectedBrand("all"); setSelectedEdition("all"); }} style={{
+              padding: "4px 10px", borderRadius: 6, fontSize: 10, border: "none", cursor: "pointer",
+              background: selectedGenre === g ? (genreInfo.color || "#8b5cf6") : "#334155",
+              color: selectedGenre === g ? "#fff" : "#94a3b8",
+              whiteSpace: "nowrap",
+            }}>{genreInfo.label}</button>
           ))}
         </div>
 
@@ -511,7 +541,10 @@ function AuthenticatedApp({ user, logout }) {
         {activeTab === "compleanni" && (
           <BirthdaysTab
             data={utentiData.length > 0 ? utentiData : filtered}
+            allData={data}
             userStats={analytics.userStats}
+            selectedCategory={selectedCategory}
+            selectedGenre={selectedGenre}
           />
         )}
       </div>

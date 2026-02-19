@@ -3,6 +3,7 @@ import { Gift, ChevronLeft, ChevronRight, Phone, Mail, MessageCircle, X, Edit3, 
 import Section from '../shared/Section';
 import { SegmentBadge } from '../shared/Badge';
 import { formatWhatsAppUrl } from '../../utils/whatsapp';
+import { BRAND_REGISTRY, GENRE_LABELS, CATEGORY_LABELS } from '../../config/eventConfig';
 
 // {nome} placeholder gets replaced with user's first name
 const MESSAGE_TEMPLATES = [
@@ -290,13 +291,72 @@ const MESI_NOMI = [
 
 const GIORNI_NOMI = ['Dom', 'Lun', 'Mar', 'Mer', 'Gio', 'Ven', 'Sab'];
 
-export default function BirthdaysTab({ data, userStats }) {
+export default function BirthdaysTab({ data, allData, userStats, selectedCategory, selectedGenre }) {
   const today = useMemo(() => new Date(), []);
   const [viewMonth, setViewMonth] = useState(today.getMonth());
   const [viewYear, setViewYear] = useState(today.getFullYear());
   const [selectedDay, setSelectedDay] = useState(null);
   const [timeRange, setTimeRange] = useState('week');
   const [whatsappUser, setWhatsappUser] = useState(null); // user for modal
+
+  // Build a lookup: for each user key -> count of participations in selected genre/category
+  const filterRelevanceMap = useMemo(() => {
+    if ((!selectedCategory || selectedCategory === 'all') && (!selectedGenre || selectedGenre === 'all')) return null;
+    const relevance = {};
+    const sourceData = allData || data;
+    for (const d of sourceData) {
+      if (!d.attended) continue;
+      const userKey = (d.email || d.fullName || d.name || '').toLowerCase().trim();
+      if (!userKey) continue;
+
+      let matches = true;
+      if (selectedCategory && selectedCategory !== 'all') {
+        if (d.category !== selectedCategory) matches = false;
+      }
+      if (selectedGenre && selectedGenre !== 'all') {
+        // Check genres on the record, or fallback to BRAND_REGISTRY
+        let genres = d.genres;
+        if (!genres || !Array.isArray(genres) || genres.length === 0) {
+          const config = BRAND_REGISTRY[d.brand];
+          genres = config?.genres || [];
+        }
+        if (!genres.includes(selectedGenre)) matches = false;
+      }
+
+      if (matches) {
+        relevance[userKey] = (relevance[userKey] || 0) + 1;
+      }
+    }
+    return relevance;
+  }, [allData, data, selectedCategory, selectedGenre]);
+
+  // Helper to get relevance score for a user
+  const getRelevance = useCallback((user) => {
+    if (!filterRelevanceMap) return 0;
+    const key1 = (user.email || '').toLowerCase().trim();
+    const key2 = (user.name || '').toLowerCase().trim();
+    return (key1 && filterRelevanceMap[key1]) || (key2 && filterRelevanceMap[key2]) || 0;
+  }, [filterRelevanceMap]);
+
+  // Sort users within a list by relevance to selected genre/category
+  const sortByRelevance = useCallback((users) => {
+    if (!filterRelevanceMap) return users;
+    return [...users].sort((a, b) => getRelevance(b) - getRelevance(a));
+  }, [filterRelevanceMap, getRelevance]);
+
+  // Active filter label for display
+  const activeFilterLabel = useMemo(() => {
+    const parts = [];
+    if (selectedCategory && selectedCategory !== 'all') {
+      const cat = CATEGORY_LABELS[selectedCategory];
+      parts.push(cat?.label || selectedCategory);
+    }
+    if (selectedGenre && selectedGenre !== 'all') {
+      const gen = GENRE_LABELS[selectedGenre];
+      parts.push(gen?.label || selectedGenre);
+    }
+    return parts.length > 0 ? parts.join(' · ') : null;
+  }, [selectedCategory, selectedGenre]);
 
   // Build birthday lookup: { "MM-DD": [users] }
   const birthdayMap = useMemo(() => {
@@ -332,8 +392,15 @@ export default function BirthdaysTab({ data, userStats }) {
       });
     }
 
+    // Sort each day's users by relevance if a filter is active
+    if (filterRelevanceMap) {
+      for (const key of Object.keys(map)) {
+        map[key] = sortByRelevance(map[key]);
+      }
+    }
+
     return map;
-  }, [data, userStats, today]);
+  }, [data, userStats, today, filterRelevanceMap, sortByRelevance]);
 
   // Upcoming birthdays
   const upcomingBirthdays = useMemo(() => {
@@ -405,6 +472,20 @@ export default function BirthdaysTab({ data, userStats }) {
       {/* WhatsApp Modal */}
       {whatsappUser && (
         <WhatsAppModal user={whatsappUser} onClose={() => setWhatsappUser(null)} />
+      )}
+
+      {/* Active filter banner */}
+      {activeFilterLabel && (
+        <div style={{
+          background: "rgba(139,92,246,0.1)", border: "1px solid rgba(139,92,246,0.3)",
+          borderRadius: 10, padding: "10px 16px",
+          display: "flex", alignItems: "center", gap: 8,
+          fontSize: 12, color: "#c4b5fd",
+        }}>
+          <span style={{ fontSize: 14 }}>🎯</span>
+          Ordinamento per presenze: <strong style={{ color: "#8b5cf6" }}>{activeFilterLabel}</strong>
+          <span style={{ color: "#64748b", fontSize: 11 }}> — gli utenti con più presenze in questa categoria appaiono per primi</span>
+        </div>
       )}
 
       {/* KPI Row */}
@@ -533,7 +614,7 @@ export default function BirthdaysTab({ data, userStats }) {
                     </span>
                   </div>
                   {group.users.map((u, ui) => (
-                    <UserBirthdayCard key={ui} user={u} compact onWhatsApp={openWhatsApp} />
+                    <UserBirthdayCard key={ui} user={u} compact onWhatsApp={openWhatsApp} relevance={getRelevance(u)} activeFilter={activeFilterLabel} />
                   ))}
                 </div>
               ))}
@@ -547,7 +628,7 @@ export default function BirthdaysTab({ data, userStats }) {
         <Section title={`Compleanni il ${selectedDay.split('-').reverse().join('/')}`}>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(300px, 1fr))", gap: 10 }}>
             {selectedUsers.map((u, i) => (
-              <UserBirthdayCard key={i} user={u} onWhatsApp={openWhatsApp} />
+              <UserBirthdayCard key={i} user={u} onWhatsApp={openWhatsApp} relevance={getRelevance(u)} activeFilter={activeFilterLabel} />
             ))}
           </div>
         </Section>
@@ -556,12 +637,13 @@ export default function BirthdaysTab({ data, userStats }) {
   );
 }
 
-function UserBirthdayCard({ user, compact, onWhatsApp }) {
+function UserBirthdayCard({ user, compact, onWhatsApp, relevance, activeFilter }) {
   if (compact) {
     return (
       <div style={{
         display: "flex", alignItems: "center", justifyContent: "space-between",
         padding: "10px 14px", background: "#0f172a", borderRadius: 10, marginBottom: 6,
+        borderLeft: relevance > 0 ? "3px solid #8b5cf6" : "3px solid transparent",
       }}>
         <div style={{ flex: 1 }}>
           <div style={{ fontSize: 13, fontWeight: 600, color: "#f1f5f9" }}>
@@ -572,6 +654,9 @@ function UserBirthdayCard({ user, compact, onWhatsApp }) {
           </div>
           <div style={{ fontSize: 11, color: "#64748b", marginTop: 3 }}>
             {user.eventCount} eventi · {user.totalParticipated} presenze
+            {relevance > 0 && activeFilter && (
+              <span style={{ color: "#8b5cf6", fontWeight: 600 }}> · {relevance} presenze {activeFilter}</span>
+            )}
           </div>
         </div>
         <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
