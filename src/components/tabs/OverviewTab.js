@@ -1,15 +1,34 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, AreaChart, Area } from 'recharts';
 import { TrendingUp } from 'lucide-react';
 import Section from '../shared/Section';
 import ResizeHandle from '../shared/ResizeHandle';
 import { COLORS, TOOLTIP_STYLE } from '../../config/constants';
+import { getHourlyData, getHourlyDataByGroup } from '../../utils/dataTransformers';
 
-export default function OverviewTab({ analytics, graphHeights, setGraphHeights }) {
+export default function OverviewTab({ analytics, filtered, selectedBrand, graphHeights, setGraphHeights }) {
   const [timeGranularity, setTimeGranularity] = useState('hourly');
   const [stackedView, setStackedView] = useState(false);
 
-  const { hourlyReg, hourlyRegByEvent, hourlyPeak, dowData, daysBeforeData, multiEvent } = analytics;
+  const { dowData, daysBeforeData, multiEvent } = analytics;
+
+  // Recalculate hourly data when granularity changes
+  const groupKey = selectedBrand !== "all" ? 'editionLabel' : 'brand';
+
+  const hourlyReg = useMemo(() => {
+    if (!filtered || !filtered.length) return analytics.hourlyReg;
+    return getHourlyData(filtered, timeGranularity);
+  }, [filtered, timeGranularity, analytics.hourlyReg]);
+
+  const hourlyRegByEvent = useMemo(() => {
+    if (!filtered || !filtered.length) return analytics.hourlyRegByEvent;
+    return getHourlyDataByGroup(filtered, groupKey, timeGranularity);
+  }, [filtered, groupKey, timeGranularity, analytics.hourlyRegByEvent]);
+
+  const hourlyPeak = useMemo(() => {
+    if (!hourlyReg || !hourlyReg.length) return null;
+    return hourlyReg.reduce((max, h) => h.registrazioni > (max?.registrazioni || 0) ? h : max, null);
+  }, [hourlyReg]);
 
   // Show stacked if multiple brands OR single brand with multiple editions (groups in byEvent data)
   const hasStackableData = multiEvent || (hourlyRegByEvent && hourlyRegByEvent.groups && hourlyRegByEvent.groups.length > 1);

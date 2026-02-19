@@ -1,5 +1,5 @@
 import { useState, useMemo, useCallback } from 'react';
-import { Gift, ChevronLeft, ChevronRight, Phone, Mail, MessageCircle, X, Edit3, Send, ChevronDown } from 'lucide-react';
+import { Gift, ChevronLeft, ChevronRight, Phone, Mail, MessageCircle, X, Edit3, Send, ChevronDown, ChevronUp, Calendar } from 'lucide-react';
 import Section from '../shared/Section';
 import { SegmentBadge } from '../shared/Badge';
 import { formatWhatsAppUrl } from '../../utils/whatsapp';
@@ -298,6 +298,7 @@ export default function BirthdaysTab({ data, allData, userStats, selectedCategor
   const [selectedDay, setSelectedDay] = useState(null);
   const [timeRange, setTimeRange] = useState('week');
   const [whatsappUser, setWhatsappUser] = useState(null); // user for modal
+  const [browseStartDate, setBrowseStartDate] = useState(null); // null = today
 
   // Build a lookup: for each user key -> count of participations in selected genre/category
   const filterRelevanceMap = useMemo(() => {
@@ -402,30 +403,41 @@ export default function BirthdaysTab({ data, allData, userStats, selectedCategor
     return map;
   }, [data, userStats, today, filterRelevanceMap, sortByRelevance]);
 
-  // Upcoming birthdays
+  // Upcoming birthdays — start from browseStartDate if set, otherwise today
+  const startDate = browseStartDate || today;
+  const isBrowsing = browseStartDate !== null;
+
   const upcomingBirthdays = useMemo(() => {
     const days = timeRange === 'week' ? 7 : timeRange === 'month' ? 30 : 7;
     const upcoming = [];
 
     for (let i = 0; i < days; i++) {
-      const d = new Date(today);
+      const d = new Date(startDate);
       d.setDate(d.getDate() + i);
       const mm = String(d.getMonth() + 1).padStart(2, '0');
       const dd = String(d.getDate()).padStart(2, '0');
       const bdKey = `${mm}-${dd}`;
       const users = birthdayMap[bdKey];
       if (users && users.length) {
+        // Compute days from today for label
+        const diffMs = d.setHours(0,0,0,0) - new Date(today).setHours(0,0,0,0);
+        const daysFromToday = Math.round(diffMs / 86400000);
+        const label = daysFromToday === 0 ? 'OGGI' : daysFromToday === 1 ? 'Domani'
+          : daysFromToday === -1 ? 'Ieri' : daysFromToday < 0 ? `${Math.abs(daysFromToday)} giorni fa`
+          : `Tra ${daysFromToday} giorni`;
         upcoming.push({
-          date: new Date(d),
-          dateStr: d.toLocaleDateString('it', { weekday: 'short', day: 'numeric', month: 'short' }),
+          date: new Date(startDate.getFullYear(), startDate.getMonth(), startDate.getDate() + i),
+          dateStr: new Date(startDate.getFullYear(), startDate.getMonth(), startDate.getDate() + i)
+            .toLocaleDateString('it', { weekday: 'short', day: 'numeric', month: 'short' }),
           daysFromNow: i,
-          label: i === 0 ? 'OGGI' : i === 1 ? 'Domani' : `Tra ${i} giorni`,
+          daysFromToday,
+          label,
           users,
         });
       }
     }
     return upcoming;
-  }, [birthdayMap, timeRange, today]);
+  }, [birthdayMap, timeRange, startDate, today]);
 
   const totalWithBirthday = useMemo(() => {
     return Object.values(birthdayMap).reduce((sum, arr) => sum + arr.length, 0);
@@ -539,7 +551,14 @@ export default function BirthdaysTab({ data, allData, userStats, selectedCategor
               return (
                 <div
                   key={i}
-                  onClick={() => cell.count > 0 && setSelectedDay(isSelected ? null : cell.bdKey)}
+                  onClick={() => {
+                    if (cell.count > 0) {
+                      const clickedDate = new Date(viewYear, viewMonth, cell.day);
+                      setSelectedDay(isSelected ? null : cell.bdKey);
+                      // Shift "Prossimi compleanni" to start from clicked date
+                      setBrowseStartDate(isSelected ? null : clickedDate);
+                    }
+                  }}
                   style={{
                     position: "relative", textAlign: "center", padding: "10px 4px",
                     borderRadius: 8, cursor: cell.count > 0 ? "pointer" : "default",
@@ -570,9 +589,21 @@ export default function BirthdaysTab({ data, allData, userStats, selectedCategor
 
         {/* Upcoming list */}
         <Section
-          title="Prossimi compleanni"
+          title={isBrowsing
+            ? `Compleanni dal ${startDate.toLocaleDateString('it', { day: 'numeric', month: 'short' })}`
+            : "Prossimi compleanni"
+          }
           extra={
-            <div style={{ display: "flex", gap: 6 }}>
+            <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+              {isBrowsing && (
+                <button onClick={() => { setBrowseStartDate(null); setSelectedDay(null); setViewMonth(today.getMonth()); setViewYear(today.getFullYear()); }} style={{
+                  padding: "5px 12px", borderRadius: 8, fontSize: 11, border: "1px solid #8b5cf6", cursor: "pointer",
+                  background: "rgba(139,92,246,0.15)", color: "#8b5cf6", fontWeight: 600,
+                  display: "flex", alignItems: "center", gap: 4,
+                }}>
+                  <Calendar size={12} /> Torna a oggi
+                </button>
+              )}
               {[
                 { key: 'week', label: '7 giorni' },
                 { key: 'month', label: '30 giorni' },
@@ -589,7 +620,7 @@ export default function BirthdaysTab({ data, allData, userStats, selectedCategor
         >
           {upcomingBirthdays.length === 0 ? (
             <div style={{ textAlign: "center", color: "#64748b", fontSize: 13, padding: 30 }}>
-              Nessun compleanno nei prossimi {timeRange === 'week' ? '7' : '30'} giorni
+              Nessun compleanno {isBrowsing ? 'in questo periodo' : `nei prossimi ${timeRange === 'week' ? '7' : '30'} giorni`}
             </div>
           ) : (
             <div style={{ display: "flex", flexDirection: "column", gap: 10, maxHeight: 520, overflowY: "auto" }}>
@@ -601,13 +632,13 @@ export default function BirthdaysTab({ data, allData, userStats, selectedCategor
                   }}>
                     <span style={{
                       fontSize: 13, fontWeight: 600,
-                      color: group.daysFromNow === 0 ? "#f59e0b" : "#e2e8f0",
+                      color: group.daysFromToday === 0 ? "#f59e0b" : "#e2e8f0",
                     }}>
                       {group.dateStr}
                     </span>
                     <span style={{
                       fontSize: 11, padding: "3px 10px", borderRadius: 8,
-                      background: group.daysFromNow === 0 ? "#f59e0b" : group.daysFromNow <= 2 ? "#ef4444" : "#334155",
+                      background: group.daysFromToday === 0 ? "#f59e0b" : group.daysFromToday > 0 && group.daysFromToday <= 2 ? "#ef4444" : "#334155",
                       color: "#fff", fontWeight: 700,
                     }}>
                       {group.label}
@@ -638,54 +669,131 @@ export default function BirthdaysTab({ data, allData, userStats, selectedCategor
 }
 
 function UserBirthdayCard({ user, compact, onWhatsApp, relevance, activeFilter }) {
+  const [expanded, setExpanded] = useState(false);
+
   if (compact) {
     return (
       <div style={{
-        display: "flex", alignItems: "center", justifyContent: "space-between",
-        padding: "10px 14px", background: "#0f172a", borderRadius: 10, marginBottom: 6,
+        background: "#0f172a", borderRadius: 10, marginBottom: 6,
         borderLeft: relevance > 0 ? "3px solid #8b5cf6" : "3px solid transparent",
+        overflow: "hidden",
       }}>
-        <div style={{ flex: 1 }}>
-          <div style={{ fontSize: 13, fontWeight: 600, color: "#f1f5f9" }}>
-            🎂 {user.name}
-            {user.age > 0 && user.age < 100 && (
-              <span style={{ color: "#64748b", fontWeight: 400 }}> — {user.age} anni</span>
-            )}
+        {/* Compact header — always visible */}
+        <div
+          onClick={() => setExpanded(!expanded)}
+          style={{
+            display: "flex", alignItems: "center", justifyContent: "space-between",
+            padding: "10px 14px", cursor: "pointer",
+            transition: "background 0.15s",
+          }}
+          onMouseEnter={e => { e.currentTarget.style.background = "#1e293b"; }}
+          onMouseLeave={e => { e.currentTarget.style.background = "transparent"; }}
+        >
+          <div style={{ flex: 1 }}>
+            <div style={{ fontSize: 13, fontWeight: 600, color: "#f1f5f9", display: "flex", alignItems: "center", gap: 6 }}>
+              🎂 {user.name}
+              {user.age > 0 && user.age < 100 && (
+                <span style={{ color: "#64748b", fontWeight: 400 }}> — {user.age} anni</span>
+              )}
+              {user.segment && <SegmentBadge segment={user.segment} />}
+            </div>
+            <div style={{ fontSize: 11, color: "#64748b", marginTop: 3 }}>
+              {user.eventCount} eventi · {user.totalParticipated} presenze
+              {relevance > 0 && activeFilter && (
+                <span style={{ color: "#8b5cf6", fontWeight: 600 }}> · {relevance} presenze {activeFilter}</span>
+              )}
+            </div>
           </div>
-          <div style={{ fontSize: 11, color: "#64748b", marginTop: 3 }}>
-            {user.eventCount} eventi · {user.totalParticipated} presenze
-            {relevance > 0 && activeFilter && (
-              <span style={{ color: "#8b5cf6", fontWeight: 600 }}> · {relevance} presenze {activeFilter}</span>
+          <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+            {user.phone && (
+              <button
+                onClick={(e) => { e.stopPropagation(); onWhatsApp(user); }}
+                style={{
+                  background: "#25D366", borderRadius: 6, padding: "3px 8px",
+                  display: "flex", alignItems: "center", gap: 4,
+                  border: "none", cursor: "pointer",
+                  color: "#fff", fontSize: 10, fontWeight: 600,
+                }}
+                title="Scegli messaggio WhatsApp"
+              >
+                <MessageCircle size={12} /> WhatsApp
+              </button>
             )}
+            {user.phone && (
+              <a href={`tel:${user.phone}`} style={{ color: "#8b5cf6" }} title={user.phone} onClick={e => e.stopPropagation()}>
+                <Phone size={14} />
+              </a>
+            )}
+            {user.email && (
+              <a href={`mailto:${user.email}`} style={{ color: "#8b5cf6" }} title={user.email} onClick={e => e.stopPropagation()}>
+                <Mail size={14} />
+              </a>
+            )}
+            {expanded ? <ChevronUp size={14} color="#64748b" /> : <ChevronDown size={14} color="#64748b" />}
           </div>
         </div>
-        <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
-          {user.phone && (
-            <button
-              onClick={() => onWhatsApp(user)}
-              style={{
-                background: "#25D366", borderRadius: 6, padding: "3px 8px",
-                display: "flex", alignItems: "center", gap: 4,
-                border: "none", cursor: "pointer",
-                color: "#fff", fontSize: 10, fontWeight: 600,
-              }}
-              title="Scegli messaggio WhatsApp"
-            >
-              <MessageCircle size={12} /> WhatsApp
-            </button>
-          )}
-          {user.phone && (
-            <a href={`tel:${user.phone}`} style={{ color: "#8b5cf6" }} title={user.phone}>
-              <Phone size={14} />
-            </a>
-          )}
-          {user.email && (
-            <a href={`mailto:${user.email}`} style={{ color: "#8b5cf6" }} title={user.email}>
-              <Mail size={14} />
-            </a>
-          )}
-        </div>
-        {user.segment && <SegmentBadge segment={user.segment} />}
+
+        {/* Expanded details */}
+        {expanded && (
+          <div style={{ padding: "0 14px 14px", borderTop: "1px solid #1e293b" }}>
+            {/* Contact info */}
+            <div style={{ display: "flex", gap: 12, padding: "10px 0", fontSize: 11, flexWrap: "wrap", alignItems: "center" }}>
+              {user.phone && (
+                <span style={{ color: "#94a3b8", display: "flex", alignItems: "center", gap: 4 }}>
+                  <Phone size={11} color="#8b5cf6" /> {user.phone}
+                </span>
+              )}
+              {user.email && (
+                <span style={{ color: "#94a3b8", display: "flex", alignItems: "center", gap: 4 }}>
+                  <Mail size={11} color="#8b5cf6" /> {user.email}
+                </span>
+              )}
+              {user.birthDate && (
+                <span style={{ color: "#94a3b8", display: "flex", alignItems: "center", gap: 4 }}>
+                  <Calendar size={11} color="#8b5cf6" /> {user.birthDate.toLocaleDateString('it', { day: 'numeric', month: 'long', year: 'numeric' })}
+                </span>
+              )}
+            </div>
+
+            {/* Stats grid */}
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 6, marginBottom: 10 }}>
+              <div style={{ background: "#1e293b", borderRadius: 6, padding: 8, textAlign: "center" }}>
+                <div style={{ fontSize: 9, color: "#64748b" }}>Registrazioni</div>
+                <div style={{ fontSize: 14, fontWeight: 700, color: "#f1f5f9" }}>{user.totalRegs}</div>
+              </div>
+              <div style={{ background: "#1e293b", borderRadius: 6, padding: 8, textAlign: "center" }}>
+                <div style={{ fontSize: 9, color: "#64748b" }}>Presenze</div>
+                <div style={{ fontSize: 14, fontWeight: 700, color: "#10b981" }}>{user.totalParticipated}</div>
+              </div>
+              <div style={{ background: "#1e293b", borderRadius: 6, padding: 8, textAlign: "center" }}>
+                <div style={{ fontSize: 9, color: "#64748b" }}>Eventi</div>
+                <div style={{ fontSize: 14, fontWeight: 700, color: "#8b5cf6" }}>{user.eventCount}</div>
+              </div>
+            </div>
+
+            {/* Events attended */}
+            {user.events && user.events.length > 0 && (
+              <div>
+                <div style={{ fontSize: 9, color: "#64748b", textTransform: "uppercase", marginBottom: 6, fontWeight: 600 }}>
+                  Eventi frequentati
+                </div>
+                <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+                  {user.events.map((ev, i) => (
+                    <div key={i} style={{
+                      display: "flex", justifyContent: "space-between", alignItems: "center",
+                      padding: "5px 8px", borderRadius: 6, background: "#1e293b", fontSize: 11,
+                    }}>
+                      <span style={{ color: "#f1f5f9" }}>{ev.event}</span>
+                      <span style={{ color: "#94a3b8", fontSize: 10 }}>
+                        {ev.count} reg. / {ev.participated} pres.
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
       </div>
     );
   }

@@ -20,6 +20,7 @@ import TrendsTab from "./components/tabs/TrendsTab";
 import UsersTab from "./components/tabs/UsersTab";
 import ComparisonTab from "./components/tabs/ComparisonTab";
 import BirthdaysTab from "./components/tabs/BirthdaysTab";
+import AiChat from "./components/AiChat";
 
 function eventNameFromFile(filename) {
   return filename.replace(/\.(csv|xlsx|xls|tsv)$/i, "").replace(/registrazioni[_\s]*/i, "").replace(/_/g, " ").trim();
@@ -504,6 +505,8 @@ function AuthenticatedApp({ user, logout }) {
         {activeTab === "overview" && (
           <OverviewTab
             analytics={analytics}
+            filtered={filtered}
+            selectedBrand={selectedBrand}
             graphHeights={graphHeights}
             setGraphHeights={setGraphHeights}
           />
@@ -548,6 +551,9 @@ function AuthenticatedApp({ user, logout }) {
           />
         )}
       </div>
+
+      {/* AI Assistant */}
+      <AiChat data={data} analytics={analytics} userStats={analytics?.userStats} />
     </div>
   );
 }
