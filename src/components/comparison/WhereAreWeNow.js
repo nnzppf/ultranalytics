@@ -32,7 +32,7 @@ function CrossBrandView({ comparisonData }) {
       </div>
 
       {/* KPI comparison */}
-      <div style={{ display: "grid", gridTemplateColumns: "1fr auto 1fr", gap: 12, marginBottom: 20 }}>
+      <div className="grid-2-col" style={{ display: "grid", gridTemplateColumns: "1fr auto 1fr", gap: 12, marginBottom: 20 }}>
         {/* Brand A stats */}
         <div style={{ background: "rgba(139,92,246,0.08)", borderRadius: 12, padding: 16, border: "1px solid rgba(139,92,246,0.3)" }}>
           <div style={{ fontSize: 12, fontWeight: 700, color: "#8b5cf6", marginBottom: 10 }}>{brandA}</div>

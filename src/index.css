@@ -11,3 +11,164 @@ code {
   font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New',
     monospace;
 }
+
+/* ===== RESPONSIVE MOBILE STYLES ===== */
+
+/* Tablet & below (< 900px) */
+@media (max-width: 900px) {
+  /* Main 2-column grids → stack vertically */
+  .grid-2-col {
+    grid-template-columns: 1fr !important;
+  }
+
+  /* Reduce main padding */
+  .app-content {
+    padding-left: 12px !important;
+    padding-right: 12px !important;
+  }
+
+  /* Top bar: let items wrap tighter */
+  .top-bar {
+    padding: 8px 12px !important;
+    gap: 8px !important;
+  }
+
+  /* KPI grid: smaller min-width */
+  .kpi-grid {
+    grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)) !important;
+    padding: 12px !important;
+    gap: 8px !important;
+  }
+
+  /* Section padding */
+  .section-box {
+    padding: 14px !important;
+    border-radius: 10px !important;
+  }
+
+  /* Tab bar */
+  .tab-bar {
+    padding: 0 12px 10px !important;
+  }
+
+  /* Birthday KPI row */
+  .bday-kpi-grid {
+    grid-template-columns: repeat(3, 1fr) !important;
+  }
+
+  /* Birthday upcoming list: taller scroll */
+  .bday-upcoming-list {
+    max-height: none !important;
+  }
+
+  /* Edition selector */
+  .edition-bar {
+    padding: 8px 12px !important;
+  }
+}
+
+/* Phone (< 600px) */
+@media (max-width: 600px) {
+  /* Top bar: stack filters below logo */
+  .top-bar {
+    padding: 8px 10px !important;
+    gap: 6px !important;
+  }
+
+  /* Hide filter separator */
+  .filter-separator {
+    border-left: none !important;
+    padding-left: 0 !important;
+  }
+
+  /* Filters: horizontal scroll */
+  .filter-row {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    flex-wrap: nowrap !important;
+    scrollbar-width: none;
+  }
+  .filter-row::-webkit-scrollbar {
+    display: none;
+  }
+
+  /* App padding minimal */
+  .app-content {
+    padding-left: 8px !important;
+    padding-right: 8px !important;
+    padding-bottom: 20px !important;
+  }
+
+  /* KPI grid: 2 columns on phone */
+  .kpi-grid {
+    grid-template-columns: repeat(2, 1fr) !important;
+    padding: 8px !important;
+  }
+
+  /* Birthday KPI: stack to 1 col on very small */
+  .bday-kpi-grid {
+    grid-template-columns: 1fr 1fr 1fr !important;
+    gap: 8px !important;
+  }
+
+  /* Section box less padding */
+  .section-box {
+    padding: 10px !important;
+    border-radius: 8px !important;
+  }
+
+  /* Section header: stack title and extra controls */
+  .section-header {
+    flex-direction: column !important;
+    align-items: flex-start !important;
+    gap: 8px !important;
+  }
+
+  /* Birthday cards: user stats 3-col stays but smaller */
+  .user-stats-grid {
+    gap: 4px !important;
+  }
+
+  /* Calendar cells smaller */
+  .calendar-grid {
+    gap: 2px !important;
+  }
+
+  /* Selected day cards: single column */
+  .selected-day-grid {
+    grid-template-columns: 1fr !important;
+  }
+
+  /* Tab buttons: slightly smaller */
+  .tab-bar button {
+    padding: 6px 12px !important;
+    font-size: 11px !important;
+  }
+
+  /* WhatsApp modal: full width */
+  .wa-modal-content {
+    max-width: 100% !important;
+    border-radius: 12px !important;
+    margin: 10px !important;
+  }
+
+  /* Prossimi compleanni extra buttons: wrap */
+  .bday-extra-controls {
+    flex-wrap: wrap !important;
+  }
+}
+
+/* Very small phones (< 400px) */
+@media (max-width: 400px) {
+  .kpi-grid {
+    grid-template-columns: 1fr 1fr !important;
+  }
+
+  .bday-kpi-grid {
+    grid-template-columns: 1fr !important;
+  }
+
+  .top-bar {
+    padding: 6px 8px !important;
+  }
+}

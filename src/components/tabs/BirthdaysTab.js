@@ -149,6 +149,7 @@ function WhatsAppModal({ user, onClose }) {
       zIndex: 9999, padding: 20,
     }} onClick={onClose}>
       <div
+        className="wa-modal-content"
         onClick={e => e.stopPropagation()}
         style={{
           background: "#1e293b", borderRadius: 16, width: "100%", maxWidth: 520,
@@ -577,7 +578,7 @@ export default function BirthdaysTab({ data, allData, userStats, selectedCategor
       )}
 
       {/* KPI Row */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 12 }}>
+      <div className="bday-kpi-grid" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 12 }}>
         <div style={{ background: "#1e293b", borderRadius: 14, padding: "18px 20px", border: "1px solid #334155" }}>
           <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
             <Gift size={18} color="#ec4899" />
@@ -599,7 +600,7 @@ export default function BirthdaysTab({ data, allData, userStats, selectedCategor
         </div>
       </div>
 
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 20 }}>
+      <div className="grid-2-col" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 20 }}>
         {/* Calendar */}
         <Section title="Calendario compleanni">
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
@@ -620,7 +621,7 @@ export default function BirthdaysTab({ data, allData, userStats, selectedCategor
             ))}
           </div>
 
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: 4 }}>
+          <div className="calendar-grid" style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: 4 }}>
             {calendarDays.map((cell, i) => {
               if (!cell) return <div key={`pad-${i}`} />;
               const isSelected = selectedDay === cell.bdKey;
@@ -670,7 +671,7 @@ export default function BirthdaysTab({ data, allData, userStats, selectedCategor
             : "Prossimi compleanni"
           }
           extra={
-            <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+            <div className="bday-extra-controls" style={{ display: "flex", gap: 6, alignItems: "center" }}>
               {isBrowsing && (
                 <button onClick={() => { setBrowseStartDate(null); setSelectedDay(null); setViewMonth(today.getMonth()); setViewYear(today.getFullYear()); }} style={{
                   padding: "5px 12px", borderRadius: 8, fontSize: 11, border: "1px solid #8b5cf6", cursor: "pointer",
@@ -708,7 +709,7 @@ export default function BirthdaysTab({ data, allData, userStats, selectedCategor
               Nessun compleanno {isBrowsing ? 'in questo periodo' : `nei prossimi ${timeRange === 'week' ? '7' : '30'} giorni`}
             </div>
           ) : (
-            <div style={{ display: "flex", flexDirection: "column", gap: 10, maxHeight: 520, overflowY: "auto" }}>
+            <div className="bday-upcoming-list" style={{ display: "flex", flexDirection: "column", gap: 10, maxHeight: 520, overflowY: "auto" }}>
               {upcomingBirthdays.map((group, gi) => (
                 <div key={gi}>
                   <div style={{
@@ -742,7 +743,7 @@ export default function BirthdaysTab({ data, allData, userStats, selectedCategor
       {/* Selected day detail */}
       {selectedDay && selectedUsers.length > 0 && (
         <Section title={`Compleanni il ${selectedDay.split('-').reverse().join('/')}`}>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(300px, 1fr))", gap: 10 }}>
+          <div className="selected-day-grid" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(300px, 1fr))", gap: 10 }}>
             {selectedUsers.map((u, i) => (
               <UserBirthdayCard key={`sel-${i}-${collapseKey}`} user={u} onWhatsApp={openWhatsApp} relevance={getRelevance(u)} activeFilter={activeFilterLabel} />
             ))}
@@ -841,7 +842,7 @@ function UserBirthdayCard({ user, compact, onWhatsApp, relevance, activeFilter }
             </div>
 
             {/* Stats grid */}
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 6, marginBottom: 10 }}>
+            <div className="user-stats-grid" style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 6, marginBottom: 10 }}>
               <div style={{ background: "#1e293b", borderRadius: 6, padding: 8, textAlign: "center" }}>
                 <div style={{ fontSize: 9, color: "#64748b" }}>Registrazioni</div>
                 <div style={{ fontSize: 14, fontWeight: 700, color: "#f1f5f9" }}>{user.totalRegs}</div>
@@ -929,7 +930,7 @@ function UserBirthdayCard({ user, compact, onWhatsApp, relevance, activeFilter }
       </div>
 
       {/* Stats */}
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 6 }}>
+      <div className="user-stats-grid" style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 6 }}>
         <div style={{ background: "#1e293b", borderRadius: 6, padding: 8, textAlign: "center" }}>
           <div style={{ fontSize: 9, color: "#64748b" }}>Registrazioni</div>
           <div style={{ fontSize: 14, fontWeight: 700, color: "#f1f5f9" }}>{user.totalRegs}</div>

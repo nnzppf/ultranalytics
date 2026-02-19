@@ -18,7 +18,7 @@ export default function FasceTab({ fasciaData, convByFascia, graphHeights, setGr
         ))}
       </div>
 
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
+      <div className="grid-2-col" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
         {/* Registrazioni per fascia */}
         <Section title="Registrazioni per fascia oraria">
           <ResponsiveContainer width="100%" height={graphHeights.fasciaData || 250}>

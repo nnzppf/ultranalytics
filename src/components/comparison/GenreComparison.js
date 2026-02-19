@@ -49,7 +49,7 @@ export default function GenreComparison({ genreStats, onSelectGenre, highlightGe
             Confronto <strong style={{ color: "#8b5cf6" }}>{highlightBrand}</strong> (media per edizione) vs media per brand di ogni genere
           </div>
 
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
+          <div className="grid-2-col" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
             {/* Registrazioni medie */}
             <Section title="Media registrazioni / edizione">
               <ResponsiveContainer width="100%" height={Math.max(250, vsData.length * 45)}>
@@ -89,7 +89,7 @@ export default function GenreComparison({ genreStats, onSelectGenre, highlightGe
 
       {/* === STANDARD MODE: genre totals === */}
       {!hasBrandContext && (
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
+        <div className="grid-2-col" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
           <Section title="Registrazioni per genere">
             <ResponsiveContainer width="100%" height={250}>
               <BarChart data={chartData}>

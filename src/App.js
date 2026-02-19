@@ -366,7 +366,7 @@ function AuthenticatedApp({ user, logout }) {
   return (
     <div style={{ minHeight: "100vh", background: "#0f172a", color: "#f1f5f9" }}>
       {/* Top Bar */}
-      <div style={{
+      <div className="top-bar" style={{
         display: "flex", alignItems: "center", gap: 12, padding: "10px 20px",
         background: "#1e293b", borderBottom: "1px solid #334155", flexWrap: "wrap",
       }}>
@@ -376,7 +376,7 @@ function AuthenticatedApp({ user, logout }) {
         <CloudIndicator />
 
         {/* Category filter */}
-        <div style={{ display: "flex", gap: 4, marginLeft: 16, alignItems: "center" }}>
+        <div className="filter-row" style={{ display: "flex", gap: 4, marginLeft: 16, alignItems: "center" }}>
           <button onClick={() => { setSelectedCategory("all"); setSelectedGenre("all"); setSelectedBrand("all"); setSelectedEdition("all"); }} style={{
             padding: "4px 10px", borderRadius: 6, fontSize: 10, border: "none", cursor: "pointer",
             background: selectedCategory === "all" && selectedGenre === "all" ? "#8b5cf6" : "#334155",
@@ -392,7 +392,7 @@ function AuthenticatedApp({ user, logout }) {
         </div>
 
         {/* Genre filter */}
-        <div style={{ display: "flex", gap: 4, alignItems: "center", borderLeft: "1px solid #475569", paddingLeft: 8 }}>
+        <div className="filter-row filter-separator" style={{ display: "flex", gap: 4, alignItems: "center", borderLeft: "1px solid #475569", paddingLeft: 8 }}>
           {Object.entries(GENRE_LABELS).map(([g, genreInfo]) => (
             <button key={g} onClick={() => { setSelectedGenre(g); setSelectedCategory("all"); setSelectedBrand("all"); setSelectedEdition("all"); }} style={{
               padding: "4px 10px", borderRadius: 6, fontSize: 10, border: "none", cursor: "pointer",
@@ -446,7 +446,7 @@ function AuthenticatedApp({ user, logout }) {
 
       {/* Edition selector - shown when a brand with multiple editions is selected */}
       {selectedBrand !== "all" && availableEditions.length > 1 && (
-        <div style={{
+        <div className="edition-bar" style={{
           display: "flex", gap: 4, padding: "8px 20px",
           background: "#1e293b80", borderBottom: "1px solid #334155",
           alignItems: "center", overflowX: "auto",
@@ -477,7 +477,7 @@ function AuthenticatedApp({ user, logout }) {
       )}
 
       {/* KPI Row */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 10, padding: "16px 20px" }}>
+      <div className="kpi-grid" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 10, padding: "16px 20px" }}>
         <KPI icon={Users} label="Registrazioni" value={analytics.total} color="#8b5cf6" />
         <KPI icon={Check} label="Presenze" value={analytics.entered} sub={`${analytics.conv}% conversione`} color="#10b981" />
         <KPI icon={TrendingUp} label="Conversione" value={`${analytics.conv}%`} color="#06b6d4" />
@@ -486,7 +486,7 @@ function AuthenticatedApp({ user, logout }) {
       </div>
 
       {/* Tab Navigation */}
-      <div style={{ display: "flex", gap: 4, padding: "0 20px 12px", overflowX: "auto" }}>
+      <div className="tab-bar" style={{ display: "flex", gap: 4, padding: "0 20px 12px", overflowX: "auto" }}>
         {tabs.map(t => (
           <button key={t.key} onClick={() => setActiveTab(t.key)} style={{
             padding: "7px 16px", borderRadius: 8, fontSize: 12, border: "none", cursor: "pointer",
@@ -501,7 +501,7 @@ function AuthenticatedApp({ user, logout }) {
       </div>
 
       {/* Tab Content */}
-      <div style={{ padding: "0 20px 40px" }}>
+      <div className="app-content" style={{ padding: "0 20px 40px" }}>
         {activeTab === "overview" && (
           <OverviewTab
             analytics={analytics}
