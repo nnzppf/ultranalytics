@@ -1,7 +1,7 @@
 import { useState, useMemo } from 'react';
 import { ChevronDown, MessageCircle, Phone, Search, X, Edit3, Send } from 'lucide-react';
 import { SegmentBadge } from '../shared/Badge';
-import { formatWhatsAppUrl, applyTemplate, RETARGET_TEMPLATES } from '../../utils/whatsapp';
+import { formatWhatsAppUrl, openWhatsAppTab, applyTemplate, RETARGET_TEMPLATES } from '../../utils/whatsapp';
 
 // ---- Retarget WhatsApp Modal ----
 function WhatsAppRetargetModal({ user, brand, eventDate, eventLink, onClose }) {
@@ -36,7 +36,7 @@ function WhatsAppRetargetModal({ user, brand, eventDate, eventLink, onClose }) {
 
   const handleSend = () => {
     const url = formatWhatsAppUrl(user.phone, currentMessage);
-    if (url) window.open(url, 'ultranalytics_whatsapp');
+    openWhatsAppTab(url);
   };
 
   return (

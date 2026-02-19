@@ -21,6 +21,21 @@ export function formatWhatsAppUrl(phone, message) {
   return `https://web.whatsapp.com/send?phone=${num}`;
 }
 
+let waWindow = null;
+
+/**
+ * Open a WhatsApp Web URL reusing the same browser tab.
+ */
+export function openWhatsAppTab(url) {
+  if (!url) return;
+  if (waWindow && !waWindow.closed) {
+    waWindow.location.href = url;
+    waWindow.focus();
+  } else {
+    waWindow = window.open(url, '_blank');
+  }
+}
+
 /**
  * Replace placeholders in a template string.
  * Supported: {nome}, {brand}, {data}, {link}

@@ -2,7 +2,7 @@ import { useState, useMemo, useCallback } from 'react';
 import { Gift, ChevronLeft, ChevronRight, Phone, Mail, MessageCircle, X, Edit3, Send, ChevronDown, ChevronUp, Calendar, Save, RotateCcw } from 'lucide-react';
 import Section from '../shared/Section';
 import { SegmentBadge } from '../shared/Badge';
-import { formatWhatsAppUrl } from '../../utils/whatsapp';
+import { formatWhatsAppUrl, openWhatsAppTab } from '../../utils/whatsapp';
 import { BRAND_REGISTRY, GENRE_LABELS, CATEGORY_LABELS } from '../../config/eventConfig';
 
 // {nome} placeholder gets replaced with user's first name
@@ -139,7 +139,7 @@ function WhatsAppModal({ user, onClose }) {
 
   const handleSend = () => {
     const url = formatWhatsAppUrl(user.phone, currentMessage);
-    if (url) window.open(url, 'ultranalytics_whatsapp');
+    openWhatsAppTab(url);
   };
 
   return (
