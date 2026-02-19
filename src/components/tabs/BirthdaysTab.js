@@ -1,5 +1,5 @@
 import { useState, useMemo, useCallback } from 'react';
-import { Gift, ChevronLeft, ChevronRight, Phone, Mail, MessageCircle, X, Edit3, Send, ChevronDown, ChevronUp, Calendar } from 'lucide-react';
+import { Gift, ChevronLeft, ChevronRight, Phone, Mail, MessageCircle, X, Edit3, Send, ChevronDown, ChevronUp, Calendar, Save, RotateCcw } from 'lucide-react';
 import Section from '../shared/Section';
 import { SegmentBadge } from '../shared/Badge';
 import { formatWhatsAppUrl } from '../../utils/whatsapp';
@@ -68,20 +68,45 @@ function applyTemplate(template, userName) {
   return template.replace(/{nome}/g, firstName);
 }
 
+// Load saved custom templates from localStorage
+function getSavedTemplates() {
+  try {
+    return JSON.parse(localStorage.getItem('ultranalytics_custom_templates') || '{}');
+  } catch { return {}; }
+}
+
+function saveCustomTemplate(templateId, text) {
+  const saved = getSavedTemplates();
+  saved[templateId] = text;
+  localStorage.setItem('ultranalytics_custom_templates', JSON.stringify(saved));
+}
+
+function removeSavedTemplate(templateId) {
+  const saved = getSavedTemplates();
+  delete saved[templateId];
+  localStorage.setItem('ultranalytics_custom_templates', JSON.stringify(saved));
+}
+
 // ---- WhatsApp Message Modal ----
 function WhatsAppModal({ user, onClose }) {
   const [selectedTemplateId, setSelectedTemplateId] = useState('auguri_promo');
   const [isEditing, setIsEditing] = useState(false);
   const [customText, setCustomText] = useState('');
   const [showTemplateList, setShowTemplateList] = useState(false);
+  const [savedTemplates, setSavedTemplates] = useState(() => getSavedTemplates());
 
   const selectedTemplate = MESSAGE_TEMPLATES.find(t => t.id === selectedTemplateId);
   const firstName = user.name ? user.name.split(' ')[0] : '';
 
-  // The message to display/send: custom if editing, otherwise from template
+  // Check if current template has a saved custom version
+  const hasSavedCustom = !!savedTemplates[selectedTemplateId];
+
+  // The message to display/send
   const currentMessage = isEditing
     ? customText
-    : applyTemplate(selectedTemplate?.text || '', user.name);
+    : hasSavedCustom
+      ? applyTemplate(savedTemplates[selectedTemplateId], user.name)
+      : applyTemplate(selectedTemplate?.text || '', user.name);
 
   const handleSelectTemplate = (tpl) => {
     setSelectedTemplateId(tpl.id);
@@ -91,8 +116,25 @@ function WhatsAppModal({ user, onClose }) {
   };
 
   const handleStartEditing = () => {
-    setCustomText(currentMessage);
+    // Edit from the raw template (with {nome} placeholder), not the applied version
+    const rawText = hasSavedCustom
+      ? savedTemplates[selectedTemplateId]
+      : selectedTemplate?.text || '';
+    setCustomText(rawText);
     setIsEditing(true);
+  };
+
+  const handleSave = () => {
+    saveCustomTemplate(selectedTemplateId, customText);
+    setSavedTemplates(getSavedTemplates());
+    setIsEditing(false);
+  };
+
+  const handleRestore = () => {
+    removeSavedTemplate(selectedTemplateId);
+    setSavedTemplates(getSavedTemplates());
+    setIsEditing(false);
+    setCustomText('');
   };
 
   const handleSend = () => {
@@ -155,7 +197,7 @@ function WhatsAppModal({ user, onClose }) {
                 color: "#f1f5f9", fontSize: 13, fontWeight: 600,
               }}
             >
-              <span>{selectedTemplate?.icon} {selectedTemplate?.label}</span>
+              <span>{selectedTemplate?.icon} {selectedTemplate?.label}{hasSavedCustom ? ' ✏️' : ''}</span>
               <ChevronDown size={16} color="#64748b" style={{
                 transform: showTemplateList ? "rotate(180deg)" : "none",
                 transition: "transform 0.2s",
@@ -185,9 +227,12 @@ function WhatsAppModal({ user, onClose }) {
                   >
                     <span style={{ fontSize: 18 }}>{tpl.icon}</span>
                     <div>
-                      <div style={{ fontWeight: 600 }}>{tpl.label}</div>
+                      <div style={{ fontWeight: 600 }}>
+                        {tpl.label}
+                        {savedTemplates[tpl.id] && <span style={{ color: "#f59e0b", fontSize: 10, marginLeft: 6 }}>✏️ personalizzato</span>}
+                      </div>
                       <div style={{ fontSize: 10, color: "#64748b", marginTop: 2 }}>
-                        {applyTemplate(tpl.text, user.name).substring(0, 60)}...
+                        {applyTemplate(savedTemplates[tpl.id] || tpl.text, user.name).substring(0, 60)}...
                       </div>
                     </div>
                   </button>
@@ -202,33 +247,63 @@ function WhatsAppModal({ user, onClose }) {
               display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8,
             }}>
               <span style={{ fontSize: 11, color: "#94a3b8", textTransform: "uppercase", fontWeight: 600 }}>
-                {isEditing ? "Modifica messaggio" : "Anteprima messaggio"}
+                {isEditing ? "Modifica messaggio" : hasSavedCustom ? "Anteprima (personalizzato)" : "Anteprima messaggio"}
               </span>
-              {!isEditing && (
-                <button
-                  onClick={handleStartEditing}
-                  style={{
-                    background: "none", border: "1px solid #334155", borderRadius: 6,
-                    padding: "3px 10px", cursor: "pointer",
-                    display: "flex", alignItems: "center", gap: 4,
-                    color: "#8b5cf6", fontSize: 10, fontWeight: 600,
-                  }}
-                >
-                  <Edit3 size={10} /> Personalizza
-                </button>
-              )}
-              {isEditing && (
-                <button
-                  onClick={() => { setIsEditing(false); setCustomText(''); }}
-                  style={{
-                    background: "none", border: "1px solid #334155", borderRadius: 6,
-                    padding: "3px 10px", cursor: "pointer",
-                    color: "#94a3b8", fontSize: 10,
-                  }}
-                >
-                  Annulla modifiche
-                </button>
-              )}
+              <div style={{ display: "flex", gap: 6 }}>
+                {!isEditing && hasSavedCustom && (
+                  <button
+                    onClick={handleRestore}
+                    style={{
+                      background: "none", border: "1px solid #334155", borderRadius: 6,
+                      padding: "3px 10px", cursor: "pointer",
+                      display: "flex", alignItems: "center", gap: 4,
+                      color: "#f59e0b", fontSize: 10, fontWeight: 600,
+                    }}
+                    title="Ripristina il messaggio originale"
+                  >
+                    <RotateCcw size={10} /> Ripristina originale
+                  </button>
+                )}
+                {!isEditing && (
+                  <button
+                    onClick={handleStartEditing}
+                    style={{
+                      background: "none", border: "1px solid #334155", borderRadius: 6,
+                      padding: "3px 10px", cursor: "pointer",
+                      display: "flex", alignItems: "center", gap: 4,
+                      color: "#8b5cf6", fontSize: 10, fontWeight: 600,
+                    }}
+                  >
+                    <Edit3 size={10} /> Personalizza
+                  </button>
+                )}
+                {isEditing && (
+                  <>
+                    <button
+                      onClick={handleSave}
+                      style={{
+                        background: "rgba(16,185,129,0.15)", border: "1px solid #10b981", borderRadius: 6,
+                        padding: "3px 10px", cursor: "pointer",
+                        display: "flex", alignItems: "center", gap: 4,
+                        color: "#10b981", fontSize: 10, fontWeight: 600,
+                      }}
+                      title="Salva come template personalizzato"
+                    >
+                      <Save size={10} /> Salva
+                    </button>
+                    <button
+                      onClick={() => { setIsEditing(false); setCustomText(''); }}
+                      style={{
+                        background: "none", border: "1px solid #334155", borderRadius: 6,
+                        padding: "3px 10px", cursor: "pointer",
+                        color: "#94a3b8", fontSize: 10,
+                      }}
+                    >
+                      Annulla
+                    </button>
+                  </>
+                )}
+              </div>
             </div>
 
             {isEditing ? (
@@ -256,7 +331,7 @@ function WhatsAppModal({ user, onClose }) {
 
             {isEditing && (
               <div style={{ fontSize: 10, color: "#64748b", marginTop: 6 }}>
-                Il nome "{firstName}" viene inserito automaticamente tramite il template. Se modifichi il testo, assicurati di includere il nome dove vuoi.
+                Usa <strong style={{ color: "#8b5cf6" }}>{'{nome}'}</strong> dove vuoi inserire il nome dell'utente. Clicca <strong>Salva</strong> per mantenere le modifiche per le prossime volte.
               </div>
             )}
           </div>
