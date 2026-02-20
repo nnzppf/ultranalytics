@@ -3,6 +3,7 @@ import { Gift, ChevronLeft, ChevronRight, Phone, Mail, MessageCircle, X, Edit3, 
 import Section from '../shared/Section';
 import { SegmentBadge } from '../shared/Badge';
 import { formatWhatsAppUrl, openWhatsAppTab } from '../../utils/whatsapp';
+import { colors, alpha, shadows } from '../../config/designTokens';
 import { BRAND_REGISTRY, GENRE_LABELS, CATEGORY_LABELS } from '../../config/eventConfig';
 
 // {nome} placeholder gets replaced with user's first name
@@ -144,7 +145,7 @@ function WhatsAppModal({ user, onClose }) {
 
   return (
     <div style={{
-      position: "fixed", inset: 0, background: "rgba(0,0,0,0.7)",
+      position: "fixed", inset: 0, background: colors.overlay.dark,
       display: "flex", alignItems: "center", justifyContent: "center",
       zIndex: 9999, padding: 20,
     }} onClick={onClose}>
@@ -152,39 +153,39 @@ function WhatsAppModal({ user, onClose }) {
         className="wa-modal-content"
         onClick={e => e.stopPropagation()}
         style={{
-          background: "#1e293b", borderRadius: 16, width: "100%", maxWidth: 520,
-          border: "1px solid #334155", overflow: "hidden",
-          boxShadow: "0 20px 60px rgba(0,0,0,0.5)",
+          background: colors.bg.card, borderRadius: 16, width: "100%", maxWidth: 520,
+          border: `1px solid ${colors.border.default}`, overflow: "hidden",
+          boxShadow: shadows.xl,
         }}
       >
         {/* Header */}
         <div style={{
-          background: "#25D366", padding: "14px 20px",
+          background: colors.whatsapp, padding: "14px 20px",
           display: "flex", justifyContent: "space-between", alignItems: "center",
         }}>
           <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-            <MessageCircle size={20} color="#fff" />
+            <MessageCircle size={20} color={colors.text.inverse} />
             <div>
-              <div style={{ fontSize: 14, fontWeight: 700, color: "#fff" }}>
+              <div style={{ fontSize: 14, fontWeight: 700, color: colors.text.inverse }}>
                 WhatsApp a {firstName}
               </div>
-              <div style={{ fontSize: 11, color: "rgba(255,255,255,0.8)" }}>
+              <div style={{ fontSize: 11, color: alpha.white[80] }}>
                 {user.phone}
               </div>
             </div>
           </div>
           <button onClick={onClose} style={{
-            background: "rgba(255,255,255,0.2)", border: "none", borderRadius: 8,
+            background: alpha.white[20], border: "none", borderRadius: 8,
             padding: 6, cursor: "pointer", display: "flex",
           }}>
-            <X size={16} color="#fff" />
+            <X size={16} color={colors.text.inverse} />
           </button>
         </div>
 
         <div style={{ padding: 20 }}>
           {/* Template selector */}
           <div style={{ marginBottom: 16 }}>
-            <div style={{ fontSize: 11, color: "#94a3b8", textTransform: "uppercase", marginBottom: 8, fontWeight: 600 }}>
+            <div style={{ fontSize: 11, color: colors.text.muted, textTransform: "uppercase", marginBottom: 8, fontWeight: 600 }}>
               Scegli messaggio
             </div>
 
@@ -193,13 +194,13 @@ function WhatsAppModal({ user, onClose }) {
               onClick={() => setShowTemplateList(!showTemplateList)}
               style={{
                 width: "100%", padding: "10px 14px", borderRadius: 10,
-                background: "#0f172a", border: "1px solid #334155",
+                background: colors.bg.page, border: `1px solid ${colors.border.default}`,
                 cursor: "pointer", display: "flex", justifyContent: "space-between", alignItems: "center",
-                color: "#f1f5f9", fontSize: 13, fontWeight: 600,
+                color: colors.text.primary, fontSize: 13, fontWeight: 600,
               }}
             >
               <span>{selectedTemplate?.icon} {selectedTemplate?.label}{hasSavedCustom ? ' ✏️' : ''}</span>
-              <ChevronDown size={16} color="#64748b" style={{
+              <ChevronDown size={16} color={colors.text.disabled} style={{
                 transform: showTemplateList ? "rotate(180deg)" : "none",
                 transition: "transform 0.2s",
               }} />
@@ -209,7 +210,7 @@ function WhatsAppModal({ user, onClose }) {
             {showTemplateList && (
               <div style={{
                 marginTop: 4, borderRadius: 10, overflow: "hidden",
-                border: "1px solid #334155", background: "#0f172a",
+                border: `1px solid ${colors.border.default}`, background: colors.bg.page,
               }}>
                 {MESSAGE_TEMPLATES.map(tpl => (
                   <button
@@ -217,22 +218,22 @@ function WhatsAppModal({ user, onClose }) {
                     onClick={() => handleSelectTemplate(tpl)}
                     style={{
                       width: "100%", padding: "10px 14px",
-                      background: tpl.id === selectedTemplateId ? "rgba(139,92,246,0.15)" : "transparent",
-                      border: "none", borderBottom: "1px solid #1e293b",
+                      background: tpl.id === selectedTemplateId ? alpha.brand[15] : "transparent",
+                      border: "none", borderBottom: `1px solid ${colors.border.subtle}`,
                       cursor: "pointer", display: "flex", alignItems: "center", gap: 10,
-                      color: tpl.id === selectedTemplateId ? "#8b5cf6" : "#f1f5f9",
+                      color: tpl.id === selectedTemplateId ? colors.brand.purple : colors.text.primary,
                       fontSize: 12, textAlign: "left",
                     }}
-                    onMouseEnter={e => { if (tpl.id !== selectedTemplateId) e.currentTarget.style.background = "#1e293b"; }}
+                    onMouseEnter={e => { if (tpl.id !== selectedTemplateId) e.currentTarget.style.background = colors.bg.card; }}
                     onMouseLeave={e => { if (tpl.id !== selectedTemplateId) e.currentTarget.style.background = "transparent"; }}
                   >
                     <span style={{ fontSize: 18 }}>{tpl.icon}</span>
                     <div>
                       <div style={{ fontWeight: 600 }}>
                         {tpl.label}
-                        {savedTemplates[tpl.id] && <span style={{ color: "#f59e0b", fontSize: 10, marginLeft: 6 }}>✏️ personalizzato</span>}
+                        {savedTemplates[tpl.id] && <span style={{ color: colors.status.warning, fontSize: 11, marginLeft: 6 }}>✏️ personalizzato</span>}
                       </div>
-                      <div style={{ fontSize: 10, color: "#64748b", marginTop: 2 }}>
+                      <div style={{ fontSize: 11, color: colors.text.disabled, marginTop: 2 }}>
                         {applyTemplate(savedTemplates[tpl.id] || tpl.text, user.name).substring(0, 60)}...
                       </div>
                     </div>
@@ -247,7 +248,7 @@ function WhatsAppModal({ user, onClose }) {
             <div style={{
               display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8,
             }}>
-              <span style={{ fontSize: 11, color: "#94a3b8", textTransform: "uppercase", fontWeight: 600 }}>
+              <span style={{ fontSize: 11, color: colors.text.muted, textTransform: "uppercase", fontWeight: 600 }}>
                 {isEditing ? "Modifica messaggio" : hasSavedCustom ? "Anteprima (personalizzato)" : "Anteprima messaggio"}
               </span>
               <div style={{ display: "flex", gap: 6 }}>
@@ -255,10 +256,10 @@ function WhatsAppModal({ user, onClose }) {
                   <button
                     onClick={handleRestore}
                     style={{
-                      background: "none", border: "1px solid #334155", borderRadius: 6,
+                      background: "none", border: `1px solid ${colors.border.default}`, borderRadius: 6,
                       padding: "3px 10px", cursor: "pointer",
                       display: "flex", alignItems: "center", gap: 4,
-                      color: "#f59e0b", fontSize: 10, fontWeight: 600,
+                      color: colors.status.warning, fontSize: 11, fontWeight: 600,
                     }}
                     title="Ripristina il messaggio originale"
                   >
@@ -269,10 +270,10 @@ function WhatsAppModal({ user, onClose }) {
                   <button
                     onClick={handleStartEditing}
                     style={{
-                      background: "none", border: "1px solid #334155", borderRadius: 6,
+                      background: "none", border: `1px solid ${colors.border.default}`, borderRadius: 6,
                       padding: "3px 10px", cursor: "pointer",
                       display: "flex", alignItems: "center", gap: 4,
-                      color: "#8b5cf6", fontSize: 10, fontWeight: 600,
+                      color: colors.brand.purple, fontSize: 11, fontWeight: 600,
                     }}
                   >
                     <Edit3 size={10} /> Personalizza
@@ -283,10 +284,10 @@ function WhatsAppModal({ user, onClose }) {
                     <button
                       onClick={handleSave}
                       style={{
-                        background: "rgba(16,185,129,0.15)", border: "1px solid #10b981", borderRadius: 6,
+                        background: alpha.success[15], border: `1px solid ${colors.status.success}`, borderRadius: 6,
                         padding: "3px 10px", cursor: "pointer",
                         display: "flex", alignItems: "center", gap: 4,
-                        color: "#10b981", fontSize: 10, fontWeight: 600,
+                        color: colors.status.success, fontSize: 11, fontWeight: 600,
                       }}
                       title="Salva come template personalizzato"
                     >
@@ -295,9 +296,9 @@ function WhatsAppModal({ user, onClose }) {
                     <button
                       onClick={() => { setIsEditing(false); setCustomText(''); }}
                       style={{
-                        background: "none", border: "1px solid #334155", borderRadius: 6,
+                        background: "none", border: `1px solid ${colors.border.default}`, borderRadius: 6,
                         padding: "3px 10px", cursor: "pointer",
-                        color: "#94a3b8", fontSize: 10,
+                        color: colors.text.muted, fontSize: 11,
                       }}
                     >
                       Annulla
@@ -313,16 +314,16 @@ function WhatsAppModal({ user, onClose }) {
                 onChange={e => setCustomText(e.target.value)}
                 style={{
                   width: "100%", minHeight: 180, padding: 14, borderRadius: 10,
-                  background: "#0f172a", border: "1px solid #8b5cf6",
-                  color: "#f1f5f9", fontSize: 13, lineHeight: 1.6,
+                  background: colors.bg.page, border: `1px solid ${colors.brand.purple}`,
+                  color: colors.text.primary, fontSize: 13, lineHeight: 1.6,
                   resize: "vertical", outline: "none", fontFamily: "inherit",
                 }}
                 placeholder="Scrivi il tuo messaggio personalizzato..."
               />
             ) : (
               <div style={{
-                background: "#0f172a", borderRadius: 10, padding: 14,
-                border: "1px solid #334155", fontSize: 13, color: "#e2e8f0",
+                background: colors.bg.page, borderRadius: 10, padding: 14,
+                border: `1px solid ${colors.border.default}`, fontSize: 13, color: colors.text.secondary,
                 lineHeight: 1.6, whiteSpace: "pre-wrap", maxHeight: 220,
                 overflowY: "auto",
               }}>
@@ -331,8 +332,8 @@ function WhatsAppModal({ user, onClose }) {
             )}
 
             {isEditing && (
-              <div style={{ fontSize: 10, color: "#64748b", marginTop: 6 }}>
-                Usa <strong style={{ color: "#8b5cf6" }}>{'{nome}'}</strong> dove vuoi inserire il nome dell'utente. Clicca <strong>Salva</strong> per mantenere le modifiche per le prossime volte.
+              <div style={{ fontSize: 11, color: colors.text.disabled, marginTop: 6 }}>
+                Usa <strong style={{ color: colors.brand.purple }}>{'{nome}'}</strong> dove vuoi inserire il nome dell'utente. Clicca <strong>Salva</strong> per mantenere le modifiche per le prossime volte.
               </div>
             )}
           </div>
@@ -343,9 +344,9 @@ function WhatsAppModal({ user, onClose }) {
             disabled={!user.phone || !currentMessage.trim()}
             style={{
               width: "100%", padding: "12px 20px", borderRadius: 10,
-              background: !user.phone || !currentMessage.trim() ? "#334155" : "#25D366",
+              background: !user.phone || !currentMessage.trim() ? colors.bg.elevated : colors.whatsapp,
               border: "none", cursor: !user.phone || !currentMessage.trim() ? "default" : "pointer",
-              color: "#fff", fontSize: 14, fontWeight: 700,
+              color: colors.text.inverse, fontSize: 14, fontWeight: 700,
               display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
               transition: "opacity 0.2s",
             }}
@@ -566,35 +567,35 @@ export default function BirthdaysTab({ data, allData, userStats, selectedCategor
       {/* Active filter banner */}
       {activeFilterLabel && (
         <div style={{
-          background: "rgba(139,92,246,0.1)", border: "1px solid rgba(139,92,246,0.3)",
+          background: alpha.brand[8], border: `1px solid ${alpha.brand[30]}`,
           borderRadius: 10, padding: "10px 16px",
           display: "flex", alignItems: "center", gap: 8,
-          fontSize: 12, color: "#c4b5fd",
+          fontSize: 12, color: colors.brand.purple,
         }}>
           <span style={{ fontSize: 14 }}>🎯</span>
-          Ordinamento per presenze: <strong style={{ color: "#8b5cf6" }}>{activeFilterLabel}</strong>
-          <span style={{ color: "#64748b", fontSize: 11 }}> — gli utenti con più presenze in questa categoria appaiono per primi</span>
+          Ordinamento per presenze: <strong style={{ color: colors.brand.purple }}>{activeFilterLabel}</strong>
+          <span style={{ color: colors.text.disabled, fontSize: 11 }}> — gli utenti con più presenze in questa categoria appaiono per primi</span>
         </div>
       )}
 
       {/* KPI Row */}
       <div className="bday-kpi-grid" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 12 }}>
-        <div style={{ background: "#1e293b", borderRadius: 14, padding: "18px 20px", border: "1px solid #334155" }}>
+        <div style={{ background: colors.bg.card, borderRadius: 14, padding: "18px 20px", border: `1px solid ${colors.border.default}` }}>
           <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
-            <Gift size={18} color="#ec4899" />
-            <span style={{ fontSize: 12, color: "#94a3b8", textTransform: "uppercase", fontWeight: 500 }}>Utenti con compleanno</span>
+            <Gift size={18} color={colors.brand.pink} />
+            <span style={{ fontSize: 12, color: colors.text.muted, textTransform: "uppercase", fontWeight: 500 }}>Utenti con compleanno</span>
           </div>
-          <div style={{ fontSize: 28, fontWeight: 700, color: "#f1f5f9" }}>{totalWithBirthday}</div>
+          <div style={{ fontSize: 28, fontWeight: 700, color: colors.text.primary }}>{totalWithBirthday}</div>
         </div>
-        <div style={{ background: "#1e293b", borderRadius: 14, padding: "18px 20px", border: "1px solid #334155" }}>
-          <div style={{ fontSize: 12, color: "#94a3b8", textTransform: "uppercase", marginBottom: 6, fontWeight: 500 }}>Prossimi 7 giorni</div>
-          <div style={{ fontSize: 28, fontWeight: 700, color: "#ec4899" }}>
+        <div style={{ background: colors.bg.card, borderRadius: 14, padding: "18px 20px", border: `1px solid ${colors.border.default}` }}>
+          <div style={{ fontSize: 12, color: colors.text.muted, textTransform: "uppercase", marginBottom: 6, fontWeight: 500 }}>Prossimi 7 giorni</div>
+          <div style={{ fontSize: 28, fontWeight: 700, color: colors.brand.pink }}>
             {upcomingBirthdays.filter(u => u.daysFromNow < 7).reduce((s, u) => s + u.users.length, 0)}
           </div>
         </div>
-        <div style={{ background: "#1e293b", borderRadius: 14, padding: "18px 20px", border: "1px solid #334155" }}>
-          <div style={{ fontSize: 12, color: "#94a3b8", textTransform: "uppercase", marginBottom: 6, fontWeight: 500 }}>Oggi</div>
-          <div style={{ fontSize: 28, fontWeight: 700, color: "#f59e0b" }}>
+        <div style={{ background: colors.bg.card, borderRadius: 14, padding: "18px 20px", border: `1px solid ${colors.border.default}` }}>
+          <div style={{ fontSize: 12, color: colors.text.muted, textTransform: "uppercase", marginBottom: 6, fontWeight: 500 }}>Oggi</div>
+          <div style={{ fontSize: 28, fontWeight: 700, color: colors.status.warning }}>
             {upcomingBirthdays.filter(u => u.daysFromNow === 0).reduce((s, u) => s + u.users.length, 0)}
           </div>
         </div>
@@ -604,20 +605,20 @@ export default function BirthdaysTab({ data, allData, userStats, selectedCategor
         {/* Calendar */}
         <Section title="Calendario compleanni">
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
-            <button onClick={prevMonth} style={{ background: "#0f172a", border: "1px solid #334155", borderRadius: 8, cursor: "pointer", padding: "6px 10px", display: "flex" }}>
-              <ChevronLeft size={20} color="#94a3b8" />
+            <button onClick={prevMonth} style={{ background: colors.bg.page, border: `1px solid ${colors.border.default}`, borderRadius: 8, cursor: "pointer", padding: "6px 10px", display: "flex" }}>
+              <ChevronLeft size={20} color={colors.text.muted} />
             </button>
-            <span style={{ fontSize: 18, fontWeight: 700, color: "#f1f5f9", letterSpacing: "0.02em" }}>
+            <span style={{ fontSize: 18, fontWeight: 700, color: colors.text.primary, letterSpacing: "0.02em" }}>
               {MESI_NOMI[viewMonth]} {viewYear}
             </span>
-            <button onClick={nextMonth} style={{ background: "#0f172a", border: "1px solid #334155", borderRadius: 8, cursor: "pointer", padding: "6px 10px", display: "flex" }}>
-              <ChevronRight size={20} color="#94a3b8" />
+            <button onClick={nextMonth} style={{ background: colors.bg.page, border: `1px solid ${colors.border.default}`, borderRadius: 8, cursor: "pointer", padding: "6px 10px", display: "flex" }}>
+              <ChevronRight size={20} color={colors.text.muted} />
             </button>
           </div>
 
           <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: 4, marginBottom: 6 }}>
             {GIORNI_NOMI.map(g => (
-              <div key={g} style={{ textAlign: "center", fontSize: 12, color: "#64748b", padding: "6px 0", fontWeight: 600 }}>{g}</div>
+              <div key={g} style={{ textAlign: "center", fontSize: 12, color: colors.text.disabled, padding: "6px 0", fontWeight: 600 }}>{g}</div>
             ))}
           </div>
 
@@ -639,20 +640,20 @@ export default function BirthdaysTab({ data, allData, userStats, selectedCategor
                   style={{
                     position: "relative", textAlign: "center", padding: "10px 4px",
                     borderRadius: 8, cursor: cell.count > 0 ? "pointer" : "default",
-                    background: isSelected ? "#8b5cf6" : cell.isToday ? "#334155" : "transparent",
-                    border: cell.isToday ? "2px solid #8b5cf6" : "2px solid transparent",
+                    background: isSelected ? colors.brand.purple : cell.isToday ? colors.bg.elevated : "transparent",
+                    border: cell.isToday ? `2px solid ${colors.brand.purple}` : "2px solid transparent",
                     transition: "all 0.15s",
                     minHeight: 48,
                   }}
-                  onMouseEnter={e => { if (cell.count > 0 && !isSelected) e.currentTarget.style.background = "#334155"; }}
+                  onMouseEnter={e => { if (cell.count > 0 && !isSelected) e.currentTarget.style.background = colors.bg.elevated; }}
                   onMouseLeave={e => { if (!isSelected && !cell.isToday) e.currentTarget.style.background = "transparent"; }}
                 >
-                  <div style={{ fontSize: 15, fontWeight: 500, color: isSelected ? "#fff" : cell.isToday ? "#8b5cf6" : "#f1f5f9" }}>
+                  <div style={{ fontSize: 15, fontWeight: 500, color: isSelected ? colors.text.inverse : cell.isToday ? colors.brand.purple : colors.text.primary }}>
                     {cell.day}
                   </div>
                   {cell.count > 0 && (
                     <div style={{
-                      fontSize: 10, fontWeight: 700, color: isSelected ? "#fff" : "#ec4899",
+                      fontSize: 11, fontWeight: 700, color: isSelected ? colors.text.inverse : colors.brand.pink,
                       marginTop: 2,
                     }}>
                       {cell.count} 🎂
@@ -674,16 +675,16 @@ export default function BirthdaysTab({ data, allData, userStats, selectedCategor
             <div className="bday-extra-controls" style={{ display: "flex", gap: 6, alignItems: "center" }}>
               {isBrowsing && (
                 <button onClick={() => { setBrowseStartDate(null); setSelectedDay(null); setViewMonth(today.getMonth()); setViewYear(today.getFullYear()); }} style={{
-                  padding: "5px 12px", borderRadius: 8, fontSize: 11, border: "1px solid #8b5cf6", cursor: "pointer",
-                  background: "rgba(139,92,246,0.15)", color: "#8b5cf6", fontWeight: 600,
+                  padding: "5px 12px", borderRadius: 8, fontSize: 11, border: `1px solid ${colors.brand.purple}`, cursor: "pointer",
+                  background: alpha.brand[15], color: colors.brand.purple, fontWeight: 600,
                   display: "flex", alignItems: "center", gap: 4,
                 }}>
                   <Calendar size={12} /> Torna a oggi
                 </button>
               )}
               <button onClick={() => setCollapseKey(k => k + 1)} style={{
-                padding: "5px 12px", borderRadius: 8, fontSize: 11, border: "1px solid #334155", cursor: "pointer",
-                background: "transparent", color: "#94a3b8", fontWeight: 600,
+                padding: "5px 12px", borderRadius: 8, fontSize: 11, border: `1px solid ${colors.border.default}`, cursor: "pointer",
+                background: "transparent", color: colors.text.muted, fontWeight: 600,
                 display: "flex", alignItems: "center", gap: 4,
               }}
                 title="Chiudi tutti gli utenti espansi"
@@ -696,8 +697,8 @@ export default function BirthdaysTab({ data, allData, userStats, selectedCategor
               ].map(t => (
                 <button key={t.key} onClick={() => setTimeRange(t.key)} style={{
                   padding: "5px 14px", borderRadius: 8, fontSize: 11, border: "none", cursor: "pointer",
-                  background: timeRange === t.key ? "#8b5cf6" : "#334155",
-                  color: timeRange === t.key ? "#fff" : "#94a3b8",
+                  background: timeRange === t.key ? colors.brand.purple : colors.bg.elevated,
+                  color: timeRange === t.key ? colors.text.inverse : colors.text.muted,
                   fontWeight: 600,
                 }}>{t.label}</button>
               ))}
@@ -705,7 +706,7 @@ export default function BirthdaysTab({ data, allData, userStats, selectedCategor
           }
         >
           {upcomingBirthdays.length === 0 ? (
-            <div style={{ textAlign: "center", color: "#64748b", fontSize: 13, padding: 30 }}>
+            <div style={{ textAlign: "center", color: colors.text.disabled, fontSize: 13, padding: 30 }}>
               Nessun compleanno {isBrowsing ? 'in questo periodo' : `nei prossimi ${timeRange === 'week' ? '7' : '30'} giorni`}
             </div>
           ) : (
@@ -714,18 +715,18 @@ export default function BirthdaysTab({ data, allData, userStats, selectedCategor
                 <div key={gi}>
                   <div style={{
                     display: "flex", justifyContent: "space-between", alignItems: "center",
-                    marginBottom: 8, paddingBottom: 6, borderBottom: "1px solid #334155",
+                    marginBottom: 8, paddingBottom: 6, borderBottom: `1px solid ${colors.border.default}`,
                   }}>
                     <span style={{
                       fontSize: 13, fontWeight: 600,
-                      color: group.daysFromToday === 0 ? "#f59e0b" : "#e2e8f0",
+                      color: group.daysFromToday === 0 ? colors.status.warning : colors.text.secondary,
                     }}>
                       {group.dateStr}
                     </span>
                     <span style={{
                       fontSize: 11, padding: "3px 10px", borderRadius: 8,
-                      background: group.daysFromToday === 0 ? "#f59e0b" : group.daysFromToday > 0 && group.daysFromToday <= 2 ? "#ef4444" : "#334155",
-                      color: "#fff", fontWeight: 700,
+                      background: group.daysFromToday === 0 ? colors.status.warning : group.daysFromToday > 0 && group.daysFromToday <= 2 ? colors.status.error : colors.bg.elevated,
+                      color: colors.text.inverse, fontWeight: 700,
                     }}>
                       {group.label}
                     </span>
@@ -760,8 +761,8 @@ function UserBirthdayCard({ user, compact, onWhatsApp, relevance, activeFilter }
   if (compact) {
     return (
       <div style={{
-        background: "#0f172a", borderRadius: 10, marginBottom: 6,
-        borderLeft: relevance > 0 ? "3px solid #8b5cf6" : "3px solid transparent",
+        background: colors.bg.page, borderRadius: 10, marginBottom: 6,
+        borderLeft: relevance > 0 ? `3px solid ${colors.brand.purple}` : "3px solid transparent",
         overflow: "hidden",
       }}>
         {/* Compact header — always visible */}
@@ -772,21 +773,21 @@ function UserBirthdayCard({ user, compact, onWhatsApp, relevance, activeFilter }
             padding: "10px 14px", cursor: "pointer",
             transition: "background 0.15s",
           }}
-          onMouseEnter={e => { e.currentTarget.style.background = "#1e293b"; }}
+          onMouseEnter={e => { e.currentTarget.style.background = colors.bg.card; }}
           onMouseLeave={e => { e.currentTarget.style.background = "transparent"; }}
         >
           <div style={{ flex: 1 }}>
-            <div style={{ fontSize: 13, fontWeight: 600, color: "#f1f5f9", display: "flex", alignItems: "center", gap: 6 }}>
+            <div style={{ fontSize: 13, fontWeight: 600, color: colors.text.primary, display: "flex", alignItems: "center", gap: 6 }}>
               🎂 {user.name}
               {user.age > 0 && user.age < 100 && (
-                <span style={{ color: "#64748b", fontWeight: 400 }}> — {user.age} anni</span>
+                <span style={{ color: colors.text.disabled, fontWeight: 400 }}> — {user.age} anni</span>
               )}
               {user.segment && <SegmentBadge segment={user.segment} />}
             </div>
-            <div style={{ fontSize: 11, color: "#64748b", marginTop: 3 }}>
+            <div style={{ fontSize: 11, color: colors.text.disabled, marginTop: 3 }}>
               {user.eventCount} eventi · {user.totalParticipated} presenze
               {relevance > 0 && activeFilter && (
-                <span style={{ color: "#8b5cf6", fontWeight: 600 }}> · {relevance} presenze {activeFilter}</span>
+                <span style={{ color: colors.brand.purple, fontWeight: 600 }}> · {relevance} presenze {activeFilter}</span>
               )}
             </div>
           </div>
@@ -795,10 +796,10 @@ function UserBirthdayCard({ user, compact, onWhatsApp, relevance, activeFilter }
               <button
                 onClick={(e) => { e.stopPropagation(); onWhatsApp(user); }}
                 style={{
-                  background: "#25D366", borderRadius: 6, padding: "3px 8px",
+                  background: colors.whatsapp, borderRadius: 6, padding: "3px 8px",
                   display: "flex", alignItems: "center", gap: 4,
                   border: "none", cursor: "pointer",
-                  color: "#fff", fontSize: 10, fontWeight: 600,
+                  color: colors.text.inverse, fontSize: 11, fontWeight: 600,
                 }}
                 title="Scegli messaggio WhatsApp"
               >
@@ -806,71 +807,71 @@ function UserBirthdayCard({ user, compact, onWhatsApp, relevance, activeFilter }
               </button>
             )}
             {user.phone && (
-              <a href={`tel:${user.phone}`} style={{ color: "#8b5cf6" }} title={user.phone} onClick={e => e.stopPropagation()}>
+              <a href={`tel:${user.phone}`} style={{ color: colors.brand.purple }} title={user.phone} onClick={e => e.stopPropagation()}>
                 <Phone size={14} />
               </a>
             )}
             {user.email && (
-              <a href={`mailto:${user.email}`} style={{ color: "#8b5cf6" }} title={user.email} onClick={e => e.stopPropagation()}>
+              <a href={`mailto:${user.email}`} style={{ color: colors.brand.purple }} title={user.email} onClick={e => e.stopPropagation()}>
                 <Mail size={14} />
               </a>
             )}
-            {expanded ? <ChevronUp size={14} color="#64748b" /> : <ChevronDown size={14} color="#64748b" />}
+            {expanded ? <ChevronUp size={14} color={colors.text.disabled} /> : <ChevronDown size={14} color={colors.text.disabled} />}
           </div>
         </div>
 
         {/* Expanded details */}
         {expanded && (
-          <div style={{ padding: "0 14px 14px", borderTop: "1px solid #1e293b" }}>
+          <div style={{ padding: "0 14px 14px", borderTop: `1px solid ${colors.border.default}` }}>
             {/* Contact info */}
             <div style={{ display: "flex", gap: 12, padding: "10px 0", fontSize: 11, flexWrap: "wrap", alignItems: "center" }}>
               {user.phone && (
-                <span style={{ color: "#94a3b8", display: "flex", alignItems: "center", gap: 4 }}>
-                  <Phone size={11} color="#8b5cf6" /> {user.phone}
+                <span style={{ color: colors.text.muted, display: "flex", alignItems: "center", gap: 4 }}>
+                  <Phone size={11} color={colors.brand.purple} /> {user.phone}
                 </span>
               )}
               {user.email && (
-                <span style={{ color: "#94a3b8", display: "flex", alignItems: "center", gap: 4 }}>
-                  <Mail size={11} color="#8b5cf6" /> {user.email}
+                <span style={{ color: colors.text.muted, display: "flex", alignItems: "center", gap: 4 }}>
+                  <Mail size={11} color={colors.brand.purple} /> {user.email}
                 </span>
               )}
               {user.birthDate && (
-                <span style={{ color: "#94a3b8", display: "flex", alignItems: "center", gap: 4 }}>
-                  <Calendar size={11} color="#8b5cf6" /> {user.birthDate.toLocaleDateString('it', { day: 'numeric', month: 'long', year: 'numeric' })}
+                <span style={{ color: colors.text.muted, display: "flex", alignItems: "center", gap: 4 }}>
+                  <Calendar size={11} color={colors.brand.purple} /> {user.birthDate.toLocaleDateString('it', { day: 'numeric', month: 'long', year: 'numeric' })}
                 </span>
               )}
             </div>
 
             {/* Stats grid */}
             <div className="user-stats-grid" style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 6, marginBottom: 10 }}>
-              <div style={{ background: "#1e293b", borderRadius: 6, padding: 8, textAlign: "center" }}>
-                <div style={{ fontSize: 9, color: "#64748b" }}>Registrazioni</div>
-                <div style={{ fontSize: 14, fontWeight: 700, color: "#f1f5f9" }}>{user.totalRegs}</div>
+              <div style={{ background: colors.bg.card, borderRadius: 6, padding: 8, textAlign: "center" }}>
+                <div style={{ fontSize: 11, color: colors.text.disabled }}>Registrazioni</div>
+                <div style={{ fontSize: 14, fontWeight: 700, color: colors.text.primary }}>{user.totalRegs}</div>
               </div>
-              <div style={{ background: "#1e293b", borderRadius: 6, padding: 8, textAlign: "center" }}>
-                <div style={{ fontSize: 9, color: "#64748b" }}>Presenze</div>
-                <div style={{ fontSize: 14, fontWeight: 700, color: "#10b981" }}>{user.totalParticipated}</div>
+              <div style={{ background: colors.bg.card, borderRadius: 6, padding: 8, textAlign: "center" }}>
+                <div style={{ fontSize: 11, color: colors.text.disabled }}>Presenze</div>
+                <div style={{ fontSize: 14, fontWeight: 700, color: colors.status.success }}>{user.totalParticipated}</div>
               </div>
-              <div style={{ background: "#1e293b", borderRadius: 6, padding: 8, textAlign: "center" }}>
-                <div style={{ fontSize: 9, color: "#64748b" }}>Eventi</div>
-                <div style={{ fontSize: 14, fontWeight: 700, color: "#8b5cf6" }}>{user.eventCount}</div>
+              <div style={{ background: colors.bg.card, borderRadius: 6, padding: 8, textAlign: "center" }}>
+                <div style={{ fontSize: 11, color: colors.text.disabled }}>Eventi</div>
+                <div style={{ fontSize: 14, fontWeight: 700, color: colors.brand.purple }}>{user.eventCount}</div>
               </div>
             </div>
 
             {/* Events attended */}
             {user.events && user.events.length > 0 && (
               <div>
-                <div style={{ fontSize: 9, color: "#64748b", textTransform: "uppercase", marginBottom: 6, fontWeight: 600 }}>
+                <div style={{ fontSize: 11, color: colors.text.disabled, textTransform: "uppercase", marginBottom: 6, fontWeight: 600 }}>
                   Eventi frequentati
                 </div>
                 <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
                   {user.events.map((ev, i) => (
                     <div key={i} style={{
                       display: "flex", justifyContent: "space-between", alignItems: "center",
-                      padding: "5px 8px", borderRadius: 6, background: "#1e293b", fontSize: 11,
+                      padding: "5px 8px", borderRadius: 6, background: colors.bg.card, fontSize: 11,
                     }}>
-                      <span style={{ color: "#f1f5f9" }}>{ev.event}</span>
-                      <span style={{ color: "#94a3b8", fontSize: 10 }}>
+                      <span style={{ color: colors.text.primary }}>{ev.event}</span>
+                      <span style={{ color: colors.text.muted, fontSize: 10 }}>
                         {ev.count} reg. / {ev.participated} pres.
                       </span>
                     </div>
@@ -886,16 +887,16 @@ function UserBirthdayCard({ user, compact, onWhatsApp, relevance, activeFilter }
 
   return (
     <div style={{
-      background: "#0f172a", borderRadius: 10, padding: 14,
-      border: "1px solid #334155",
+      background: colors.bg.page, borderRadius: 10, padding: 14,
+      border: `1px solid ${colors.border.default}`,
     }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 10 }}>
         <div>
-          <div style={{ fontSize: 14, fontWeight: 700, color: "#f1f5f9" }}>
+          <div style={{ fontSize: 14, fontWeight: 700, color: colors.text.primary }}>
             🎂 {user.name}
           </div>
           {user.age > 0 && user.age < 100 && (
-            <div style={{ fontSize: 11, color: "#94a3b8" }}>Compie {user.age} anni</div>
+            <div style={{ fontSize: 11, color: colors.text.muted }}>Compie {user.age} anni</div>
           )}
         </div>
         {user.segment && <SegmentBadge segment={user.segment} />}
@@ -904,12 +905,12 @@ function UserBirthdayCard({ user, compact, onWhatsApp, relevance, activeFilter }
       {/* Contact */}
       <div style={{ display: "flex", gap: 12, marginBottom: 10, fontSize: 11, flexWrap: "wrap", alignItems: "center" }}>
         {user.phone && (
-          <a href={`tel:${user.phone}`} style={{ color: "#8b5cf6", display: "flex", alignItems: "center", gap: 4, textDecoration: "none" }}>
+          <a href={`tel:${user.phone}`} style={{ color: colors.brand.purple, display: "flex", alignItems: "center", gap: 4, textDecoration: "none" }}>
             <Phone size={12} /> {user.phone}
           </a>
         )}
         {user.email && (
-          <a href={`mailto:${user.email}`} style={{ color: "#8b5cf6", display: "flex", alignItems: "center", gap: 4, textDecoration: "none" }}>
+          <a href={`mailto:${user.email}`} style={{ color: colors.brand.purple, display: "flex", alignItems: "center", gap: 4, textDecoration: "none" }}>
             <Mail size={12} /> {user.email}
           </a>
         )}
@@ -917,10 +918,10 @@ function UserBirthdayCard({ user, compact, onWhatsApp, relevance, activeFilter }
           <button
             onClick={() => onWhatsApp(user)}
             style={{
-              background: "#25D366", borderRadius: 6, padding: "4px 10px",
+              background: colors.whatsapp, borderRadius: 6, padding: "4px 10px",
               display: "flex", alignItems: "center", gap: 4,
               border: "none", cursor: "pointer",
-              color: "#fff", fontSize: 11, fontWeight: 600,
+              color: colors.text.inverse, fontSize: 11, fontWeight: 600,
             }}
             title="Scegli messaggio WhatsApp"
           >
@@ -931,29 +932,29 @@ function UserBirthdayCard({ user, compact, onWhatsApp, relevance, activeFilter }
 
       {/* Stats */}
       <div className="user-stats-grid" style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 6 }}>
-        <div style={{ background: "#1e293b", borderRadius: 6, padding: 8, textAlign: "center" }}>
-          <div style={{ fontSize: 9, color: "#64748b" }}>Registrazioni</div>
-          <div style={{ fontSize: 14, fontWeight: 700, color: "#f1f5f9" }}>{user.totalRegs}</div>
+        <div style={{ background: colors.bg.card, borderRadius: 6, padding: 8, textAlign: "center" }}>
+          <div style={{ fontSize: 11, color: colors.text.disabled }}>Registrazioni</div>
+          <div style={{ fontSize: 14, fontWeight: 700, color: colors.text.primary }}>{user.totalRegs}</div>
         </div>
-        <div style={{ background: "#1e293b", borderRadius: 6, padding: 8, textAlign: "center" }}>
-          <div style={{ fontSize: 9, color: "#64748b" }}>Presenze</div>
-          <div style={{ fontSize: 14, fontWeight: 700, color: "#10b981" }}>{user.totalParticipated}</div>
+        <div style={{ background: colors.bg.card, borderRadius: 6, padding: 8, textAlign: "center" }}>
+          <div style={{ fontSize: 11, color: colors.text.disabled }}>Presenze</div>
+          <div style={{ fontSize: 14, fontWeight: 700, color: colors.status.success }}>{user.totalParticipated}</div>
         </div>
-        <div style={{ background: "#1e293b", borderRadius: 6, padding: 8, textAlign: "center" }}>
-          <div style={{ fontSize: 9, color: "#64748b" }}>Eventi</div>
-          <div style={{ fontSize: 14, fontWeight: 700, color: "#8b5cf6" }}>{user.eventCount}</div>
+        <div style={{ background: colors.bg.card, borderRadius: 6, padding: 8, textAlign: "center" }}>
+          <div style={{ fontSize: 11, color: colors.text.disabled }}>Eventi</div>
+          <div style={{ fontSize: 14, fontWeight: 700, color: colors.brand.purple }}>{user.eventCount}</div>
         </div>
       </div>
 
       {/* Events attended */}
       {user.events.length > 0 && (
         <div style={{ marginTop: 8 }}>
-          <div style={{ fontSize: 9, color: "#64748b", textTransform: "uppercase", marginBottom: 4 }}>Eventi frequentati</div>
+          <div style={{ fontSize: 11, color: colors.text.disabled, textTransform: "uppercase", marginBottom: 4 }}>Eventi frequentati</div>
           <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
             {user.events.map((ev, i) => (
               <span key={i} style={{
-                background: "#1e293b", borderRadius: 4, padding: "2px 6px",
-                fontSize: 10, color: "#94a3b8",
+                background: colors.bg.card, borderRadius: 4, padding: "2px 6px",
+                fontSize: 11, color: colors.text.muted,
               }}>
                 {ev.event}
               </span>

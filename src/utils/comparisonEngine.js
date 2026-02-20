@@ -32,7 +32,12 @@ function buildCumulativeCurve(rows) {
  * For a given brand and target edition (upcoming/current), compare registration
  * progress against the same point in time of previous editions.
  */
-export function computeWhereAreWeNow(allData, targetBrand, targetEdition) {
+/**
+ * overrides: optional object with two modes
+ *   { mode: 'now', value: 70 }           — override current total only
+ *   { mode: 'daily', days: { 2: 55, 1: 65, 0: 70 } } — cumulative totals for specific days-before
+ */
+export function computeWhereAreWeNow(allData, targetBrand, targetEdition, overrides) {
   const brandData = allData.filter(d => d.brand === targetBrand);
   const targetRows = brandData.filter(d => d.editionLabel === targetEdition);
 
@@ -42,9 +47,84 @@ export function computeWhereAreWeNow(allData, targetBrand, targetEdition) {
   if (!targetEventDate) return null;
 
   const now = new Date();
-  const currentDaysBefore = Math.max(0, Math.floor((targetEventDate - now) / 86400000));
-  const currentRegistrations = targetRows.length;
+  // Compare dates at midnight to avoid time-of-day rounding issues
+  const todayMidnight = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const eventMidnight = new Date(targetEventDate.getFullYear(), targetEventDate.getMonth(), targetEventDate.getDate());
+  const currentDaysBefore = Math.max(0, Math.round((eventMidnight - todayMidnight) / 86400000));
+  // Event is "past" only after the day AFTER the event (registrations can arrive
+  // until ~3am the next morning — people registering at the door)
+  const dayAfterEvent = new Date(targetEventDate);
+  dayAfterEvent.setDate(dayAfterEvent.getDate() + 1);
+  dayAfterEvent.setHours(6, 0, 0, 0); // grace period until 6am the next day
+  const isEventPast = now > dayAfterEvent;
+  const dataRegistrations = targetRows.length;
   const currentAttended = targetRows.filter(r => r.attended).length;
+
+  // Build the target's own cumulative curve from file data
+  const rawTargetCumulative = buildCumulativeCurve(targetRows);
+
+  // Detect missing/incomplete days based on actual registration timestamps
+  const rowsWithDays = targetRows.filter(r => r.daysBefore !== null && r.daysBefore !== undefined);
+  const mostRecentDataDay = rowsWithDays.length > 0
+    ? Math.min(...rowsWithDays.map(r => r.daysBefore))
+    : currentDaysBefore;
+
+  // Check if the most recent data day is "complete" (last registration after 23:00)
+  const recentDayRows = rowsWithDays.filter(r => r.daysBefore === mostRecentDataDay);
+  const latestPurchaseHour = recentDayRows.reduce((max, r) => {
+    const h = r.purchaseDate ? r.purchaseDate.getHours() : 0;
+    return h > max ? h : max;
+  }, 0);
+  const isRecentDayComplete = latestPurchaseHour >= 23;
+
+  // Build missing days list
+  const missingDays = [];
+  // Start from mostRecentDataDay if incomplete, otherwise from the day after
+  const startDay = isRecentDayComplete ? mostRecentDataDay - 1 : mostRecentDataDay;
+  for (let d = startDay; d >= currentDaysBefore; d--) {
+    missingDays.push(d);
+  }
+  // Always include today if not already there
+  if (!missingDays.includes(currentDaysBefore)) {
+    missingDays.push(currentDaysBefore);
+  }
+  missingDays.sort((a, b) => b - a); // descending (farthest day first)
+
+  // Apply overrides to cumulative curve
+  const targetCumulative = { ...rawTargetCumulative };
+  let currentRegistrations = dataRegistrations;
+  let isOverridden = false;
+
+  if (!isEventPast && overrides) {
+    if (overrides.mode === 'now' && overrides.value != null && overrides.value > 0) {
+      currentRegistrations = overrides.value;
+      isOverridden = overrides.value !== dataRegistrations;
+      // Patch the cumulative curve at currentDaysBefore
+      targetCumulative[currentDaysBefore] = overrides.value;
+    } else if (overrides.mode === 'daily' && overrides.days) {
+      // Merge daily cumulative values into the curve
+      const sortedDays = Object.keys(overrides.days).map(Number).sort((a, b) => b - a);
+      for (const d of sortedDays) {
+        const val = overrides.days[d];
+        if (val != null && val > 0) {
+          targetCumulative[d] = val;
+        }
+      }
+      // currentRegistrations = value at currentDaysBefore (today)
+      if (overrides.days[currentDaysBefore] != null && overrides.days[currentDaysBefore] > 0) {
+        currentRegistrations = overrides.days[currentDaysBefore];
+        isOverridden = currentRegistrations !== dataRegistrations;
+      }
+      // Fill gaps: ensure cumulative is monotonically non-decreasing
+      const allDays = Object.keys(targetCumulative).map(Number).sort((a, b) => b - a);
+      let prev = 0;
+      for (let i = allDays.length - 1; i >= 0; i--) {
+        const d = allDays[i];
+        if (targetCumulative[d] < prev) targetCumulative[d] = prev;
+        prev = targetCumulative[d];
+      }
+    }
+  }
 
   // Get all other editions for this brand
   const otherEditions = [...new Set(brandData.map(d => d.editionLabel))]
@@ -66,9 +146,14 @@ export function computeWhereAreWeNow(allData, targetBrand, targetEdition) {
     const deltaPercent = atSamePoint > 0
       ? parseFloat(((delta / atSamePoint) * 100).toFixed(1))
       : null;
-    const projectedFinal = atSamePoint > 0
+    const projectedFinal = (!isEventPast && atSamePoint > 0)
       ? Math.round((currentRegistrations / atSamePoint) * totalFinal)
       : null;
+
+    // What % of final registrations this edition had at the same point
+    const completionPercent = totalFinal > 0
+      ? parseFloat(((atSamePoint / totalFinal) * 100).toFixed(1))
+      : 0;
 
     comparisons.push({
       editionLabel: edLabel,
@@ -81,20 +166,19 @@ export function computeWhereAreWeNow(allData, targetBrand, targetEdition) {
       delta,
       deltaPercent,
       projectedFinal,
+      completionPercent,
     });
   }
-
-  // Build the target's own cumulative curve
-  const targetCumulative = buildCumulativeCurve(targetRows);
 
   // Average metrics
   const validComps = comparisons.filter(c => c.atSamePoint > 0);
   const avgAtSamePoint = validComps.length
     ? Math.round(validComps.reduce((s, c) => s + c.atSamePoint, 0) / validComps.length)
     : 0;
-  const avgProjectedFinal = validComps.length
-    ? Math.round(validComps.reduce((s, c) => s + (c.projectedFinal || 0), 0) / validComps.length)
-    : 0;
+  const validProjections = validComps.filter(c => c.projectedFinal != null);
+  const avgProjectedFinal = (!isEventPast && validProjections.length)
+    ? Math.round(validProjections.reduce((s, c) => s + c.projectedFinal, 0) / validProjections.length)
+    : null;
   const avgFinal = comparisons.length
     ? Math.round(comparisons.reduce((s, c) => s + c.totalFinal, 0) / comparisons.length)
     : 0;
@@ -121,7 +205,11 @@ export function computeWhereAreWeNow(allData, targetBrand, targetEdition) {
     edition: targetEdition,
     eventDate: targetEventDate,
     currentDaysBefore,
+    isEventPast,
     currentRegistrations,
+    dataRegistrations,
+    isOverridden,
+    missingDays,
     currentAttended,
     currentConversion: currentRegistrations > 0
       ? parseFloat(((currentAttended / currentRegistrations) * 100).toFixed(1))

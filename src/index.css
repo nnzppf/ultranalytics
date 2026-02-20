@@ -1,67 +1,124 @@
+/* ===== IMPORT INTER FONT ===== */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+
+/* ===== BASE RESET ===== */
+*, *::before, *::after {
+  box-sizing: border-box;
+}
+
 body {
   margin: 0;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
-    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
-    sans-serif;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  background: #0f172a;
+  color: #f1f5f9;
+  line-height: 1.5;
 }
 
 code {
-  font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New',
-    monospace;
+  font-family: 'JetBrains Mono', 'Fira Code', source-code-pro, Menlo, Monaco, Consolas, monospace;
+}
+
+/* ===== CUSTOM SCROLLBAR — GLOBAL ===== */
+/* Webkit (Chrome, Safari, Edge) */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(148, 163, 184, 0.2);
+  border-radius: 99px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(148, 163, 184, 0.35);
+}
+
+::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
+/* Firefox */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(148, 163, 184, 0.2) transparent;
+}
+
+/* ===== SELECTION ===== */
+::selection {
+  background: rgba(139, 92, 246, 0.3);
+  color: #f1f5f9;
+}
+
+/* ===== GLOBAL INTERACTIVE TRANSITIONS ===== */
+button, a, select, input {
+  transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease,
+              box-shadow 0.15s ease, transform 0.15s ease, opacity 0.15s ease;
+}
+
+/* Remove default focus outline, add custom */
+button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible {
+  outline: 2px solid rgba(139, 92, 246, 0.5);
+  outline-offset: 2px;
+}
+
+/* ===== SMOOTH SCROLL ===== */
+html {
+  scroll-behavior: smooth;
+}
+
+/* ===== TABLE POLISH ===== */
+table {
+  border-spacing: 0;
 }
 
 /* ===== RESPONSIVE MOBILE STYLES ===== */
 
 /* Tablet & below (< 900px) */
 @media (max-width: 900px) {
-  /* Main 2-column grids → stack vertically */
   .grid-2-col {
     grid-template-columns: 1fr !important;
   }
 
-  /* Reduce main padding */
   .app-content {
     padding-left: 12px !important;
     padding-right: 12px !important;
   }
 
-  /* Top bar: let items wrap tighter */
   .top-bar {
     padding: 8px 12px !important;
     gap: 8px !important;
   }
 
-  /* KPI grid: smaller min-width */
   .kpi-grid {
     grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)) !important;
     padding: 12px !important;
     gap: 8px !important;
   }
 
-  /* Section padding */
   .section-box {
     padding: 14px !important;
     border-radius: 10px !important;
   }
 
-  /* Tab bar */
   .tab-bar {
     padding: 0 12px 10px !important;
   }
 
-  /* Birthday KPI row */
   .bday-kpi-grid {
     grid-template-columns: repeat(3, 1fr) !important;
   }
 
-  /* Birthday upcoming list: taller scroll */
   .bday-upcoming-list {
     max-height: none !important;
   }
 
-  /* Edition selector */
   .edition-bar {
     padding: 8px 12px !important;
   }
@@ -69,19 +126,16 @@ code {
 
 /* Phone (< 600px) */
 @media (max-width: 600px) {
-  /* Top bar: stack filters below logo */
   .top-bar {
     padding: 8px 10px !important;
     gap: 6px !important;
   }
 
-  /* Hide filter separator */
   .filter-separator {
     border-left: none !important;
     padding-left: 0 !important;
   }
 
-  /* Filters: horizontal scroll */
   .filter-row {
     overflow-x: auto;
     -webkit-overflow-scrolling: touch;
@@ -92,67 +146,56 @@ code {
     display: none;
   }
 
-  /* App padding minimal */
   .app-content {
     padding-left: 8px !important;
     padding-right: 8px !important;
     padding-bottom: 20px !important;
   }
 
-  /* KPI grid: 2 columns on phone */
   .kpi-grid {
     grid-template-columns: repeat(2, 1fr) !important;
     padding: 8px !important;
   }
 
-  /* Birthday KPI: stack to 1 col on very small */
   .bday-kpi-grid {
     grid-template-columns: 1fr 1fr 1fr !important;
     gap: 8px !important;
   }
 
-  /* Section box less padding */
   .section-box {
     padding: 10px !important;
     border-radius: 8px !important;
   }
 
-  /* Section header: stack title and extra controls */
   .section-header {
     flex-direction: column !important;
     align-items: flex-start !important;
     gap: 8px !important;
   }
 
-  /* Birthday cards: user stats 3-col stays but smaller */
   .user-stats-grid {
     gap: 4px !important;
   }
 
-  /* Calendar cells smaller */
   .calendar-grid {
     gap: 2px !important;
   }
 
-  /* Selected day cards: single column */
   .selected-day-grid {
     grid-template-columns: 1fr !important;
   }
 
-  /* Tab buttons: slightly smaller */
   .tab-bar button {
     padding: 6px 12px !important;
-    font-size: 11px !important;
+    font-size: 12px !important;
   }
 
-  /* WhatsApp modal: full width */
   .wa-modal-content {
     max-width: 100% !important;
     border-radius: 12px !important;
     margin: 10px !important;
   }
 
-  /* Prossimi compleanni extra buttons: wrap */
   .bday-extra-controls {
     flex-wrap: wrap !important;
   }

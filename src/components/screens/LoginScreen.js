@@ -1,5 +1,6 @@
 import { useAuth } from '../../contexts/AuthContext';
 import { Loader } from 'lucide-react';
+import { colors, font, radius, gradients, shadows, alpha } from '../../config/designTokens';
 
 export default function LoginScreen() {
   const { loginWithGoogle, authError, loading } = useAuth();
@@ -7,11 +8,11 @@ export default function LoginScreen() {
   if (loading) {
     return (
       <div style={{
-        minHeight: "100vh", background: "#0f172a", display: "flex",
+        minHeight: "100vh", background: colors.bg.page, display: "flex",
         alignItems: "center", justifyContent: "center", flexDirection: "column", gap: 16,
       }}>
-        <Loader size={32} color="#8b5cf6" style={{ animation: "spin 1s linear infinite" }} />
-        <div style={{ color: "#94a3b8", fontSize: 14 }}>Verifica autenticazione...</div>
+        <Loader size={32} color={colors.brand.purple} style={{ animation: "spin 1s linear infinite" }} />
+        <div style={{ color: colors.text.muted, fontSize: font.size.md }}>Verifica autenticazione...</div>
         <style>{`@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }`}</style>
       </div>
     );
@@ -19,32 +20,32 @@ export default function LoginScreen() {
 
   return (
     <div style={{
-      minHeight: "100vh", background: "#0f172a", display: "flex",
+      minHeight: "100vh", background: colors.bg.page, display: "flex",
       flexDirection: "column", alignItems: "center", justifyContent: "center",
     }}>
       {/* Logo / Header */}
       <div style={{ textAlign: "center", marginBottom: 40 }}>
         <div style={{
-          fontSize: 36, fontWeight: 800, letterSpacing: "-0.02em",
-          background: "linear-gradient(135deg, #7c3aed 0%, #ec4899 100%)",
+          fontSize: 36, fontWeight: font.weight.black, letterSpacing: "-0.02em",
+          background: gradients.brand,
           WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent",
         }}>
           Ultranalytics
         </div>
-        <div style={{ color: "#64748b", fontSize: 14, marginTop: 8 }}>
+        <div style={{ color: colors.text.disabled, fontSize: font.size.md, marginTop: 8 }}>
           Dashboard eventi & registrazioni
         </div>
       </div>
 
       {/* Login Card */}
       <div style={{
-        background: "#1e293b", borderRadius: 16, padding: "36px 40px",
-        border: "1px solid #334155", width: "100%", maxWidth: 380,
+        background: colors.bg.card, borderRadius: radius["4xl"], padding: "36px 40px",
+        border: `1px solid ${colors.border.default}`, width: "100%", maxWidth: 380,
         display: "flex", flexDirection: "column", alignItems: "center", gap: 20,
       }}>
         <div style={{
-          width: 56, height: 56, borderRadius: 16,
-          background: "linear-gradient(135deg, #7c3aed, #ec4899)",
+          width: 56, height: 56, borderRadius: radius["4xl"],
+          background: gradients.brand,
           display: "flex", alignItems: "center", justifyContent: "center",
           fontSize: 24,
         }}>
@@ -52,19 +53,19 @@ export default function LoginScreen() {
         </div>
 
         <div style={{ textAlign: "center" }}>
-          <div style={{ fontSize: 18, fontWeight: 700, color: "#f1f5f9" }}>
+          <div style={{ fontSize: font.size.xl, fontWeight: font.weight.bold, color: colors.text.primary }}>
             Accesso richiesto
           </div>
-          <div style={{ fontSize: 13, color: "#64748b", marginTop: 4 }}>
+          <div style={{ fontSize: font.size.base, color: colors.text.disabled, marginTop: 4 }}>
             Accedi con il tuo account Google per continuare
           </div>
         </div>
 
         {authError && (
           <div style={{
-            background: "rgba(239,68,68,0.1)", border: "1px solid rgba(239,68,68,0.3)",
-            borderRadius: 8, padding: "10px 14px", width: "100%",
-            fontSize: 12, color: "#fca5a5", textAlign: "center",
+            background: alpha.error[10], border: `1px solid ${alpha.error[30]}`,
+            borderRadius: radius.lg, padding: "10px 14px", width: "100%",
+            fontSize: font.size.sm, color: colors.status.errorLight, textAlign: "center",
           }}>
             {authError}
           </div>
@@ -73,15 +74,15 @@ export default function LoginScreen() {
         <button
           onClick={loginWithGoogle}
           style={{
-            width: "100%", padding: "12px 20px", borderRadius: 10,
-            background: "#fff", border: "none", cursor: "pointer",
+            width: "100%", padding: "12px 20px", borderRadius: radius.xl,
+            background: colors.text.inverse, border: "none", cursor: "pointer",
             display: "flex", alignItems: "center", justifyContent: "center", gap: 10,
-            fontSize: 14, fontWeight: 600, color: "#1e293b",
-            transition: "transform 0.15s, box-shadow 0.15s",
+            fontSize: font.size.md, fontWeight: font.weight.semibold, color: colors.bg.card,
+            transition: `transform 0.15s, box-shadow 0.15s`,
           }}
           onMouseEnter={e => {
             e.currentTarget.style.transform = "translateY(-1px)";
-            e.currentTarget.style.boxShadow = "0 4px 12px rgba(139,92,246,0.3)";
+            e.currentTarget.style.boxShadow = shadows.brand;
           }}
           onMouseLeave={e => {
             e.currentTarget.style.transform = "translateY(0)";
@@ -99,7 +100,7 @@ export default function LoginScreen() {
         </button>
       </div>
 
-      <div style={{ color: "#475569", fontSize: 11, marginTop: 24, textAlign: "center" }}>
+      <div style={{ color: colors.border.strong, fontSize: font.size.xs, marginTop: 24, textAlign: "center" }}>
         Solo gli account autorizzati possono accedere
       </div>
     </div>

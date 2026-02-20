@@ -2,6 +2,7 @@ import { useState, useMemo } from 'react';
 import { Phone, Mail, MessageCircle, Calendar } from 'lucide-react';
 import { SegmentBadge } from '../shared/Badge';
 import { formatWhatsAppUrl } from '../../utils/whatsapp';
+import { colors, font, radius, shadows, presets, transition as tr } from '../../config/designTokens';
 
 function formatBirthDate(d) {
   if (!d || !(d instanceof Date)) return null;
@@ -54,15 +55,17 @@ export default function UsersTab({ userStats }) {
 
   const sortIcon = (key) => sortBy === key ? (sortDir === 'asc' ? ' \u25b2' : ' \u25bc') : '';
 
+  const thStyle = { padding: "10px 8px", color: colors.text.muted, fontWeight: font.weight.medium, cursor: "pointer" };
+
   return (
     <div>
       {/* Filters */}
       <div style={{ display: "flex", gap: 8, marginBottom: 14, flexWrap: "wrap", alignItems: "center" }}>
         {segments.map(s => (
           <button key={s.key} onClick={() => setSegmentFilter(s.key)} style={{
-            padding: "5px 12px", borderRadius: 8, fontSize: 11, border: "none", cursor: "pointer",
-            background: segmentFilter === s.key ? "#8b5cf6" : "#1e293b",
-            color: segmentFilter === s.key ? "#fff" : "#94a3b8",
+            ...presets.filterButton,
+            background: segmentFilter === s.key ? colors.interactive.active : colors.bg.card,
+            color: segmentFilter === s.key ? colors.interactive.activeText : colors.interactive.inactiveText,
           }}>{s.label}</button>
         ))}
         <input
@@ -70,36 +73,36 @@ export default function UsersTab({ userStats }) {
           value={searchTerm}
           onChange={e => setSearchTerm(e.target.value)}
           style={{
-            background: "#1e293b", border: "1px solid #334155", borderRadius: 8,
-            padding: "5px 12px", color: "#f1f5f9", fontSize: 12, outline: "none", marginLeft: "auto",
+            background: colors.bg.card, border: `1px solid ${colors.border.default}`, borderRadius: radius.lg,
+            padding: "5px 12px", color: colors.text.primary, fontSize: font.size.sm, outline: "none", marginLeft: "auto",
           }}
         />
       </div>
 
       {/* Count */}
-      <div style={{ fontSize: 11, color: "#64748b", marginBottom: 8 }}>
+      <div style={{ fontSize: font.size.xs, color: colors.text.disabled, marginBottom: 8 }}>
         {filtered.length} utenti trovati
       </div>
 
       {/* Table */}
-      <div style={{ background: "#1e293b", borderRadius: 12, border: "1px solid #334155", overflowX: "auto" }}>
-        <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
+      <div style={{ background: colors.bg.card, borderRadius: radius["2xl"], border: `1px solid ${colors.border.default}`, overflowX: "auto" }}>
+        <table style={{ width: "100%", borderCollapse: "collapse", fontSize: font.size.sm }}>
           <thead>
-            <tr style={{ borderBottom: "1px solid #334155" }}>
-              <th onClick={() => toggleSort('name')} style={{ textAlign: "left", padding: "10px 12px", color: "#94a3b8", cursor: "pointer", fontWeight: 500 }}>
+            <tr style={{ borderBottom: `1px solid ${colors.border.default}` }}>
+              <th onClick={() => toggleSort('name')} style={{ ...thStyle, textAlign: "left", paddingLeft: 12 }}>
                 Nome{sortIcon('name')}
               </th>
-              <th style={{ padding: "10px 8px", color: "#94a3b8", fontWeight: 500 }}>Segmento</th>
-              <th onClick={() => toggleSort('totalRegs')} style={{ textAlign: "center", padding: "10px 8px", color: "#94a3b8", cursor: "pointer", fontWeight: 500 }}>
+              <th style={{ ...thStyle, cursor: "default" }}>Segmento</th>
+              <th onClick={() => toggleSort('totalRegs')} style={{ ...thStyle, textAlign: "center" }}>
                 Registrazioni{sortIcon('totalRegs')}
               </th>
-              <th onClick={() => toggleSort('totalParticipated')} style={{ textAlign: "center", padding: "10px 8px", color: "#94a3b8", cursor: "pointer", fontWeight: 500 }}>
+              <th onClick={() => toggleSort('totalParticipated')} style={{ ...thStyle, textAlign: "center" }}>
                 Presenze{sortIcon('totalParticipated')}
               </th>
-              <th onClick={() => toggleSort('conversion')} style={{ textAlign: "center", padding: "10px 8px", color: "#94a3b8", cursor: "pointer", fontWeight: 500 }}>
+              <th onClick={() => toggleSort('conversion')} style={{ ...thStyle, textAlign: "center" }}>
                 Conv.{sortIcon('conversion')}
               </th>
-              <th style={{ textAlign: "center", padding: "10px 8px", color: "#94a3b8", fontWeight: 500 }}>Eventi</th>
+              <th style={{ ...thStyle, textAlign: "center", cursor: "default" }}>Eventi</th>
             </tr>
           </thead>
           <tbody>
@@ -108,26 +111,26 @@ export default function UsersTab({ userStats }) {
                 key={i}
                 onClick={() => setSelectedUser(u)}
                 style={{
-                  borderBottom: "1px solid #0f172a", cursor: "pointer",
-                  transition: "background 0.1s",
+                  borderBottom: `1px solid ${colors.bg.page}`, cursor: "pointer",
+                  transition: tr.fast,
                 }}
-                onMouseEnter={e => { e.currentTarget.style.background = "#334155"; }}
+                onMouseEnter={e => { e.currentTarget.style.background = colors.bg.elevated; }}
                 onMouseLeave={e => { e.currentTarget.style.background = "transparent"; }}
               >
-                <td style={{ padding: "8px 12px", color: "#f1f5f9", fontWeight: 500 }}>{u.name}</td>
+                <td style={{ padding: "8px 12px", color: colors.text.primary, fontWeight: font.weight.medium }}>{u.name}</td>
                 <td style={{ padding: "8px", textAlign: "center" }}><SegmentBadge segment={u.segment} /></td>
-                <td style={{ padding: "8px", textAlign: "center", color: "#f1f5f9" }}>{u.totalRegs}</td>
-                <td style={{ padding: "8px", textAlign: "center", color: "#f1f5f9" }}>{u.totalParticipated}</td>
-                <td style={{ padding: "8px", textAlign: "center", color: u.conversion >= 70 ? "#10b981" : u.conversion >= 40 ? "#f59e0b" : "#ef4444", fontWeight: 600 }}>
+                <td style={{ padding: "8px", textAlign: "center", color: colors.text.primary }}>{u.totalRegs}</td>
+                <td style={{ padding: "8px", textAlign: "center", color: colors.text.primary }}>{u.totalParticipated}</td>
+                <td style={{ padding: "8px", textAlign: "center", color: u.conversion >= 70 ? colors.status.success : u.conversion >= 40 ? colors.status.warning : colors.status.error, fontWeight: font.weight.semibold }}>
                   {u.conversion}%
                 </td>
-                <td style={{ padding: "8px", textAlign: "center", color: "#94a3b8" }}>{u.eventCount}</td>
+                <td style={{ padding: "8px", textAlign: "center", color: colors.text.muted }}>{u.eventCount}</td>
               </tr>
             ))}
           </tbody>
         </table>
         {filtered.length > 100 && (
-          <div style={{ padding: 12, textAlign: "center", fontSize: 11, color: "#64748b" }}>
+          <div style={{ padding: 12, textAlign: "center", fontSize: font.size.xs, color: colors.text.disabled }}>
             Mostrati 100 di {filtered.length} utenti
           </div>
         )}
@@ -144,48 +147,49 @@ export default function UsersTab({ userStats }) {
           }}
         >
           <div onClick={e => e.stopPropagation()} style={{
-            background: "#1e293b", borderRadius: 16, padding: 24, maxWidth: 500, width: "90%",
-            border: "1px solid #334155", maxHeight: "80vh", overflowY: "auto",
+            background: colors.bg.card, borderRadius: radius["4xl"], padding: 24, maxWidth: 500, width: "90%",
+            border: `1px solid ${colors.border.default}`, maxHeight: "80vh", overflowY: "auto",
+            boxShadow: shadows.xl,
           }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
               <div>
-                <div style={{ fontSize: 18, fontWeight: 700, color: "#f1f5f9" }}>{selectedUser.name}</div>
+                <div style={{ fontSize: font.size.xl, fontWeight: font.weight.bold, color: colors.text.primary }}>{selectedUser.name}</div>
                 <SegmentBadge segment={selectedUser.segment} />
               </div>
               <button onClick={() => setSelectedUser(null)} style={{
-                background: "#334155", border: "none", borderRadius: 8, padding: "6px 12px",
-                color: "#f1f5f9", cursor: "pointer", fontSize: 12,
+                background: colors.bg.elevated, border: "none", borderRadius: radius.lg, padding: "6px 12px",
+                color: colors.text.primary, cursor: "pointer", fontSize: font.size.sm,
               }}>Chiudi</button>
             </div>
 
             {/* Contact info */}
-            <div style={{ background: "#0f172a", borderRadius: 10, padding: 14, marginBottom: 16 }}>
+            <div style={{ background: colors.bg.page, borderRadius: radius.xl, padding: 14, marginBottom: 16 }}>
               <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
                 {selectedUser.phone && (
                   <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                    <Phone size={14} color="#8b5cf6" />
-                    <span style={{ fontSize: 13, color: "#f1f5f9" }}>{selectedUser.phone}</span>
+                    <Phone size={14} color={colors.brand.purple} />
+                    <span style={{ fontSize: font.size.base, color: colors.text.primary }}>{selectedUser.phone}</span>
                   </div>
                 )}
                 {selectedUser.email && (
                   <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                    <Mail size={14} color="#8b5cf6" />
-                    <span style={{ fontSize: 13, color: "#f1f5f9" }}>{selectedUser.email}</span>
+                    <Mail size={14} color={colors.brand.purple} />
+                    <span style={{ fontSize: font.size.base, color: colors.text.primary }}>{selectedUser.email}</span>
                   </div>
                 )}
                 {selectedUser.birthDate && (
                   <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                    <Calendar size={14} color="#8b5cf6" />
-                    <span style={{ fontSize: 13, color: "#f1f5f9" }}>
+                    <Calendar size={14} color={colors.brand.purple} />
+                    <span style={{ fontSize: font.size.base, color: colors.text.primary }}>
                       {formatBirthDate(selectedUser.birthDate)}
                       {calculateAge(selectedUser.birthDate) != null && (
-                        <span style={{ color: "#94a3b8", marginLeft: 6 }}>({calculateAge(selectedUser.birthDate)} anni)</span>
+                        <span style={{ color: colors.text.muted, marginLeft: 6 }}>({calculateAge(selectedUser.birthDate)} anni)</span>
                       )}
                     </span>
                   </div>
                 )}
                 {!selectedUser.phone && !selectedUser.email && !selectedUser.birthDate && (
-                  <div style={{ fontSize: 12, color: "#64748b", fontStyle: "italic" }}>Nessun dato di contatto disponibile</div>
+                  <div style={{ fontSize: font.size.sm, color: colors.text.disabled, fontStyle: "italic" }}>Nessun dato di contatto disponibile</div>
                 )}
               </div>
 
@@ -197,8 +201,8 @@ export default function UsersTab({ userStats }) {
                   rel="noopener noreferrer"
                   style={{
                     display: "inline-flex", alignItems: "center", gap: 8, marginTop: 12,
-                    background: "#25d366", color: "#fff", borderRadius: 10, padding: "8px 18px",
-                    fontSize: 13, fontWeight: 600, textDecoration: "none", border: "none", cursor: "pointer",
+                    background: colors.whatsapp, color: colors.text.inverse, borderRadius: radius.xl, padding: "8px 18px",
+                    fontSize: font.size.base, fontWeight: font.weight.semibold, textDecoration: "none", border: "none", cursor: "pointer",
                   }}
                 >
                   <MessageCircle size={16} />
@@ -214,23 +218,23 @@ export default function UsersTab({ userStats }) {
                 { label: "Conversione", value: `${selectedUser.conversion}%` },
                 { label: "Eventi", value: selectedUser.eventCount },
               ].map(k => (
-                <div key={k.label} style={{ background: "#0f172a", borderRadius: 8, padding: 10, textAlign: "center" }}>
-                  <div style={{ fontSize: 9, color: "#64748b" }}>{k.label}</div>
-                  <div style={{ fontSize: 16, fontWeight: 700, color: "#f1f5f9" }}>{k.value}</div>
+                <div key={k.label} style={{ background: colors.bg.page, borderRadius: radius.lg, padding: 10, textAlign: "center" }}>
+                  <div style={presets.statLabel}>{k.label}</div>
+                  <div style={{ fontSize: font.size.lg, fontWeight: font.weight.bold, color: colors.text.primary }}>{k.value}</div>
                 </div>
               ))}
             </div>
 
-            <div style={{ fontSize: 11, color: "#94a3b8", textTransform: "uppercase", marginBottom: 8 }}>
+            <div style={{ ...presets.sectionLabel, marginBottom: 8 }}>
               Dettaglio eventi
             </div>
             {selectedUser.events.map((ev, i) => (
               <div key={i} style={{
                 display: "flex", justifyContent: "space-between", alignItems: "center",
-                padding: "8px 0", borderBottom: "1px solid #334155", fontSize: 12,
+                padding: "8px 0", borderBottom: `1px solid ${colors.border.default}`, fontSize: font.size.sm,
               }}>
-                <span style={{ color: "#f1f5f9" }}>{ev.event}</span>
-                <span style={{ color: "#94a3b8" }}>
+                <span style={{ color: colors.text.primary }}>{ev.event}</span>
+                <span style={{ color: colors.text.muted }}>
                   {ev.count} reg. / {ev.participated} pres.
                 </span>
               </div>

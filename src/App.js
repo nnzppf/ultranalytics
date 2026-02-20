@@ -11,6 +11,7 @@ import { getHourlyData, getHourlyDataByGroup, getDowData, getFasciaData, getDays
 import { saveDataset, loadAllData, deleteDataset, hasStoredData } from "./services/firebaseDataService";
 
 import { GENRE_LABELS, BRAND_REGISTRY } from "./config/eventConfig";
+import { colors, font, radius, gradients, transition as tr } from "./config/designTokens";
 import KPI from "./components/shared/KPI";
 import UploadScreen from "./components/screens/UploadScreen";
 import OverviewTab from "./components/tabs/OverviewTab";
@@ -33,11 +34,11 @@ export default function ClubAnalytics() {
   if (authLoading) {
     return (
       <div style={{
-        minHeight: "100vh", background: "#0f172a", display: "flex",
+        minHeight: "100vh", background: colors.bg.page, display: "flex",
         alignItems: "center", justifyContent: "center", flexDirection: "column", gap: 16,
       }}>
-        <Loader size={32} color="#8b5cf6" style={{ animation: "spin 1s linear infinite" }} />
-        <div style={{ color: "#94a3b8", fontSize: 14 }}>Verifica autenticazione...</div>
+        <Loader size={32} color={colors.brand.purple} style={{ animation: "spin 1s linear infinite" }} />
+        <div style={{ color: colors.text.muted, fontSize: font.size.md }}>Verifica autenticazione...</div>
         <style>{`@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }`}</style>
       </div>
     );
@@ -320,11 +321,11 @@ function AuthenticatedApp({ user, logout }) {
   if (step === "loading") {
     return (
       <div style={{
-        minHeight: "100vh", background: "#0f172a", display: "flex",
+        minHeight: "100vh", background: colors.bg.page, display: "flex",
         alignItems: "center", justifyContent: "center", flexDirection: "column", gap: 16,
       }}>
-        <Loader size={32} color="#8b5cf6" style={{ animation: "spin 1s linear infinite" }} />
-        <div style={{ color: "#94a3b8", fontSize: 14 }}>Caricamento dati dal cloud...</div>
+        <Loader size={32} color={colors.brand.purple} style={{ animation: "spin 1s linear infinite" }} />
+        <div style={{ color: colors.text.muted, fontSize: font.size.md }}>Caricamento dati dal cloud...</div>
         <style>{`@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }`}</style>
       </div>
     );
@@ -353,51 +354,52 @@ function AuthenticatedApp({ user, logout }) {
   // Cloud status indicator
   const CloudIndicator = () => (
     <div style={{ display: "flex", alignItems: "center", gap: 6, marginLeft: 8 }}>
-      {cloudStatus === "saving" && <Loader size={12} color="#f59e0b" style={{ animation: "spin 1s linear infinite" }} />}
-      {cloudStatus === "saved" && <Cloud size={12} color="#10b981" />}
-      {cloudStatus === "error" && <CloudOff size={12} color="#ef4444" />}
-      {cloudStatus === "idle" && <CloudOff size={12} color="#64748b" />}
-      <span style={{ fontSize: 9, color: cloudStatus === "saved" ? "#10b981" : cloudStatus === "error" ? "#ef4444" : "#64748b" }}>
+      {cloudStatus === "saving" && <Loader size={12} color={colors.status.warning} style={{ animation: "spin 1s linear infinite" }} />}
+      {cloudStatus === "saved" && <Cloud size={12} color={colors.status.success} />}
+      {cloudStatus === "error" && <CloudOff size={12} color={colors.status.error} />}
+      {cloudStatus === "idle" && <CloudOff size={12} color={colors.text.disabled} />}
+      <span style={{ fontSize: font.size.xs, color: cloudStatus === "saved" ? colors.status.success : cloudStatus === "error" ? colors.status.error : colors.text.disabled }}>
         {cloudStatus === "saving" ? "Salvando..." : cloudStatus === "saved" ? "Cloud sync" : cloudStatus === "error" ? "Errore sync" : "Locale"}
       </span>
     </div>
   );
 
+  // Shared filter button style helper
+  const filterBtn = (isActive) => ({
+    padding: "5px 12px", borderRadius: radius.lg, fontSize: font.size.xs, border: "none", cursor: "pointer",
+    background: isActive ? colors.interactive.active : colors.interactive.inactive,
+    color: isActive ? colors.interactive.activeText : colors.interactive.inactiveText,
+    transition: tr.normal,
+  });
+
   return (
-    <div style={{ minHeight: "100vh", background: "#0f172a", color: "#f1f5f9" }}>
+    <div style={{ minHeight: "100vh", background: colors.bg.page, color: colors.text.primary }}>
       {/* Top Bar */}
       <div className="top-bar" style={{
         display: "flex", alignItems: "center", gap: 12, padding: "10px 20px",
-        background: "#1e293b", borderBottom: "1px solid #334155", flexWrap: "wrap",
+        background: colors.bg.card, borderBottom: `1px solid ${colors.border.default}`, flexWrap: "wrap",
       }}>
-        <div style={{ fontWeight: 800, fontSize: 16, background: "linear-gradient(135deg, #7c3aed, #ec4899)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>
+        <div style={{ fontWeight: font.weight.black, fontSize: font.size.lg, background: gradients.brand, WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>
           Ultranalytics
         </div>
         <CloudIndicator />
 
         {/* Category filter */}
         <div className="filter-row" style={{ display: "flex", gap: 4, marginLeft: 16, alignItems: "center" }}>
-          <button onClick={() => { setSelectedCategory("all"); setSelectedGenre("all"); setSelectedBrand("all"); setSelectedEdition("all"); }} style={{
-            padding: "4px 10px", borderRadius: 6, fontSize: 10, border: "none", cursor: "pointer",
-            background: selectedCategory === "all" && selectedGenre === "all" ? "#8b5cf6" : "#334155",
-            color: selectedCategory === "all" && selectedGenre === "all" ? "#fff" : "#94a3b8",
-          }}>Tutti</button>
+          <button onClick={() => { setSelectedCategory("all"); setSelectedGenre("all"); setSelectedBrand("all"); setSelectedEdition("all"); }}
+            style={filterBtn(selectedCategory === "all" && selectedGenre === "all")}>Tutti</button>
           {categories.map(c => (
-            <button key={c} onClick={() => { setSelectedCategory(c); setSelectedGenre("all"); setSelectedBrand("all"); setSelectedEdition("all"); }} style={{
-              padding: "4px 10px", borderRadius: 6, fontSize: 10, border: "none", cursor: "pointer",
-              background: selectedCategory === c && selectedGenre === "all" ? "#8b5cf6" : "#334155",
-              color: selectedCategory === c && selectedGenre === "all" ? "#fff" : "#94a3b8", textTransform: "capitalize",
-            }}>{c}</button>
+            <button key={c} onClick={() => { setSelectedCategory(c); setSelectedGenre("all"); setSelectedBrand("all"); setSelectedEdition("all"); }}
+              style={{ ...filterBtn(selectedCategory === c && selectedGenre === "all"), textTransform: "capitalize" }}>{c}</button>
           ))}
         </div>
 
         {/* Genre filter */}
-        <div className="filter-row filter-separator" style={{ display: "flex", gap: 4, alignItems: "center", borderLeft: "1px solid #475569", paddingLeft: 8 }}>
+        <div className="filter-row filter-separator" style={{ display: "flex", gap: 4, alignItems: "center", borderLeft: `1px solid ${colors.border.strong}`, paddingLeft: 8 }}>
           {Object.entries(GENRE_LABELS).map(([g, genreInfo]) => (
             <button key={g} onClick={() => { setSelectedGenre(g); setSelectedCategory("all"); setSelectedBrand("all"); setSelectedEdition("all"); }} style={{
-              padding: "4px 10px", borderRadius: 6, fontSize: 10, border: "none", cursor: "pointer",
-              background: selectedGenre === g ? (genreInfo.color || "#8b5cf6") : "#334155",
-              color: selectedGenre === g ? "#fff" : "#94a3b8",
+              ...filterBtn(selectedGenre === g),
+              background: selectedGenre === g ? (genreInfo.color || colors.interactive.active) : colors.interactive.inactive,
               whiteSpace: "nowrap",
             }}>{genreInfo.label}</button>
           ))}
@@ -408,8 +410,8 @@ function AuthenticatedApp({ user, logout }) {
           value={selectedBrand}
           onChange={e => { setSelectedBrand(e.target.value); setSelectedEdition("all"); }}
           style={{
-            background: "#334155", border: "1px solid #475569", borderRadius: 6,
-            color: "#f1f5f9", fontSize: 11, padding: "4px 8px", outline: "none",
+            background: colors.bg.elevated, border: `1px solid ${colors.border.strong}`, borderRadius: radius.md,
+            color: colors.text.primary, fontSize: font.size.xs, padding: "4px 8px", outline: "none",
           }}
         >
           <option value="all">Tutti i brand ({availableBrands.length})</option>
@@ -419,8 +421,8 @@ function AuthenticatedApp({ user, logout }) {
         {/* Right side: data management + user */}
         <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 8 }}>
           <button onClick={() => { setStep("upload"); setFiles([]); }} style={{
-            background: "#334155", border: "none", borderRadius: 6,
-            color: "#94a3b8", fontSize: 11, padding: "5px 12px", cursor: "pointer",
+            background: colors.bg.elevated, border: "none", borderRadius: radius.md,
+            color: colors.text.muted, fontSize: font.size.xs, padding: "5px 12px", cursor: "pointer",
             display: "flex", alignItems: "center", gap: 4,
           }}>
             <Database size={11} /> Gestisci dati
@@ -431,14 +433,14 @@ function AuthenticatedApp({ user, logout }) {
             {user?.photoURL && (
               <img src={user.photoURL} alt="" style={{
                 width: 24, height: 24, borderRadius: "50%",
-                border: "1px solid #475569",
+                border: `1px solid ${colors.border.strong}`,
               }} referrerPolicy="no-referrer" />
             )}
             <button onClick={logout} title="Esci" style={{
               background: "none", border: "none", cursor: "pointer", padding: 4,
               display: "flex", alignItems: "center",
             }}>
-              <LogOut size={14} color="#64748b" />
+              <LogOut size={14} color={colors.text.disabled} />
             </button>
           </div>
         </div>
@@ -448,29 +450,19 @@ function AuthenticatedApp({ user, logout }) {
       {selectedBrand !== "all" && availableEditions.length > 1 && (
         <div className="edition-bar" style={{
           display: "flex", gap: 4, padding: "8px 20px",
-          background: "#1e293b80", borderBottom: "1px solid #334155",
+          background: `${colors.bg.card}80`, borderBottom: `1px solid ${colors.border.default}`,
           alignItems: "center", overflowX: "auto",
         }}>
-          <span style={{ fontSize: 10, color: "#64748b", marginRight: 4, whiteSpace: "nowrap" }}>Edizione:</span>
+          <span style={{ fontSize: font.size.xs, color: colors.text.disabled, marginRight: 4, whiteSpace: "nowrap" }}>Edizione:</span>
           <button
             onClick={() => setSelectedEdition("all")}
-            style={{
-              padding: "3px 10px", borderRadius: 6, fontSize: 10, border: "none", cursor: "pointer",
-              background: selectedEdition === "all" ? "#8b5cf6" : "#334155",
-              color: selectedEdition === "all" ? "#fff" : "#94a3b8",
-              whiteSpace: "nowrap",
-            }}
+            style={{ ...filterBtn(selectedEdition === "all"), whiteSpace: "nowrap" }}
           >Tutte ({availableEditions.length})</button>
           {availableEditions.map(ed => (
             <button
               key={ed}
               onClick={() => setSelectedEdition(ed)}
-              style={{
-                padding: "3px 10px", borderRadius: 6, fontSize: 10, border: "none", cursor: "pointer",
-                background: selectedEdition === ed ? "#8b5cf6" : "#334155",
-                color: selectedEdition === ed ? "#fff" : "#94a3b8",
-                whiteSpace: "nowrap",
-              }}
+              style={{ ...filterBtn(selectedEdition === ed), whiteSpace: "nowrap" }}
             >{ed}</button>
           ))}
         </div>
@@ -478,24 +470,25 @@ function AuthenticatedApp({ user, logout }) {
 
       {/* KPI Row */}
       <div className="kpi-grid" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 10, padding: "16px 20px" }}>
-        <KPI icon={Users} label="Registrazioni" value={analytics.total} color="#8b5cf6" />
-        <KPI icon={Check} label="Presenze" value={analytics.entered} sub={`${analytics.conv}% conversione`} color="#10b981" />
-        <KPI icon={TrendingUp} label="Conversione" value={`${analytics.conv}%`} color="#06b6d4" />
-        <KPI icon={X} label="No-Show" value={`${analytics.noShowRate}%`} color="#ef4444" />
-        <KPI icon={Calendar} label="Brand" value={analytics.brands.length} color="#f59e0b" />
+        <KPI icon={Users} label="Registrazioni" value={analytics.total} color={colors.brand.purple} primary />
+        <KPI icon={Check} label="Presenze" value={analytics.entered} sub={`${analytics.conv}% conversione`} color={colors.status.success} />
+        <KPI icon={TrendingUp} label="Conversione" value={`${analytics.conv}%`} color={colors.brand.cyan} />
+        <KPI icon={X} label="No-Show" value={`${analytics.noShowRate}%`} color={colors.status.error} />
+        <KPI icon={Calendar} label="Brand" value={analytics.brands.length} color={colors.status.warning} />
       </div>
 
       {/* Tab Navigation */}
       <div className="tab-bar" style={{ display: "flex", gap: 4, padding: "0 20px 12px", overflowX: "auto" }}>
         {tabs.map(t => (
           <button key={t.key} onClick={() => setActiveTab(t.key)} style={{
-            padding: "7px 16px", borderRadius: 8, fontSize: 12, border: "none", cursor: "pointer",
+            padding: "8px 18px", borderRadius: radius.lg, fontSize: font.size.base, border: "none", cursor: "pointer",
             background: activeTab === t.key
-              ? (t.highlight ? "linear-gradient(135deg, #7c3aed, #ec4899)" : "#8b5cf6")
-              : "#1e293b",
-            color: activeTab === t.key ? "#fff" : "#94a3b8",
-            fontWeight: activeTab === t.key ? 600 : 400,
+              ? (t.highlight ? gradients.brand : colors.interactive.active)
+              : colors.bg.card,
+            color: activeTab === t.key ? colors.interactive.activeText : colors.interactive.inactiveText,
+            fontWeight: activeTab === t.key ? font.weight.semibold : font.weight.medium,
             whiteSpace: "nowrap",
+            transition: tr.normal,
           }}>{t.label}</button>
         ))}
       </div>

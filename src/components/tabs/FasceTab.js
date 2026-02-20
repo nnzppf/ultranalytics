@@ -2,9 +2,10 @@ import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContaine
 import Section from '../shared/Section';
 import ResizeHandle from '../shared/ResizeHandle';
 import { TOOLTIP_STYLE, FASCE } from '../../config/constants';
+import { colors, font, radius } from '../../config/designTokens';
 
 export default function FasceTab({ fasciaData, convByFascia, graphHeights, setGraphHeights }) {
-  const pieColors = ["#6366f1", "#f59e0b", "#06b6d4", "#ec4899"];
+  const pieColors = colors.fasce;
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
@@ -12,8 +13,8 @@ export default function FasceTab({ fasciaData, convByFascia, graphHeights, setGr
       <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
         {FASCE.map((f, i) => (
           <span key={f} style={{
-            background: "#1e293b", borderRadius: 8, padding: "4px 12px",
-            fontSize: 11, color: pieColors[i], border: `1px solid ${pieColors[i]}33`,
+            background: colors.bg.card, borderRadius: radius.lg, padding: "4px 12px",
+            fontSize: font.size.xs, color: pieColors[i], border: `1px solid ${pieColors[i]}33`,
           }}>{f}</span>
         ))}
       </div>
@@ -23,9 +24,9 @@ export default function FasceTab({ fasciaData, convByFascia, graphHeights, setGr
         <Section title="Registrazioni per fascia oraria">
           <ResponsiveContainer width="100%" height={graphHeights.fasciaData || 250}>
             <BarChart data={fasciaData}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
-              <XAxis dataKey="fascia" tick={{ fill: "#94a3b8", fontSize: 11 }} />
-              <YAxis tick={{ fill: "#94a3b8", fontSize: 10 }} />
+              <CartesianGrid strokeDasharray="3 3" stroke={colors.border.default} />
+              <XAxis dataKey="fascia" tick={{ fill: colors.text.muted, fontSize: 11 }} />
+              <YAxis tick={{ fill: colors.text.muted, fontSize: 10 }} />
               <Tooltip {...TOOLTIP_STYLE} />
               <Bar dataKey="count" name="Registrazioni" radius={[6, 6, 0, 0]} maxBarSize={45}>
                 {fasciaData.map((_, i) => <Cell key={i} fill={pieColors[i]} />)}
@@ -39,13 +40,13 @@ export default function FasceTab({ fasciaData, convByFascia, graphHeights, setGr
         <Section title="Tasso di conversione per fascia">
           <ResponsiveContainer width="100%" height={graphHeights.convByFascia || 250}>
             <BarChart data={convByFascia}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
-              <XAxis dataKey="fascia" tick={{ fill: "#94a3b8", fontSize: 11 }} />
-              <YAxis tick={{ fill: "#94a3b8", fontSize: 10 }} unit="%" />
+              <CartesianGrid strokeDasharray="3 3" stroke={colors.border.default} />
+              <XAxis dataKey="fascia" tick={{ fill: colors.text.muted, fontSize: 11 }} />
+              <YAxis tick={{ fill: colors.text.muted, fontSize: 10 }} unit="%" />
               <Tooltip {...TOOLTIP_STYLE} />
               <Bar dataKey="conversione" name="Conversione %" radius={[6, 6, 0, 0]} maxBarSize={45}>
                 {convByFascia.map((d, i) => (
-                  <Cell key={i} fill={d.conversione >= 70 ? "#10b981" : d.conversione >= 40 ? "#f59e0b" : "#ef4444"} />
+                  <Cell key={i} fill={d.conversione >= 70 ? colors.status.success : d.conversione >= 40 ? colors.status.warning : colors.status.error} />
                 ))}
               </Bar>
             </BarChart>

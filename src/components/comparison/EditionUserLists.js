@@ -2,6 +2,7 @@ import { useState, useMemo } from 'react';
 import { ChevronDown, MessageCircle, Phone, Search, X, Edit3, Send } from 'lucide-react';
 import { SegmentBadge } from '../shared/Badge';
 import { formatWhatsAppUrl, openWhatsAppTab, applyTemplate, RETARGET_TEMPLATES } from '../../utils/whatsapp';
+import { colors, font, radius, shadows, presets, transition as tr, alpha } from '../../config/designTokens';
 
 // ---- Retarget WhatsApp Modal ----
 function WhatsAppRetargetModal({ user, brand, eventDate, eventLink, onClose }) {
@@ -41,59 +42,59 @@ function WhatsAppRetargetModal({ user, brand, eventDate, eventLink, onClose }) {
 
   return (
     <div style={{
-      position: "fixed", inset: 0, background: "rgba(0,0,0,0.7)",
+      position: "fixed", inset: 0, background: colors.overlay.dark,
       display: "flex", alignItems: "center", justifyContent: "center",
       zIndex: 9999, padding: 20,
     }} onClick={onClose}>
       <div
         onClick={e => e.stopPropagation()}
         style={{
-          background: "#1e293b", borderRadius: 16, width: "100%", maxWidth: 520,
-          border: "1px solid #334155", overflow: "hidden",
-          boxShadow: "0 20px 60px rgba(0,0,0,0.5)",
+          background: colors.bg.card, borderRadius: radius["4xl"], width: "100%", maxWidth: 520,
+          border: `1px solid ${colors.border.default}`, overflow: "hidden",
+          boxShadow: shadows.xl,
         }}
       >
         {/* Header */}
         <div style={{
-          background: "#25D366", padding: "14px 20px",
+          background: colors.whatsapp, padding: "14px 20px",
           display: "flex", justifyContent: "space-between", alignItems: "center",
         }}>
           <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-            <MessageCircle size={20} color="#fff" />
+            <MessageCircle size={20} color={colors.text.inverse} />
             <div>
-              <div style={{ fontSize: 14, fontWeight: 700, color: "#fff" }}>
+              <div style={{ fontSize: font.size.md, fontWeight: font.weight.bold, color: colors.text.inverse }}>
                 Invita {firstName} a {brand}
               </div>
-              <div style={{ fontSize: 11, color: "rgba(255,255,255,0.8)" }}>
+              <div style={{ fontSize: font.size.xs, color: alpha.white[80] }}>
                 {user.phone}
               </div>
             </div>
           </div>
           <button onClick={onClose} style={{
-            background: "rgba(255,255,255,0.2)", border: "none", borderRadius: 8,
+            background: alpha.white[20], border: "none", borderRadius: radius.lg,
             padding: 6, cursor: "pointer", display: "flex",
           }}>
-            <X size={16} color="#fff" />
+            <X size={16} color={colors.text.inverse} />
           </button>
         </div>
 
         <div style={{ padding: 20, maxHeight: "70vh", overflowY: "auto" }}>
           {/* Template selector */}
           <div style={{ marginBottom: 16 }}>
-            <div style={{ fontSize: 11, color: "#94a3b8", textTransform: "uppercase", marginBottom: 8, fontWeight: 600 }}>
+            <div style={{ ...presets.sectionLabel, marginBottom: 8 }}>
               Scegli messaggio
             </div>
             <button
               onClick={() => setShowTemplateList(!showTemplateList)}
               style={{
-                width: "100%", padding: "10px 14px", borderRadius: 10,
-                background: "#0f172a", border: "1px solid #334155",
+                width: "100%", padding: "10px 14px", borderRadius: radius.xl,
+                background: colors.bg.input, border: `1px solid ${colors.border.default}`,
                 cursor: "pointer", display: "flex", justifyContent: "space-between", alignItems: "center",
-                color: "#f1f5f9", fontSize: 13, fontWeight: 600,
+                color: colors.text.primary, fontSize: font.size.base, fontWeight: font.weight.semibold,
               }}
             >
               <span>{selectedTemplate?.icon} {selectedTemplate?.label}</span>
-              <ChevronDown size={16} color="#64748b" style={{
+              <ChevronDown size={16} color={colors.text.disabled} style={{
                 transform: showTemplateList ? "rotate(180deg)" : "none",
                 transition: "transform 0.2s",
               }} />
@@ -101,8 +102,8 @@ function WhatsAppRetargetModal({ user, brand, eventDate, eventLink, onClose }) {
 
             {showTemplateList && (
               <div style={{
-                marginTop: 4, borderRadius: 10, overflow: "hidden",
-                border: "1px solid #334155", background: "#0f172a",
+                marginTop: 4, borderRadius: radius.xl, overflow: "hidden",
+                border: `1px solid ${colors.border.default}`, background: colors.bg.input,
               }}>
                 {RETARGET_TEMPLATES.map(tpl => (
                   <button
@@ -110,19 +111,19 @@ function WhatsAppRetargetModal({ user, brand, eventDate, eventLink, onClose }) {
                     onClick={() => handleSelectTemplate(tpl)}
                     style={{
                       width: "100%", padding: "10px 14px",
-                      background: tpl.id === selectedTemplateId ? "rgba(139,92,246,0.15)" : "transparent",
-                      border: "none", borderBottom: "1px solid #1e293b",
+                      background: tpl.id === selectedTemplateId ? alpha.brand[15] : "transparent",
+                      border: "none", borderBottom: `1px solid ${colors.border.subtle}`,
                       cursor: "pointer", display: "flex", alignItems: "center", gap: 10,
-                      color: tpl.id === selectedTemplateId ? "#8b5cf6" : "#f1f5f9",
-                      fontSize: 12, textAlign: "left",
+                      color: tpl.id === selectedTemplateId ? colors.brand.purple : colors.text.primary,
+                      fontSize: font.size.sm, textAlign: "left",
                     }}
-                    onMouseEnter={e => { if (tpl.id !== selectedTemplateId) e.currentTarget.style.background = "#1e293b"; }}
+                    onMouseEnter={e => { if (tpl.id !== selectedTemplateId) e.currentTarget.style.background = colors.bg.card; }}
                     onMouseLeave={e => { if (tpl.id !== selectedTemplateId) e.currentTarget.style.background = "transparent"; }}
                   >
                     <span style={{ fontSize: 18 }}>{tpl.icon}</span>
                     <div>
-                      <div style={{ fontWeight: 600 }}>{tpl.label}</div>
-                      <div style={{ fontSize: 10, color: "#64748b", marginTop: 2 }}>
+                      <div style={{ fontWeight: font.weight.semibold }}>{tpl.label}</div>
+                      <div style={{ fontSize: font.size.xs, color: colors.text.disabled, marginTop: 2 }}>
                         {applyTemplate(tpl.text, replacements).substring(0, 60)}...
                       </div>
                     </div>
@@ -137,17 +138,17 @@ function WhatsAppRetargetModal({ user, brand, eventDate, eventLink, onClose }) {
             <div style={{
               display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8,
             }}>
-              <span style={{ fontSize: 11, color: "#94a3b8", textTransform: "uppercase", fontWeight: 600 }}>
+              <span style={{ ...presets.sectionLabel }}>
                 {isEditing ? "Modifica messaggio" : "Anteprima messaggio"}
               </span>
               {!isEditing && (
                 <button
                   onClick={handleStartEditing}
                   style={{
-                    background: "none", border: "1px solid #334155", borderRadius: 6,
+                    background: "none", border: `1px solid ${colors.border.default}`, borderRadius: radius.md,
                     padding: "3px 10px", cursor: "pointer",
                     display: "flex", alignItems: "center", gap: 4,
-                    color: "#8b5cf6", fontSize: 10, fontWeight: 600,
+                    color: colors.brand.purple, fontSize: font.size.xs, fontWeight: font.weight.semibold,
                   }}
                 >
                   <Edit3 size={10} /> Personalizza
@@ -157,9 +158,9 @@ function WhatsAppRetargetModal({ user, brand, eventDate, eventLink, onClose }) {
                 <button
                   onClick={() => { setIsEditing(false); setCustomText(''); }}
                   style={{
-                    background: "none", border: "1px solid #334155", borderRadius: 6,
+                    background: "none", border: `1px solid ${colors.border.default}`, borderRadius: radius.md,
                     padding: "3px 10px", cursor: "pointer",
-                    color: "#94a3b8", fontSize: 10,
+                    color: colors.text.muted, fontSize: font.size.xs,
                   }}
                 >
                   Annulla modifiche
@@ -172,18 +173,18 @@ function WhatsAppRetargetModal({ user, brand, eventDate, eventLink, onClose }) {
                 value={customText}
                 onChange={e => setCustomText(e.target.value)}
                 style={{
-                  width: "100%", minHeight: 180, padding: 14, borderRadius: 10,
-                  background: "#0f172a", border: "1px solid #8b5cf6",
-                  color: "#f1f5f9", fontSize: 13, lineHeight: 1.6,
+                  width: "100%", minHeight: 180, padding: 14, borderRadius: radius.xl,
+                  background: colors.bg.input, border: `1px solid ${colors.brand.purple}`,
+                  color: colors.text.primary, fontSize: font.size.base, lineHeight: font.lineHeight.relaxed,
                   resize: "vertical", outline: "none", fontFamily: "inherit",
                 }}
                 placeholder="Scrivi il tuo messaggio personalizzato..."
               />
             ) : (
               <div style={{
-                background: "#0f172a", borderRadius: 10, padding: 14,
-                border: "1px solid #334155", fontSize: 13, color: "#e2e8f0",
-                lineHeight: 1.6, whiteSpace: "pre-wrap", maxHeight: 220,
+                background: colors.bg.input, borderRadius: radius.xl, padding: 14,
+                border: `1px solid ${colors.border.default}`, fontSize: font.size.base, color: colors.text.secondary,
+                lineHeight: font.lineHeight.relaxed, whiteSpace: "pre-wrap", maxHeight: 220,
                 overflowY: "auto",
               }}>
                 {currentMessage}
@@ -196,10 +197,10 @@ function WhatsAppRetargetModal({ user, brand, eventDate, eventLink, onClose }) {
             onClick={handleSend}
             disabled={!user.phone || !currentMessage.trim()}
             style={{
-              width: "100%", padding: "12px 20px", borderRadius: 10,
-              background: !user.phone || !currentMessage.trim() ? "#334155" : "#25D366",
+              width: "100%", padding: "12px 20px", borderRadius: radius.xl,
+              background: !user.phone || !currentMessage.trim() ? colors.bg.elevated : colors.whatsapp,
               border: "none", cursor: !user.phone || !currentMessage.trim() ? "default" : "pointer",
-              color: "#fff", fontSize: 14, fontWeight: 700,
+              color: colors.text.inverse, fontSize: font.size.md, fontWeight: font.weight.bold,
               display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
             }}
           >
@@ -225,25 +226,25 @@ function UserRow({ user, isRetarget, brand, eventDate, eventLink, userStats, onO
   return (
     <div style={{
       display: "flex", alignItems: "center", justifyContent: "space-between",
-      padding: "8px 12px", borderBottom: "1px solid #1e293b",
-      transition: "background 0.1s",
+      padding: "8px 12px", borderBottom: `1px solid ${colors.border.subtle}`,
+      transition: tr.fast,
     }}
-      onMouseEnter={e => { e.currentTarget.style.background = "#334155"; }}
+      onMouseEnter={e => { e.currentTarget.style.background = colors.bg.elevated; }}
       onMouseLeave={e => { e.currentTarget.style.background = "transparent"; }}
     >
       <div style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0, flex: 1 }}>
         <div style={{ minWidth: 0, flex: 1 }}>
-          <div style={{ fontSize: 13, fontWeight: 600, color: "#f1f5f9", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+          <div style={{ fontSize: font.size.base, fontWeight: font.weight.semibold, color: colors.text.primary, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
             {user.fullName}
           </div>
           <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 2 }}>
             {user.phone && (
-              <span style={{ fontSize: 11, color: "#64748b", display: "flex", alignItems: "center", gap: 3 }}>
+              <span style={{ fontSize: font.size.xs, color: colors.text.disabled, display: "flex", alignItems: "center", gap: 3 }}>
                 <Phone size={10} /> {user.phone}
               </span>
             )}
             {isRetarget && user.pastEditionCount && (
-              <span style={{ fontSize: 10, color: "#94a3b8", background: "#0f172a", padding: "1px 6px", borderRadius: 4 }}>
+              <span style={{ fontSize: font.size.xs, color: colors.text.muted, background: colors.bg.page, padding: "1px 6px", borderRadius: radius.sm }}>
                 {user.pastEditionCount} ediz. passate
               </span>
             )}
@@ -258,8 +259,8 @@ function UserRow({ user, isRetarget, brand, eventDate, eventLink, userStats, onO
           <button
             onClick={() => onOpenRetargetModal(user)}
             style={{
-              background: "#25d366", color: "#fff", borderRadius: 8, padding: "5px 12px",
-              fontSize: 11, fontWeight: 600, border: "none", cursor: "pointer",
+              background: colors.whatsapp, color: colors.text.inverse, borderRadius: radius.lg, padding: "5px 12px",
+              fontSize: font.size.xs, fontWeight: font.weight.semibold, border: "none", cursor: "pointer",
               display: "flex", alignItems: "center", gap: 5, flexShrink: 0, marginLeft: 8,
             }}
           >
@@ -271,8 +272,8 @@ function UserRow({ user, isRetarget, brand, eventDate, eventLink, userStats, onO
             target="_blank"
             rel="noopener noreferrer"
             style={{
-              background: "#25d366", color: "#fff", borderRadius: 8, padding: "5px 12px",
-              fontSize: 11, fontWeight: 600, textDecoration: "none", border: "none", cursor: "pointer",
+              background: colors.whatsapp, color: colors.text.inverse, borderRadius: radius.lg, padding: "5px 12px",
+              fontSize: font.size.xs, fontWeight: font.weight.semibold, textDecoration: "none", border: "none", cursor: "pointer",
               display: "inline-flex", alignItems: "center", gap: 5, flexShrink: 0, marginLeft: 8,
             }}
           >
@@ -290,7 +291,7 @@ function CollapsibleSection({ title, count, withPhoneCount, children, defaultOpe
 
   return (
     <div style={{
-      background: "#1e293b", borderRadius: 12, border: "1px solid #334155",
+      background: colors.bg.card, borderRadius: radius["2xl"], border: `1px solid ${colors.border.default}`,
       overflow: "hidden",
     }}>
       <button
@@ -303,27 +304,27 @@ function CollapsibleSection({ title, count, withPhoneCount, children, defaultOpe
         }}
       >
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-          <span style={{ fontSize: 14, fontWeight: 700, color: "#f1f5f9" }}>{title}</span>
+          <span style={{ fontSize: font.size.md, fontWeight: font.weight.bold, color: colors.text.primary }}>{title}</span>
           <span style={{
-            fontSize: 12, fontWeight: 700, color: "#fff",
-            background: accentColor || "#8b5cf6", borderRadius: 10, padding: "2px 10px",
+            fontSize: font.size.sm, fontWeight: font.weight.bold, color: colors.text.inverse,
+            background: accentColor || colors.brand.purple, borderRadius: radius.xl, padding: "2px 10px",
           }}>
             {count}
           </span>
           {withPhoneCount !== undefined && withPhoneCount < count && (
-            <span style={{ fontSize: 11, color: "#64748b" }}>
+            <span style={{ fontSize: font.size.xs, color: colors.text.disabled }}>
               ({withPhoneCount} con telefono)
             </span>
           )}
         </div>
-        <ChevronDown size={18} color="#64748b" style={{
+        <ChevronDown size={18} color={colors.text.disabled} style={{
           transform: isOpen ? "rotate(180deg)" : "none",
           transition: "transform 0.2s",
         }} />
       </button>
 
       {isOpen && (
-        <div style={{ borderTop: "1px solid #334155" }}>
+        <div style={{ borderTop: `1px solid ${colors.border.default}` }}>
           {children}
         </div>
       )}
@@ -354,6 +355,24 @@ export default function EditionUserLists({ registered, retarget, brand, edition,
 
   if (!registered.length && !retarget.length) return null;
 
+  const searchInput = (value, onChange) => (
+    <div style={{ padding: "8px 12px", borderBottom: `1px solid ${colors.border.default}` }}>
+      <div style={{ position: "relative" }}>
+        <Search size={14} color={colors.text.disabled} style={{ position: "absolute", left: 10, top: 8 }} />
+        <input
+          placeholder="Cerca nome..."
+          value={value}
+          onChange={e => onChange(e.target.value)}
+          style={{
+            width: "100%", padding: "6px 12px 6px 30px", borderRadius: radius.lg,
+            background: colors.bg.input, border: `1px solid ${colors.border.default}`,
+            color: colors.text.primary, fontSize: font.size.sm, outline: "none",
+          }}
+        />
+      </div>
+    </div>
+  );
+
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
       {/* Registered users */}
@@ -362,25 +381,9 @@ export default function EditionUserLists({ registered, retarget, brand, edition,
         count={registered.length}
         withPhoneCount={regWithPhone}
         defaultOpen={false}
-        accentColor="#8b5cf6"
+        accentColor={colors.brand.purple}
       >
-        {registered.length > 10 && (
-          <div style={{ padding: "8px 12px", borderBottom: "1px solid #334155" }}>
-            <div style={{ position: "relative" }}>
-              <Search size={14} color="#64748b" style={{ position: "absolute", left: 10, top: 8 }} />
-              <input
-                placeholder="Cerca nome..."
-                value={regSearch}
-                onChange={e => setRegSearch(e.target.value)}
-                style={{
-                  width: "100%", padding: "6px 12px 6px 30px", borderRadius: 8,
-                  background: "#0f172a", border: "1px solid #334155",
-                  color: "#f1f5f9", fontSize: 12, outline: "none",
-                }}
-              />
-            </div>
-          </div>
-        )}
+        {registered.length > 10 && searchInput(regSearch, setRegSearch)}
         <div style={{ maxHeight: 400, overflowY: "auto" }}>
           {filteredReg.map((user, i) => (
             <UserRow
@@ -390,7 +393,7 @@ export default function EditionUserLists({ registered, retarget, brand, edition,
             />
           ))}
           {filteredReg.length === 0 && (
-            <div style={{ padding: 16, textAlign: "center", fontSize: 12, color: "#64748b" }}>
+            <div style={{ padding: 16, textAlign: "center", fontSize: font.size.sm, color: colors.text.disabled }}>
               Nessun risultato
             </div>
           )}
@@ -404,25 +407,9 @@ export default function EditionUserLists({ registered, retarget, brand, edition,
           count={retarget.length}
           withPhoneCount={retWithPhone}
           defaultOpen={false}
-          accentColor="#f59e0b"
+          accentColor={colors.status.warning}
         >
-          {retarget.length > 10 && (
-            <div style={{ padding: "8px 12px", borderBottom: "1px solid #334155" }}>
-              <div style={{ position: "relative" }}>
-                <Search size={14} color="#64748b" style={{ position: "absolute", left: 10, top: 8 }} />
-                <input
-                  placeholder="Cerca nome..."
-                  value={retSearch}
-                  onChange={e => setRetSearch(e.target.value)}
-                  style={{
-                    width: "100%", padding: "6px 12px 6px 30px", borderRadius: 8,
-                    background: "#0f172a", border: "1px solid #334155",
-                    color: "#f1f5f9", fontSize: 12, outline: "none",
-                  }}
-                />
-              </div>
-            </div>
-          )}
+          {retarget.length > 10 && searchInput(retSearch, setRetSearch)}
           <div style={{ maxHeight: 400, overflowY: "auto" }}>
             {filteredRet.map((user, i) => (
               <UserRow
@@ -433,7 +420,7 @@ export default function EditionUserLists({ registered, retarget, brand, edition,
               />
             ))}
             {filteredRet.length === 0 && (
-              <div style={{ padding: 16, textAlign: "center", fontSize: 12, color: "#64748b" }}>
+              <div style={{ padding: 16, textAlign: "center", fontSize: font.size.sm, color: colors.text.disabled }}>
                 Nessun risultato
               </div>
             )}

@@ -3,12 +3,15 @@ import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContaine
 import { TrendingUp } from 'lucide-react';
 import Section from '../shared/Section';
 import ResizeHandle from '../shared/ResizeHandle';
+import ScaleToggle from '../shared/ScaleToggle';
 import { COLORS, TOOLTIP_STYLE } from '../../config/constants';
+import { colors, font, radius, alpha, transition as tr } from '../../config/designTokens';
 import { getHourlyData, getHourlyDataByGroup } from '../../utils/dataTransformers';
 
 export default function OverviewTab({ analytics, filtered, selectedBrand, graphHeights, setGraphHeights }) {
   const [timeGranularity, setTimeGranularity] = useState('hourly');
   const [stackedView, setStackedView] = useState(false);
+  const [logScale, setLogScale] = useState(false);
 
   const { dowData, daysBeforeData, multiEvent } = analytics;
 
@@ -48,38 +51,39 @@ export default function OverviewTab({ analytics, filtered, selectedBrand, graphH
           <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
             {granButtons.map(b => (
               <button key={b.key} onClick={() => setTimeGranularity(b.key)} style={{
-                padding: "3px 10px", borderRadius: 6, fontSize: 10, border: "none", cursor: "pointer",
-                background: timeGranularity === b.key ? "#8b5cf6" : "#334155",
-                color: timeGranularity === b.key ? "#fff" : "#94a3b8",
+                padding: "3px 10px", borderRadius: radius.md, fontSize: font.size.xs, border: "none", cursor: "pointer",
+                background: timeGranularity === b.key ? colors.interactive.active : colors.interactive.inactive,
+                color: timeGranularity === b.key ? colors.interactive.activeText : colors.interactive.inactiveText, transition: tr.normal,
               }}>{b.label}</button>
             ))}
             {hasStackableData && (
               <button onClick={() => setStackedView(v => !v)} style={{
-                padding: "3px 10px", borderRadius: 6, fontSize: 10, border: "none", cursor: "pointer",
-                background: stackedView ? "#8b5cf6" : "#334155",
-                color: stackedView ? "#fff" : "#94a3b8", marginLeft: 8,
+                padding: "3px 10px", borderRadius: radius.md, fontSize: font.size.xs, border: "none", cursor: "pointer",
+                background: stackedView ? colors.interactive.active : colors.interactive.inactive,
+                color: stackedView ? colors.interactive.activeText : colors.text.muted, marginLeft: 8,
+                transition: tr.normal,
               }}>Stacked</button>
             )}
           </div>
         }
       >
         {hourlyPeak && (
-          <div style={{ fontSize: 11, color: "#94a3b8", marginBottom: 8, display: "flex", gap: 6, alignItems: "center" }}>
-            <TrendingUp size={12} color="#8b5cf6" />
-            Picco: <strong style={{ color: "#f1f5f9" }}>{hourlyPeak.hour}</strong> con {hourlyPeak.registrazioni} registrazioni
+          <div style={{ fontSize: font.size.xs, color: colors.text.muted, marginBottom: 8, display: "flex", gap: 6, alignItems: "center" }}>
+            <TrendingUp size={12} color={colors.brand.purple} />
+            Picco: <strong style={{ color: colors.text.primary }}>{hourlyPeak.hour}</strong> con {hourlyPeak.registrazioni} registrazioni
           </div>
         )}
         <ResponsiveContainer width="100%" height={graphHeights.hourly || 250}>
           <BarChart data={stackedView && hourlyRegByEvent ? hourlyRegByEvent.data : hourlyReg}>
-            <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
-            <XAxis dataKey="hour" tick={{ fill: "#94a3b8", fontSize: 9 }} interval={timeGranularity === '15min' ? 7 : timeGranularity === '30min' ? 3 : 1} />
-            <YAxis tick={{ fill: "#94a3b8", fontSize: 10 }} />
+            <CartesianGrid strokeDasharray="3 3" stroke={colors.border.default} />
+            <XAxis dataKey="hour" tick={{ fill: colors.text.muted, fontSize: 9 }} interval={timeGranularity === '15min' ? 7 : timeGranularity === '30min' ? 3 : 1} />
+            <YAxis tick={{ fill: colors.text.muted, fontSize: 10 }} />
             <Tooltip {...TOOLTIP_STYLE} />
             {stackedView && hourlyRegByEvent
               ? hourlyRegByEvent.groups.map((g, i) => (
                   <Bar key={g} dataKey={g} stackId="a" fill={COLORS[i % COLORS.length]} maxBarSize={18} />
                 ))
-              : <Bar dataKey="registrazioni" fill="#8b5cf6" radius={[4, 4, 0, 0]} maxBarSize={18} />
+              : <Bar dataKey="registrazioni" fill={colors.brand.purple} radius={[4, 4, 0, 0]} maxBarSize={18} />
             }
           </BarChart>
         </ResponsiveContainer>
@@ -90,26 +94,29 @@ export default function OverviewTab({ analytics, filtered, selectedBrand, graphH
       <Section title="Registrazioni per giorno della settimana">
         <ResponsiveContainer width="100%" height={graphHeights.dowData || 220}>
           <BarChart data={dowData}>
-            <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
-            <XAxis dataKey="giorno" tick={{ fill: "#94a3b8", fontSize: 11 }} />
-            <YAxis tick={{ fill: "#94a3b8", fontSize: 10 }} />
+            <CartesianGrid strokeDasharray="3 3" stroke={colors.border.default} />
+            <XAxis dataKey="giorno" tick={{ fill: colors.text.muted, fontSize: 11 }} />
+            <YAxis tick={{ fill: colors.text.muted, fontSize: 10 }} />
             <Tooltip {...TOOLTIP_STYLE} />
-            <Bar dataKey="count" name="Registrazioni" fill="#8b5cf6" radius={[4, 4, 0, 0]} maxBarSize={32} />
-            <Bar dataKey="partecipato" name="Presenze" fill="#10b981" radius={[4, 4, 0, 0]} maxBarSize={32} />
+            <Bar dataKey="count" name="Registrazioni" fill={colors.brand.purple} radius={[4, 4, 0, 0]} maxBarSize={32} />
+            <Bar dataKey="partecipato" name="Presenze" fill={colors.status.success} radius={[4, 4, 0, 0]} maxBarSize={32} />
           </BarChart>
         </ResponsiveContainer>
         <ResizeHandle chartKey="dowData" graphHeights={graphHeights} setGraphHeights={setGraphHeights} />
       </Section>
 
       {/* Quando si registrano */}
-      <Section title="Quando si registrano (giorni prima dell'evento)">
+      <Section
+        title="Quando si registrano (giorni prima dell'evento)"
+        extra={<ScaleToggle isLog={logScale} onToggle={setLogScale} />}
+      >
         <ResponsiveContainer width="100%" height={graphHeights.daysBeforeData || 220}>
           <AreaChart data={daysBeforeData}>
-            <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
-            <XAxis dataKey="days" tick={{ fill: "#94a3b8", fontSize: 10 }} angle={-20} textAnchor="end" height={45} />
-            <YAxis tick={{ fill: "#94a3b8", fontSize: 10 }} />
+            <CartesianGrid strokeDasharray="3 3" stroke={colors.border.default} />
+            <XAxis dataKey="days" tick={{ fill: colors.text.muted, fontSize: 10 }} angle={-20} textAnchor="end" height={45} />
+            <YAxis scale={logScale ? "log" : "auto"} domain={logScale ? ["auto", "auto"] : [0, "auto"]} allowDataOverflow={logScale} tick={{ fill: colors.text.muted, fontSize: 10 }} />
             <Tooltip {...TOOLTIP_STYLE} />
-            <Area type="monotone" dataKey="count" stroke="#8b5cf6" fill="rgba(139,92,246,0.2)" strokeWidth={2} />
+            <Area type="monotone" dataKey="count" stroke={colors.brand.purple} fill={alpha.brand[20]} strokeWidth={2} />
           </AreaChart>
         </ResponsiveContainer>
         <ResizeHandle chartKey="daysBeforeData" graphHeights={graphHeights} setGraphHeights={setGraphHeights} />

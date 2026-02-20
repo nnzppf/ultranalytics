@@ -1,7 +1,6 @@
-export const COLORS = [
-  "#8b5cf6","#ec4899","#06b6d4","#f59e0b","#10b981",
-  "#ef4444","#3b82f6","#f97316","#14b8a6","#a855f7"
-];
+import { colors, radius } from './designTokens';
+
+export const COLORS = colors.chart;
 
 export const DAYS_ORDER = ["Lunedì","Martedì","Mercoledì","Giovedì","Venerdì","Sabato","Domenica"];
 export const DAYS_SHORT = ["Lun","Mar","Mer","Gio","Ven","Sab","Dom"];
@@ -19,9 +18,9 @@ export const MESI_IT = {
 };
 
 export const TOOLTIP_STYLE = {
-  contentStyle: { background:"#1e293b", border:"1px solid #334155", borderRadius:8, color:"#f1f5f9" },
-  itemStyle: { color:"#f1f5f9" },
-  labelStyle: { color:"#94a3b8" }
+  contentStyle: { background: colors.bg.card, border: `1px solid ${colors.border.default}`, borderRadius: radius.lg, color: colors.text.primary },
+  itemStyle: { color: colors.text.primary },
+  labelStyle: { color: colors.text.muted }
 };
 
 export const getFascia = (hour) => {

@@ -1,14 +1,14 @@
 import { useState, useMemo, useEffect } from 'react';
-import { ChevronRight } from 'lucide-react';
+import { ChevronRight, Link2, Users, Calendar } from 'lucide-react';
 import WhereAreWeNow from '../comparison/WhereAreWeNow';
 import EditionUserLists from '../comparison/EditionUserLists';
 import BrandComparison from '../comparison/BrandComparison';
 import GenreComparison from '../comparison/GenreComparison';
 import LocationComparison from '../comparison/LocationComparison';
-import { Link2 } from 'lucide-react';
 import { compareBrands, compareGenres, compareLocations, computeWhereAreWeNow, computeCrossBrandComparison, getBrandsWithMultipleEditions, computeEditionUserLists } from '../../utils/comparisonEngine';
 import { getUserStats } from '../../utils/dataTransformers';
 import { GENRE_LABELS } from '../../config/eventConfig';
+import { colors, font, radius, gradients, alpha, transition as tr } from '../../config/designTokens';
 
 export default function ComparisonTab({ data, filtered, selectedBrand: topSelectedBrand, selectedCategory }) {
   const [view, setView] = useState('genre'); // genre | brand | location | tracker
@@ -55,8 +55,29 @@ export default function ComparisonTab({ data, filtered, selectedBrand: topSelect
     return getUserStats(brandData);
   }, [baseData, selectedBrand, highlightBrand]);
 
+  // Manual override: 'now' = single total, 'daily' = per-day cumulative values
+  const [overrideMode, setOverrideMode] = useState('now');
+  const [manualCount, setManualCount] = useState('');
+  const [dailyCounts, setDailyCounts] = useState({});
+
   // Manual event link input — user pastes the registration URL
   const [eventLinkInput, setEventLinkInput] = useState('');
+
+  // Build overrides object for engine
+  const overrides = useMemo(() => {
+    if (overrideMode === 'now') {
+      const val = manualCount ? parseInt(manualCount, 10) : null;
+      return val ? { mode: 'now', value: val } : null;
+    }
+    // daily mode: convert dailyCounts { daysBefore: "55" } → { daysBefore: 55 }
+    const days = {};
+    let hasAny = false;
+    for (const [d, v] of Object.entries(dailyCounts)) {
+      const parsed = v ? parseInt(v, 10) : null;
+      if (parsed && parsed > 0) { days[Number(d)] = parsed; hasAny = true; }
+    }
+    return hasAny ? { mode: 'daily', days } : null;
+  }, [overrideMode, manualCount, dailyCounts]);
 
   const trackerData = useMemo(() => {
     const brand = selectedBrand || (view === 'tracker' ? highlightBrand : null);
@@ -67,8 +88,8 @@ export default function ComparisonTab({ data, filtered, selectedBrand: topSelect
     }
     // Normal single-brand tracker (needs edition selected)
     if (!selectedEdition) return null;
-    return computeWhereAreWeNow(baseData, brand, selectedEdition);
-  }, [baseData, selectedBrand, highlightBrand, view, selectedEdition, crossBrandTarget]);
+    return computeWhereAreWeNow(baseData, brand, selectedEdition, overrides);
+  }, [baseData, selectedBrand, highlightBrand, view, selectedEdition, crossBrandTarget, overrides]);
 
   // Stats of the highlighted brand (for brand-vs-genre comparison)
   const highlightBrandStats = useMemo(() => {
@@ -112,6 +133,8 @@ export default function ComparisonTab({ data, filtered, selectedBrand: topSelect
     setSelectedBrand(brand);
     setSelectedEdition(null);
     setCrossBrandTarget(null);
+    setManualCount('');
+    setDailyCounts({});
     const brandInfo = multiEditionBrands.find(b => b.brand === brand);
     if (brandInfo && brandInfo.editions.length >= 2) {
       setSelectedEdition(brandInfo.editions[brandInfo.editions.length - 1]);
@@ -144,14 +167,14 @@ export default function ComparisonTab({ data, filtered, selectedBrand: topSelect
       {/* Context banner when a brand is selected in top bar */}
       {highlightBrand && (
         <div style={{
-          background: "linear-gradient(90deg, rgba(139,92,246,0.15), rgba(236,72,153,0.1))",
-          borderRadius: 10, padding: "10px 16px", marginBottom: 14,
-          border: "1px solid rgba(139,92,246,0.3)",
-          display: "flex", alignItems: "center", gap: 8, fontSize: 12,
+          background: gradients.highlight,
+          borderRadius: radius.xl, padding: "10px 16px", marginBottom: 14,
+          border: `1px solid ${alpha.brand[30]}`,
+          display: "flex", alignItems: "center", gap: 8, fontSize: font.size.sm,
         }}>
-          <span style={{ color: "#94a3b8" }}>Confronti in evidenza per</span>
-          <span style={{ color: "#8b5cf6", fontWeight: 700 }}>{highlightBrand}</span>
-          <span style={{ color: "#64748b" }}>vs tutti i brand</span>
+          <span style={{ color: colors.text.muted }}>Confronti in evidenza per</span>
+          <span style={{ color: colors.brand.purple, fontWeight: font.weight.bold }}>{highlightBrand}</span>
+          <span style={{ color: colors.text.disabled }}>vs tutti i brand</span>
         </div>
       )}
 
@@ -165,9 +188,11 @@ export default function ComparisonTab({ data, filtered, selectedBrand: topSelect
             if (t.key === 'brand') { setSelectedBrand(null); setSelectedEdition(null); }
             if (t.key === 'tracker') { setSelectedBrand(null); setSelectedEdition(null); }
           }} style={{
-            padding: "6px 14px", borderRadius: 8, fontSize: 12, border: "none", cursor: "pointer",
-            background: view === t.key ? (t.highlight ? "linear-gradient(135deg, #7c3aed, #ec4899)" : "#8b5cf6") : "#1e293b",
-            color: view === t.key ? "#fff" : "#94a3b8", fontWeight: view === t.key ? 600 : 400,
+            padding: "6px 14px", borderRadius: radius.lg, fontSize: font.size.sm, border: "none", cursor: "pointer",
+            background: view === t.key ? (t.highlight ? gradients.brand : colors.interactive.active) : colors.bg.card,
+            color: view === t.key ? colors.interactive.activeText : colors.interactive.inactiveText,
+            fontWeight: view === t.key ? font.weight.semibold : font.weight.medium,
+            transition: tr.normal,
           }}>{t.label}</button>
         ))}
       </div>
@@ -177,14 +202,14 @@ export default function ComparisonTab({ data, filtered, selectedBrand: topSelect
         <div style={{ display: "flex", alignItems: "center", gap: 4, marginBottom: 14, fontSize: 12 }}>
           {breadcrumb.map((b, i) => (
             <span key={i} style={{ display: "flex", alignItems: "center", gap: 4 }}>
-              {i > 0 && <ChevronRight size={12} color="#475569" />}
+              {i > 0 && <ChevronRight size={12} color={colors.border.strong} />}
               {b.action ? (
                 <button onClick={b.action} style={{
-                  background: "none", border: "none", color: "#8b5cf6", cursor: "pointer",
-                  fontSize: 12, padding: 0, textDecoration: "underline",
+                  background: "none", border: "none", color: colors.brand.purple, cursor: "pointer",
+                  fontSize: font.size.sm, padding: 0, textDecoration: "underline",
                 }}>{b.label}</button>
               ) : (
-                <span style={{ color: "#f1f5f9", fontWeight: 600 }}>{b.label}</span>
+                <span style={{ color: colors.text.primary, fontWeight: font.weight.semibold }}>{b.label}</span>
               )}
             </span>
           ))}
@@ -209,18 +234,18 @@ export default function ComparisonTab({ data, filtered, selectedBrand: topSelect
           {/* Brand selector: only when no brand is selected (neither from top bar nor manually) */}
           {!effectiveBrand && (
             <div>
-              <div style={{ fontSize: 12, color: "#94a3b8", marginBottom: 8 }}>
+              <div style={{ fontSize: font.size.sm, color: colors.text.muted, marginBottom: 8 }}>
                 Seleziona un brand con più edizioni per vedere il Live Tracker:
               </div>
               <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
                 {multiEditionBrands.map(b => (
                   <button key={b.brand} onClick={() => handleSelectBrand(b.brand)} style={{
-                    padding: "8px 16px", borderRadius: 8, fontSize: 12,
-                    border: "1px solid #334155",
-                    cursor: "pointer", background: "#1e293b",
-                    color: "#f1f5f9",
+                    padding: "8px 16px", borderRadius: radius.lg, fontSize: font.size.sm,
+                    border: `1px solid ${colors.border.default}`,
+                    cursor: "pointer", background: colors.bg.card,
+                    color: colors.text.primary,
                   }}>
-                    {b.brand} <span style={{ color: "#64748b" }}>({b.editions.length} edizioni)</span>
+                    {b.brand} <span style={{ color: colors.text.disabled }}>({b.editions.length} edizioni)</span>
                   </button>
                 ))}
               </div>
@@ -241,12 +266,13 @@ export default function ComparisonTab({ data, filtered, selectedBrand: topSelect
               <div>
                 {editions.length > 0 && (
                   <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 8, alignItems: "center" }}>
-                    <span style={{ fontSize: 11, color: "#64748b", marginRight: 4 }}>Edizione:</span>
+                    <span style={{ fontSize: font.size.xs, color: colors.text.disabled, marginRight: 4 }}>Edizione:</span>
                     {editions.map(ed => (
-                      <button key={ed} onClick={() => { setSelectedEdition(ed); setCrossBrandTarget(null); }} style={{
-                        padding: "5px 12px", borderRadius: 6, fontSize: 11, border: "none", cursor: "pointer",
-                        background: (selectedEdition || activeEdition) === ed ? "#8b5cf6" : "#334155",
-                        color: (selectedEdition || activeEdition) === ed ? "#fff" : "#94a3b8",
+                      <button key={ed} onClick={() => { setSelectedEdition(ed); setCrossBrandTarget(null); setManualCount(''); setDailyCounts({}); }} style={{
+                        padding: "5px 12px", borderRadius: radius.md, fontSize: font.size.xs, border: "none", cursor: "pointer",
+                        background: (selectedEdition || activeEdition) === ed ? colors.interactive.active : colors.interactive.inactive,
+                        color: (selectedEdition || activeEdition) === ed ? colors.interactive.activeText : colors.interactive.inactiveText,
+                        transition: tr.normal,
                       }}>{ed}</button>
                     ))}
                   </div>
@@ -258,15 +284,120 @@ export default function ComparisonTab({ data, filtered, selectedBrand: topSelect
           {/* Cross-brand comparison section */}
           {effectiveBrand && isCrossBrandMode && (
             <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
-              <span style={{ fontSize: 12, color: "#94a3b8" }}>
-                Confronto: <strong style={{ color: "#8b5cf6" }}>{effectiveBrand}</strong> vs <strong style={{ color: "#ec4899" }}>{crossBrandTarget}</strong>
+              <span style={{ fontSize: font.size.sm, color: colors.text.muted }}>
+                Confronto: <strong style={{ color: colors.brand.purple }}>{effectiveBrand}</strong> vs <strong style={{ color: colors.brand.pink }}>{crossBrandTarget}</strong>
               </span>
               <button onClick={() => setCrossBrandTarget(null)} style={{
-                padding: "3px 10px", borderRadius: 6, fontSize: 10, border: "1px solid #334155",
-                background: "transparent", color: "#94a3b8", cursor: "pointer",
+                padding: "3px 10px", borderRadius: radius.md, fontSize: font.size.xs, border: `1px solid ${colors.border.default}`,
+                background: "transparent", color: colors.text.muted, cursor: "pointer",
               }}>
                 Torna alle edizioni
               </button>
+            </div>
+          )}
+
+          {/* Manual registration override — only for upcoming events */}
+          {effectiveBrand && selectedEdition && !isCrossBrandMode && trackerData && !trackerData.isEventPast && (
+            <div style={{
+              background: colors.bg.card, borderRadius: radius.xl, padding: "12px 16px",
+              border: `1px solid ${overrides ? colors.brand.purple : colors.border.default}`,
+              transition: tr.normal,
+            }}>
+              {/* Mode toggle */}
+              <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: overrideMode === 'daily' || manualCount ? 10 : 0 }}>
+                <div style={{ display: "inline-flex", borderRadius: radius.lg, overflow: "hidden", border: `1px solid ${colors.border.default}` }}>
+                  {[{ key: 'now', label: 'Ad ora', icon: Users }, { key: 'daily', label: 'Giorni mancanti', icon: Calendar }].map(({ key, label, icon: Icon }) => {
+                    const active = overrideMode === key;
+                    return (
+                      <button key={key} onClick={() => setOverrideMode(key)} style={{
+                        display: "flex", alignItems: "center", gap: 4,
+                        padding: "4px 12px", fontSize: font.size.xs, fontWeight: font.weight.semibold,
+                        border: "none", cursor: "pointer", transition: tr.normal,
+                        background: active ? colors.brand.purple : "transparent",
+                        color: active ? colors.text.inverse : colors.text.muted,
+                      }}>
+                        <Icon size={11} />
+                        {label}
+                      </button>
+                    );
+                  })}
+                </div>
+                {overrides && (
+                  <button onClick={() => { setManualCount(''); setDailyCounts({}); }} style={{
+                    padding: "3px 8px", borderRadius: radius.md, fontSize: font.size.xs,
+                    border: "none", cursor: "pointer",
+                    background: alpha.brand[15], color: colors.brand.purple,
+                  }}>
+                    Reset
+                  </button>
+                )}
+                <span style={{ fontSize: 10, color: colors.text.disabled, marginLeft: "auto" }}>
+                  Aggiorna solo la proiezione
+                </span>
+              </div>
+
+              {/* "Ad ora" mode — single input */}
+              {overrideMode === 'now' && (
+                <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                  <span style={{ fontSize: font.size.xs, color: colors.text.muted, whiteSpace: "nowrap" }}>
+                    Registrazioni totali ad ora:
+                  </span>
+                  <input
+                    type="number" min="0"
+                    placeholder={String(trackerData.dataRegistrations)}
+                    value={manualCount}
+                    onChange={e => setManualCount(e.target.value)}
+                    style={{
+                      width: 80, padding: "5px 10px", borderRadius: radius.md,
+                      background: colors.bg.input, border: `1px solid ${colors.border.default}`,
+                      color: colors.text.primary, fontSize: font.size.sm, outline: "none",
+                      fontFamily: "inherit", textAlign: "center",
+                    }}
+                    onFocus={e => { e.currentTarget.style.borderColor = colors.brand.purple; }}
+                    onBlur={e => { e.currentTarget.style.borderColor = colors.border.default; }}
+                  />
+                </div>
+              )}
+
+              {/* "Giorni mancanti" mode — one input per missing day */}
+              {overrideMode === 'daily' && trackerData.missingDays && (
+                <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                  <div style={{ fontSize: font.size.xs, color: colors.text.muted, marginBottom: 2 }}>
+                    Inserisci le registrazioni <strong>cumulative</strong> (totali) per ogni giorno:
+                  </div>
+                  <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+                    {trackerData.missingDays.map(d => {
+                      const dayLabel = d === trackerData.currentDaysBefore ? 'Oggi'
+                        : d === trackerData.currentDaysBefore + 1 ? 'Ieri'
+                        : `-${d}gg`;
+                      return (
+                        <div key={d} style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 2 }}>
+                          <span style={{ fontSize: 10, color: colors.text.disabled }}>{dayLabel}</span>
+                          <input
+                            type="number" min="0"
+                            placeholder="-"
+                            value={dailyCounts[d] || ''}
+                            onChange={e => setDailyCounts(prev => ({ ...prev, [d]: e.target.value }))}
+                            style={{
+                              width: 64, padding: "5px 6px", borderRadius: radius.md,
+                              background: colors.bg.input, border: `1px solid ${colors.border.default}`,
+                              color: colors.text.primary, fontSize: font.size.sm, outline: "none",
+                              fontFamily: "inherit", textAlign: "center",
+                            }}
+                            onFocus={e => { e.currentTarget.style.borderColor = colors.brand.purple; }}
+                            onBlur={e => { e.currentTarget.style.borderColor = colors.border.default; }}
+                          />
+                        </div>
+                      );
+                    })}
+                  </div>
+                  {trackerData.missingDays.length === 0 && (
+                    <span style={{ fontSize: font.size.xs, color: colors.status.success }}>
+                      Nessun giorno mancante — i dati sono aggiornati
+                    </span>
+                  )}
+                </div>
+              )}
             </div>
           )}
 
@@ -277,12 +408,12 @@ export default function ComparisonTab({ data, filtered, selectedBrand: topSelect
             <>
               {/* Event registration link input */}
               <div style={{
-                background: "#1e293b", borderRadius: 12, padding: 16,
-                border: "1px solid #334155",
+                background: colors.bg.card, borderRadius: radius["2xl"], padding: 16,
+                border: `1px solid ${colors.border.default}`,
               }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
-                  <Link2 size={14} color="#8b5cf6" />
-                  <span style={{ fontSize: 11, color: "#94a3b8", textTransform: "uppercase", fontWeight: 600 }}>
+                  <Link2 size={14} color={colors.brand.purple} />
+                  <span style={{ fontSize: font.size.xs, color: colors.text.muted, textTransform: "uppercase", fontWeight: font.weight.semibold }}>
                     Link registrazione evento
                   </span>
                 </div>
@@ -292,21 +423,21 @@ export default function ComparisonTab({ data, filtered, selectedBrand: topSelect
                   value={eventLinkInput}
                   onChange={e => setEventLinkInput(e.target.value)}
                   style={{
-                    width: "100%", padding: "8px 12px", borderRadius: 8,
-                    background: "#0f172a", border: "1px solid #334155",
-                    color: "#f1f5f9", fontSize: 12, outline: "none",
+                    width: "100%", padding: "8px 12px", borderRadius: radius.lg,
+                    background: colors.bg.input, border: `1px solid ${colors.border.default}`,
+                    color: colors.text.primary, fontSize: font.size.sm, outline: "none",
                     fontFamily: "inherit",
                   }}
-                  onFocus={e => { e.currentTarget.style.borderColor = "#8b5cf6"; }}
-                  onBlur={e => { e.currentTarget.style.borderColor = "#334155"; }}
+                  onFocus={e => { e.currentTarget.style.borderColor = colors.brand.purple; }}
+                  onBlur={e => { e.currentTarget.style.borderColor = colors.border.default; }}
                 />
                 {eventLinkInput && (
-                  <div style={{ fontSize: 10, color: "#10b981", marginTop: 6, display: "flex", alignItems: "center", gap: 4 }}>
+                  <div style={{ fontSize: font.size.xs, color: colors.status.success, marginTop: 6, display: "flex", alignItems: "center", gap: 4 }}>
                     ✓ Il link verrà incluso nei messaggi WhatsApp di invito
                   </div>
                 )}
                 {!eventLinkInput && (
-                  <div style={{ fontSize: 10, color: "#64748b", marginTop: 6 }}>
+                  <div style={{ fontSize: font.size.xs, color: colors.text.disabled, marginTop: 6 }}>
                     Incolla il link dal sito per includerlo automaticamente nei messaggi WhatsApp
                   </div>
                 )}
@@ -327,10 +458,10 @@ export default function ComparisonTab({ data, filtered, selectedBrand: topSelect
           {/* Cross-brand option: show only in single-brand mode with data loaded */}
           {effectiveBrand && !isCrossBrandMode && trackerData && (
             <div style={{
-              background: "#0f172a", borderRadius: 12, padding: 16,
-              border: "1px solid #334155",
+              background: colors.bg.page, borderRadius: radius["2xl"], padding: 16,
+              border: `1px solid ${colors.border.default}`,
             }}>
-              <div style={{ fontSize: 11, color: "#94a3b8", textTransform: "uppercase", marginBottom: 10, fontWeight: 600 }}>
+              <div style={{ fontSize: font.size.xs, color: colors.text.muted, textTransform: "uppercase", marginBottom: 10, fontWeight: font.weight.semibold }}>
                 Confronta con altro brand
               </div>
               <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
@@ -338,12 +469,12 @@ export default function ComparisonTab({ data, filtered, selectedBrand: topSelect
                   .filter(b => b.brand !== effectiveBrand)
                   .map(b => (
                     <button key={b.brand} onClick={() => setCrossBrandTarget(b.brand)} style={{
-                      padding: "6px 14px", borderRadius: 8, fontSize: 11,
-                      border: "1px solid #334155",
-                      cursor: "pointer", background: "#1e293b",
-                      color: "#f1f5f9",
+                      padding: "6px 14px", borderRadius: radius.lg, fontSize: font.size.xs,
+                      border: `1px solid ${colors.border.default}`,
+                      cursor: "pointer", background: colors.bg.card,
+                      color: colors.text.primary,
                     }}>
-                      {b.brand} <span style={{ color: "#64748b" }}>({b.editionCount} ediz.)</span>
+                      {b.brand} <span style={{ color: colors.text.disabled }}>({b.editionCount} ediz.)</span>
                     </button>
                   ))}
               </div>
