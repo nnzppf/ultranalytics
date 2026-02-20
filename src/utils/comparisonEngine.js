@@ -51,6 +51,8 @@ export function computeWhereAreWeNow(allData, targetBrand, targetEdition, overri
   const todayMidnight = new Date(now.getFullYear(), now.getMonth(), now.getDate());
   const eventMidnight = new Date(targetEventDate.getFullYear(), targetEventDate.getMonth(), targetEventDate.getDate());
   const currentDaysBefore = Math.max(0, Math.round((eventMidnight - todayMidnight) / 86400000));
+  // Intra-day fraction: 0.0 (midnight) → ~1.0 (23:59) for time-adjusted projections
+  const dayFraction = (now.getHours() * 60 + now.getMinutes()) / (24 * 60);
   // Event is "past" only after the day AFTER the event (registrations can arrive
   // until ~3am the next morning — people registering at the door)
   const dayAfterEvent = new Date(targetEventDate);
@@ -154,12 +156,22 @@ export function computeWhereAreWeNow(allData, targetBrand, targetEdition, overri
     const totalAttended = edRows.filter(r => r.attended).length;
     const atSamePoint = cumulative[currentDaysBefore] || 0;
 
-    const delta = currentRegistrations - atSamePoint;
-    const deltaPercent = atSamePoint > 0
-      ? parseFloat(((delta / atSamePoint) * 100).toFixed(1))
+    // Time-adjusted comparison: interpolate between previous day and current day
+    // to estimate what past editions had at this exact time of day.
+    // cumulative[currentDaysBefore+1] = end of previous day (= start of current day)
+    // cumulative[currentDaysBefore] = end of current day
+    // At dayFraction through the day, estimated = prevDay + (currentDay - prevDay) * dayFraction
+    const prevDayValue = cumulative[currentDaysBefore + 1] || 0;
+    const atSamePointAdjusted = isEventPast
+      ? atSamePoint
+      : Math.round(prevDayValue + (atSamePoint - prevDayValue) * dayFraction);
+
+    const delta = currentRegistrations - atSamePointAdjusted;
+    const deltaPercent = atSamePointAdjusted > 0
+      ? parseFloat(((delta / atSamePointAdjusted) * 100).toFixed(1))
       : null;
-    const projectedFinal = (!isEventPast && atSamePoint > 0)
-      ? Math.round((currentRegistrations / atSamePoint) * totalFinal)
+    const projectedFinal = (!isEventPast && atSamePointAdjusted > 0)
+      ? Math.round((currentRegistrations / atSamePointAdjusted) * totalFinal)
       : null;
 
     // What % of final registrations this edition had at the same point
@@ -175,6 +187,7 @@ export function computeWhereAreWeNow(allData, targetBrand, targetEdition, overri
       finalConversion: totalFinal > 0 ? parseFloat(((totalAttended / totalFinal) * 100).toFixed(1)) : 0,
       cumulative,
       atSamePoint,
+      atSamePointAdjusted,
       delta,
       deltaPercent,
       projectedFinal,
@@ -182,10 +195,10 @@ export function computeWhereAreWeNow(allData, targetBrand, targetEdition, overri
     });
   }
 
-  // Average metrics
+  // Average metrics (use time-adjusted values for fair comparison)
   const validComps = comparisons.filter(c => c.atSamePoint > 0);
   const avgAtSamePoint = validComps.length
-    ? Math.round(validComps.reduce((s, c) => s + c.atSamePoint, 0) / validComps.length)
+    ? Math.round(validComps.reduce((s, c) => s + c.atSamePointAdjusted, 0) / validComps.length)
     : 0;
   const validProjections = validComps.filter(c => c.projectedFinal != null);
   const avgProjectedFinal = (!isEventPast && validProjections.length)
@@ -246,6 +259,8 @@ export function computeWhereAreWeNow(allData, targetBrand, targetEdition, overri
     overlayData,
     allEditionLabels: [targetEdition, ...comparisons.map(c => c.editionLabel)],
     targetCumulative,
+    dayFraction,
+    snapshotHour: `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`,
   };
 }
 

@@ -238,6 +238,7 @@ function SingleBrandView({ comparisonData }) {
     currentAttended, currentConversion,
     comparisons, avgAtSamePoint, avgProjectedFinal,
     avgFinal, progressPercent, overlayData, allEditionLabels,
+    snapshotHour,
   } = comparisonData;
   const [logScale, setLogScale] = useState(false);
   // Track which lines are visible (all visible by default, plus projection)
@@ -366,7 +367,7 @@ function SingleBrandView({ comparisonData }) {
               <thead>
                 <tr style={{ borderBottom: `1px solid ${colors.border.default}` }}>
                   <Th columnKey="editionLabel" sortKey={cSortKey} sortDir={cSortDir} onSort={cToggleSort}>Edizione</Th>
-                  <Th columnKey="atSamePoint" sortKey={cSortKey} sortDir={cSortDir} onSort={cToggleSort} align="center">A -{currentDaysBefore}gg</Th>
+                  <Th columnKey="atSamePoint" sortKey={cSortKey} sortDir={cSortDir} onSort={cToggleSort} align="center">A -{currentDaysBefore}gg{!isEventPast && snapshotHour ? ` (${snapshotHour})` : ''}</Th>
                   <Th columnKey="deltaPercent" sortKey={cSortKey} sortDir={cSortDir} onSort={cToggleSort} align="center">Delta</Th>
                   <Th columnKey="totalFinal" sortKey={cSortKey} sortDir={cSortDir} onSort={cToggleSort} align="center">Finale</Th>
                   <Th columnKey="finalConversion" sortKey={cSortKey} sortDir={cSortDir} onSort={cToggleSort} align="center">Conv.</Th>
@@ -377,7 +378,9 @@ function SingleBrandView({ comparisonData }) {
                 {sortedComparisons.map((c, i) => (
                   <tr key={i} style={{ borderBottom: `1px solid ${colors.border.subtle}` }}>
                     <td style={{ padding: "8px", color: colors.text.primary, fontWeight: font.weight.semibold }}>{c.editionLabel}</td>
-                    <td style={{ padding: "8px", color: colors.text.primary, textAlign: "center" }}>{c.atSamePoint}</td>
+                    <td style={{ padding: "8px", color: colors.text.primary, textAlign: "center" }} title={!isEventPast && c.atSamePointAdjusted !== c.atSamePoint ? `Fine giornata: ${c.atSamePoint}` : undefined}>
+                      {!isEventPast && c.atSamePointAdjusted != null ? c.atSamePointAdjusted : c.atSamePoint}
+                    </td>
                     <td style={{ padding: "8px", textAlign: "center" }}>
                       <DeltaBadge value={c.deltaPercent} />
                     </td>
