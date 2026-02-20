@@ -159,6 +159,11 @@ table {
 
 /* ===== RESPONSIVE MOBILE STYLES ===== */
 
+/* Edition bar: desktop buttons visible, mobile dropdown hidden by default */
+.edition-dropdown {
+  display: none !important;
+}
+
 /* Tab bar — scrollable with fade edges */
 .tab-bar {
   position: relative;
@@ -236,6 +241,24 @@ table {
 
   .edition-bar {
     padding: 8px 12px !important;
+  }
+
+  /* Edition bar: switch to dropdown on mobile */
+  .edition-buttons {
+    display: none !important;
+  }
+  .edition-dropdown {
+    display: block !important;
+  }
+
+  /* Tracker KPI grid — 2 columns on tablet */
+  .tracker-kpi-grid {
+    grid-template-columns: 1fr 1fr !important;
+  }
+
+  /* Cross-brand comparison — stack vertically */
+  .cross-brand-grid {
+    grid-template-columns: 1fr !important;
   }
 
   /* Cloud indicator - compact */
@@ -328,6 +351,40 @@ table {
 
   .bday-extra-controls {
     flex-wrap: wrap !important;
+  }
+
+  /* Tracker KPI — 2 columns on phone */
+  .tracker-kpi-grid {
+    grid-template-columns: 1fr 1fr !important;
+    gap: 6px !important;
+  }
+
+  .tracker-kpi-grid > div {
+    padding: 10px !important;
+  }
+
+  /* Tables on mobile — smaller text, tighter padding */
+  table {
+    font-size: 12px !important;
+  }
+
+  table th, table td {
+    padding: 6px 4px !important;
+  }
+
+  /* Cross-brand comparison — delta row horizontal on mobile */
+  .cross-brand-grid {
+    gap: 8px !important;
+  }
+
+  /* Comparison tab sub-tabs */
+  .comparison-sub-tabs {
+    gap: 3px !important;
+  }
+
+  .comparison-sub-tabs button {
+    padding: 5px 10px !important;
+    font-size: 11px !important;
   }
 
   /* Action buttons even more compact */

@@ -615,22 +615,37 @@ function AuthenticatedApp({ user, logout }) {
       {/* Edition selector - shown when a brand with multiple editions is selected */}
       {selectedBrand !== "all" && availableEditions.length > 1 && (
         <div className="edition-bar" style={{
-          display: "flex", gap: 4, padding: "8px 20px",
+          padding: "8px 20px",
           background: `${colors.bg.card}80`, borderBottom: `1px solid ${colors.border.default}`,
-          alignItems: "center", overflowX: "auto",
+          alignItems: "center",
         }}>
-          <span style={{ fontSize: font.size.xs, color: colors.text.disabled, marginRight: 4, whiteSpace: "nowrap" }}>Edizione:</span>
-          <button
-            onClick={() => setSelectedEdition("all")}
-            style={{ ...filterBtn(selectedEdition === "all"), whiteSpace: "nowrap" }}
-          >Tutte ({availableEditions.length})</button>
-          {availableEditions.map(ed => (
+          {/* Desktop: buttons row */}
+          <div className="edition-buttons" style={{ display: "flex", gap: 4, alignItems: "center" }}>
+            <span style={{ fontSize: font.size.xs, color: colors.text.disabled, marginRight: 4, whiteSpace: "nowrap" }}>Edizione:</span>
             <button
-              key={ed}
-              onClick={() => setSelectedEdition(ed)}
-              style={{ ...filterBtn(selectedEdition === ed), whiteSpace: "nowrap" }}
-            >{ed}</button>
-          ))}
+              onClick={() => setSelectedEdition("all")}
+              style={{ ...filterBtn(selectedEdition === "all"), whiteSpace: "nowrap" }}
+            >Tutte ({availableEditions.length})</button>
+            {availableEditions.map(ed => (
+              <button
+                key={ed}
+                onClick={() => setSelectedEdition(ed)}
+                style={{ ...filterBtn(selectedEdition === ed), whiteSpace: "nowrap" }}
+              >{ed}</button>
+            ))}
+          </div>
+          {/* Mobile: compact dropdown */}
+          <div className="edition-dropdown" style={{ display: "none" }}>
+            <Dropdown
+              value={selectedEdition}
+              onChange={setSelectedEdition}
+              placeholder="Edizione"
+              options={[
+                { value: "all", label: `Tutte le edizioni (${availableEditions.length})` },
+                ...availableEditions.map(ed => ({ value: ed, label: ed })),
+              ]}
+            />
+          </div>
         </div>
       )}
 

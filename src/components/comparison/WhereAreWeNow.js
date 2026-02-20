@@ -44,7 +44,7 @@ function CrossBrandView({ comparisonData }) {
       </div>
 
       {/* KPI comparison */}
-      <div className="grid-2-col" style={{ display: "grid", gridTemplateColumns: "1fr auto 1fr", gap: 12, marginBottom: 20 }}>
+      <div className="grid-2-col cross-brand-grid" style={{ display: "grid", gridTemplateColumns: "1fr auto 1fr", gap: 12, marginBottom: 20 }}>
         {/* Brand A stats */}
         <div style={{ background: alpha.brand[8], borderRadius: radius["2xl"], padding: 16, border: `1px solid ${alpha.brand[30]}` }}>
           <div style={{ fontSize: font.size.sm, fontWeight: font.weight.bold, color: colors.brand.purple, marginBottom: 10 }}>{brandA}</div>
@@ -285,7 +285,7 @@ function SingleBrandView({ comparisonData }) {
       </div>
 
       {/* KPI Row */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(130px, 1fr))", gap: 10, marginBottom: 16 }}>
+      <div className="tracker-kpi-grid" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(130px, 1fr))", gap: 10, marginBottom: 16 }}>
         <div style={{ background: colors.bg.page, borderRadius: radius.xl, padding: 12, textAlign: "center" }}>
           <div style={{ fontSize: font.size.xs, color: colors.text.muted, marginBottom: 4 }}>
             {isEventPast ? "Registrazioni totali" : "Registrazioni attuali"}

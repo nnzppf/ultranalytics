@@ -181,7 +181,7 @@ export default function ComparisonTab({ data, filtered, selectedBrand: topSelect
       )}
 
       {/* Sub-tabs */}
-      <div style={{ display: "flex", gap: 6, marginBottom: 16, flexWrap: "wrap" }}>
+      <div className="comparison-sub-tabs" style={{ display: "flex", gap: 6, marginBottom: 16, flexWrap: "wrap" }}>
         {tabs.map(t => (
           <button key={t.key} onClick={() => {
             setView(t.key);
