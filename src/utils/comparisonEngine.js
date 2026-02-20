@@ -303,7 +303,9 @@ export function computeCrossBrandComparison(allData, brandA, brandB, specificEdi
   }
 
   const aggA = brandAgg(dataA, editionsA);
-  const aggB = brandAgg(dataB, editionsB);
+  // When a specific edition is selected, filter dataB to only that edition's rows
+  const filteredDataB = specificEditionB ? dataB.filter(d => editionsB.includes(d.editionLabel)) : dataB;
+  const aggB = brandAgg(filteredDataB, editionsB);
 
   // Build overlay chart: all editions of both brands on same x-axis (days-before)
   const maxDaysAll = Math.max(
