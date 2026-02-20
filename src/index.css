@@ -236,7 +236,7 @@ table {
   }
 
   .kpi-grid {
-    grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)) !important;
+    grid-template-columns: repeat(4, 1fr) !important;
     padding: 12px !important;
     gap: 8px !important;
   }
