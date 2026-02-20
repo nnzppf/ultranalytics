@@ -131,6 +131,13 @@ export const BRAND_REGISTRY = {
       { edition: "Carnival 2026", patterns: ["euphoria: jungle carnival", "euphoria"] },
     ]
   },
+  "JESUS LOVES DISCO": {
+    category: "standard",
+    genres: ["commerciale"],
+    matchPatterns: [
+      { edition: "Jesus Loves Disco is Back", patterns: ["jesus loves disco", "28 febbraio - jesus loves disco"] },
+    ]
+  },
 };
 
 export const GENRE_LABELS = {
