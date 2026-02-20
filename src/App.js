@@ -13,7 +13,7 @@ import { loadEventConfig, saveEventConfig } from "./services/eventConfigService"
 import EventManagerModal from "./components/screens/EventManagerModal";
 
 import { GENRE_LABELS, BRAND_REGISTRY } from "./config/eventConfig";
-import { colors, font, radius, gradients, transition as tr } from "./config/designTokens";
+import { colors, font, radius, gradients, glass, shadows, transition as tr } from "./config/designTokens";
 import KPI from "./components/shared/KPI";
 import UploadScreen from "./components/screens/UploadScreen";
 import OverviewTab from "./components/tabs/OverviewTab";
@@ -24,6 +24,7 @@ import UsersTab from "./components/tabs/UsersTab";
 import ComparisonTab from "./components/tabs/ComparisonTab";
 import BirthdaysTab from "./components/tabs/BirthdaysTab";
 import AiChat from "./components/AiChat";
+import { motion } from "framer-motion";
 import { StaggerList, StaggerItem, TabTransition } from "./components/shared/Motion";
 import { ToastProvider, useToast } from "./components/shared/Toast";
 import { SkeletonDashboard } from "./components/shared/Skeleton";
@@ -653,13 +654,39 @@ function AuthenticatedApp({ user, logout }) {
       <StaggerList className="kpi-grid" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 10, padding: "16px 20px" }}>
         <StaggerItem><KPI icon={Users} label="Registrazioni" value={analytics.total} color={colors.brand.purple} primary trend={analytics.trend?.total} sub={analytics.trend ? `vs ${analytics.trend.prevEdition}` : undefined} /></StaggerItem>
         <StaggerItem><KPI icon={Check} label="Presenze" value={analytics.entered} color={colors.status.success} trend={analytics.trend?.entered} /></StaggerItem>
-        <StaggerItem><KPI icon={TrendingUp} label="Conversione" value={`${analytics.conv}%`} color={colors.brand.cyan} trend={analytics.trend?.conv} trendSuffix="pp" /></StaggerItem>
-        <StaggerItem><KPI icon={X} label="No-Show" value={`${analytics.noShowRate}%`} color={colors.status.error} /></StaggerItem>
+        <StaggerItem>
+          <motion.div
+            whileHover={{ scale: 1.03, boxShadow: shadows.md }}
+            transition={{ type: "spring", stiffness: 400, damping: 25 }}
+            style={{
+              background: colors.bg.card, borderRadius: radius["2xl"], padding: "14px 16px",
+              border: `1px solid ${colors.border.default}`, ...glass.card, boxShadow: shadows.sm, cursor: "default",
+            }}
+          >
+            <div style={{ display: "flex", gap: 16 }}>
+              <div style={{ flex: 1 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 4 }}>
+                  <TrendingUp size={14} color={colors.brand.cyan} />
+                  <span style={{ fontSize: font.size.xs, color: colors.text.muted, textTransform: "uppercase", letterSpacing: "0.05em" }}>Conv.</span>
+                </div>
+                <div style={{ fontSize: font.size["3xl"], fontWeight: font.weight.bold, color: colors.text.primary }}>{analytics.conv}%</div>
+              </div>
+              <div style={{ width: 1, background: colors.border.default, alignSelf: "stretch" }} />
+              <div style={{ flex: 1 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 4 }}>
+                  <X size={14} color={colors.status.error} />
+                  <span style={{ fontSize: font.size.xs, color: colors.text.muted, textTransform: "uppercase", letterSpacing: "0.05em" }}>No-Show</span>
+                </div>
+                <div style={{ fontSize: font.size["3xl"], fontWeight: font.weight.bold, color: colors.text.primary }}>{analytics.noShowRate}%</div>
+              </div>
+            </div>
+          </motion.div>
+        </StaggerItem>
         <StaggerItem><KPI icon={Calendar} label="Brand" value={analytics.brands.length} color={colors.status.warning} /></StaggerItem>
       </StaggerList>
 
-      {/* Tab Navigation */}
-      <div className="tab-bar" style={{ display: "flex", gap: 4, padding: "0 20px 12px", overflowX: "auto" }}>
+      {/* Tab Navigation — Desktop: buttons */}
+      <div className="tab-bar tab-bar-buttons" style={{ display: "flex", gap: 4, padding: "0 20px 12px", overflowX: "auto" }}>
         {tabs.map(t => {
           const isActive = activeTab === t.key;
           return (
@@ -677,6 +704,15 @@ function AuthenticatedApp({ user, logout }) {
             }}>{t.label}</button>
           );
         })}
+      </div>
+      {/* Tab Navigation — Mobile: dropdown */}
+      <div className="tab-bar-dropdown" style={{ display: "none", padding: "0 20px 12px" }}>
+        <Dropdown
+          value={activeTab}
+          onChange={(key) => switchTab(key)}
+          placeholder="Sezione"
+          options={tabs.map(t => ({ value: t.key, label: t.label }))}
+        />
       </div>
 
       {/* Tab Content */}

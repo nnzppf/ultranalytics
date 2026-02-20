@@ -171,6 +171,11 @@ table {
   display: none !important;
 }
 
+/* Main tab bar: mobile dropdown hidden by default */
+.tab-bar-dropdown {
+  display: none !important;
+}
+
 /* Tab bar — scrollable with fade edges */
 .tab-bar {
   position: relative;
@@ -231,11 +236,13 @@ table {
     border-radius: 10px !important;
   }
 
-  .tab-bar {
+  /* Main tab bar: switch to dropdown on mobile */
+  .tab-bar-buttons {
+    display: none !important;
+  }
+  .tab-bar-dropdown {
+    display: block !important;
     padding: 0 12px 10px !important;
-    /* Fade edges to indicate scrollability */
-    -webkit-mask-image: linear-gradient(to right, transparent, black 12px, black calc(100% - 12px), transparent);
-    mask-image: linear-gradient(to right, transparent, black 12px, black calc(100% - 12px), transparent);
   }
 
   .bday-kpi-grid {
