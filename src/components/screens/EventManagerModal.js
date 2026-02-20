@@ -30,6 +30,7 @@ export default function EventManagerModal({ data, eventConfig, onSave, onClose }
     brands: eventConfig?.brands || {},
     excludedBrands: eventConfig?.excludedBrands || [],
     renames: eventConfig?.renames || {},
+    editionRenames: eventConfig?.editionRenames || {},  // { "BRAND": { "old_label": "new_label" } }
   }));
 
   // Extract all brands from data + registry
@@ -90,12 +91,22 @@ export default function EventManagerModal({ data, eventConfig, onSave, onClose }
       }
     }
 
-    return Object.values(brandMap).map(b => ({
-      ...b,
-      displayName: b.displayName || b.name,
-      editions: [...b.editions],
-      excluded: localConfig.excludedBrands.includes(b.name),
-    })).sort((a, b) => b.recordCount - a.recordCount);
+    return Object.values(brandMap).map(b => {
+      const edRenames = localConfig.editionRenames?.[b.name] || {};
+      const rawEditions = [...b.editions];
+      // Build editions with original + display name
+      const editionsWithNames = rawEditions.map(ed => ({
+        original: ed,
+        display: edRenames[ed] || ed,
+      }));
+      return {
+        ...b,
+        displayName: b.displayName || b.name,
+        editions: rawEditions,
+        editionsWithNames,
+        excluded: localConfig.excludedBrands.includes(b.name),
+      };
+    }).sort((a, b) => b.recordCount - a.recordCount);
   }, [data, localConfig]);
 
   // Filtered brands
@@ -118,12 +129,19 @@ export default function EventManagerModal({ data, eventConfig, onSave, onClose }
   // Start editing a brand
   const startEdit = (brand) => {
     const config = localConfig.brands[brand.name] || {};
+    const edRenames = localConfig.editionRenames?.[brand.name] || {};
+    // Build edition renames map for the form: { originalLabel: displayLabel }
+    const editionNames = {};
+    for (const ed of brand.editions) {
+      editionNames[ed] = edRenames[ed] || ed;
+    }
     setEditingBrand(brand.name);
     setEditForm({
       displayName: config.displayName || brand.displayName || brand.name,
       category: config.category || brand.category || 'standard',
       genres: config.genres || brand.genres || [],
       venue: config.venue || brand.venue || '',
+      editionNames,
     });
   };
 
@@ -143,6 +161,25 @@ export default function EventManagerModal({ data, eventConfig, onSave, onClose }
     // If displayName changed, add rename
     if (editForm.displayName !== editingBrand) {
       newConfig.renames = { ...newConfig.renames, [editingBrand]: editForm.displayName };
+    }
+
+    // Save edition renames (only those that actually changed)
+    if (editForm.editionNames) {
+      const changedEditions = {};
+      for (const [original, display] of Object.entries(editForm.editionNames)) {
+        if (display !== original && display.trim()) {
+          changedEditions[original] = display.trim();
+        }
+      }
+      if (Object.keys(changedEditions).length > 0) {
+        newConfig.editionRenames = {
+          ...newConfig.editionRenames,
+          [editingBrand]: {
+            ...(newConfig.editionRenames?.[editingBrand] || {}),
+            ...changedEditions,
+          },
+        };
+      }
     }
 
     setLocalConfig(newConfig);
@@ -597,6 +634,38 @@ function BrandRow({
                   {venues.map(v => <option key={v} value={v} />)}
                 </datalist>
               </div>
+
+              {/* Edizioni */}
+              {editForm.editionNames && Object.keys(editForm.editionNames).length > 0 && (
+                <div style={{ gridColumn: "1 / -1" }}>
+                  <label style={{ fontSize: font.size.xs, color: colors.text.muted, marginBottom: 6, display: "block" }}>
+                    Edizioni ({Object.keys(editForm.editionNames).length})
+                  </label>
+                  <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                    {Object.entries(editForm.editionNames).map(([original, display]) => (
+                      <div key={original} style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+                        {display !== original && (
+                          <span style={{ fontSize: 9, color: colors.text.disabled }}>{original}</span>
+                        )}
+                        <input
+                          value={display}
+                          onChange={e => setEditForm(prev => ({
+                            ...prev,
+                            editionNames: { ...prev.editionNames, [original]: e.target.value },
+                          }))}
+                          style={{
+                            width: 120, padding: "4px 8px", borderRadius: radius.md,
+                            background: colors.bg.input,
+                            border: `1px solid ${display !== original ? colors.brand.purple : colors.border.default}`,
+                            color: colors.text.primary, fontSize: font.size.xs, outline: "none",
+                            fontFamily: "inherit",
+                          }}
+                        />
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
 
               {/* Save/Cancel buttons */}
               <div style={{ gridColumn: "1 / -1", display: "flex", gap: 8, justifyContent: "flex-end", marginTop: 4 }}>

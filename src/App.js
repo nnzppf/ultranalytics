@@ -233,25 +233,31 @@ function AuthenticatedApp({ user, logout }) {
     const success = await saveEventConfig(config);
     if (success) {
       setEventConfig(config);
-      // Apply renames and exclusions to current data in-memory
-      if (config.renames || config.excludedBrands?.length) {
-        setData(prev => prev.map(d => {
-          let brand = d.brand;
-          // Apply renames
-          if (config.renames?.[brand]) {
-            brand = config.renames[brand];
-          }
-          // Apply custom config (category, genres, venue)
-          const brandConfig = config.brands?.[d.brand] || config.brands?.[brand];
-          return {
-            ...d,
-            brand,
-            category: brandConfig?.category || d.category,
-            genres: brandConfig?.genres?.length ? brandConfig.genres : d.genres,
-            location: brandConfig?.venue || d.location,
-          };
-        }).filter(d => !config.excludedBrands?.includes(d.brand)));
-      }
+      // Apply renames, edition renames, and exclusions to current data in-memory
+      setData(prev => prev.map(d => {
+        let brand = d.brand;
+        let editionLabel = d.editionLabel;
+        // Apply brand renames
+        if (config.renames?.[brand]) {
+          brand = config.renames[brand];
+        }
+        // Apply edition renames
+        if (config.editionRenames?.[d.brand]?.[editionLabel]) {
+          editionLabel = config.editionRenames[d.brand][editionLabel];
+        } else if (config.editionRenames?.[brand]?.[editionLabel]) {
+          editionLabel = config.editionRenames[brand][editionLabel];
+        }
+        // Apply custom config (category, genres, venue)
+        const brandConfig = config.brands?.[d.brand] || config.brands?.[brand];
+        return {
+          ...d,
+          brand,
+          editionLabel,
+          category: brandConfig?.category || d.category,
+          genres: brandConfig?.genres?.length ? brandConfig.genres : d.genres,
+          location: brandConfig?.venue || d.location,
+        };
+      }).filter(d => !config.excludedBrands?.includes(d.brand)));
     }
   }, []);
 
