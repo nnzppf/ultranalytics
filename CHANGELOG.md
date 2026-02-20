@@ -1,6 +1,51 @@
-# Changelog - Design System + Live Tracker Upgrade
+# Changelog - Ultranalytics
 
-## 20 Febbraio 2026
+## 20 Febbraio 2026 (v2)
+
+### Live Tracker — Supporto brand con 1 sola edizione
+- `getBrandsWithMultipleEditions` rinominata in `getBrandsForTracker` — ora accetta brand con 1+ edizione
+- Brand nuovi (mai fatti prima) appaiono nel tracker con KPI e curva cumulativa
+- Se non ci sono edizioni precedenti: nascosti tabella confronto, KPI media, barra progresso
+- Mantiene piena retrocompatibilita per brand con 2+ edizioni
+
+### Rimozione DECO 90
+- Aggiunto `"deco 90"` a `EXCLUDED_EVENTS` — non appare piu tra i brand analizzati
+
+### Pagina Gestione Eventi
+- Nuovo file `src/services/eventConfigService.js` — CRUD configurazione eventi su Firebase (collection `appConfig`)
+- Nuovo file `src/components/screens/EventManagerModal.js` — modal fullscreen accessibile da icona ingranaggio nella top bar
+- **Funzionalita:**
+  - Lista tutti i brand rilevati dai dati + quelli nel registry
+  - Badge "NUOVO" per brand non ancora configurati
+  - Editor inline: rinomina brand, cambia categoria, multi-select generi, campo locale con autocomplete
+  - Merge duplicati: seleziona 2+ brand, scegli nome principale, crea alias automatici
+  - Brand esclusi: toggle per nascondere/mostrare brand dall'analisi
+  - Ricerca per nome brand
+  - Salva tutto su Firebase con persistenza cross-sessione
+
+### Integrazione customConfig nel data pipeline
+- `matchBrand()` in `eventNameCleaner.js` accetta parametro opzionale `customConfig`
+  - Supporta alias (da merge), renames, esclusioni custom, override categoria/generi
+- `processRawRows()` in `csvProcessor.js` passa `customConfig` al matching
+- `App.js`: carica `eventConfig` da Firebase all'avvio, applica renames/esclusioni ai dati in-memory al salvataggio
+
+### File modificati/creati
+
+| File | Tipo modifica |
+|------|--------------|
+| `src/services/eventConfigService.js` | NUOVO — Firebase CRUD config eventi |
+| `src/components/screens/EventManagerModal.js` | NUOVO — UI gestione eventi |
+| `src/utils/comparisonEngine.js` | `getBrandsForTracker` (1+ ediz.) |
+| `src/components/tabs/ComparisonTab.js` | Import aggiornato, testo UI, logica selezione brand |
+| `src/components/comparison/WhereAreWeNow.js` | Gestione 0 comparisons (nasconde KPI non rilevanti) |
+| `src/config/eventConfig.js` | Aggiunto "deco 90" a EXCLUDED_EVENTS |
+| `src/utils/eventNameCleaner.js` | Supporto customConfig in matchBrand() |
+| `src/utils/csvProcessor.js` | Supporto customConfig in processRawRows() |
+| `src/App.js` | Icona settings, stato modal, caricamento/salvataggio config Firebase |
+
+---
+
+## 20 Febbraio 2026 (v1)
 
 ### Design System Completo (Prompt 1 + Prompt 6)
 

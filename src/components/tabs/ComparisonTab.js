@@ -5,7 +5,7 @@ import EditionUserLists from '../comparison/EditionUserLists';
 import BrandComparison from '../comparison/BrandComparison';
 import GenreComparison from '../comparison/GenreComparison';
 import LocationComparison from '../comparison/LocationComparison';
-import { compareBrands, compareGenres, compareLocations, computeWhereAreWeNow, computeCrossBrandComparison, getBrandsWithMultipleEditions, computeEditionUserLists } from '../../utils/comparisonEngine';
+import { compareBrands, compareGenres, compareLocations, computeWhereAreWeNow, computeCrossBrandComparison, getBrandsForTracker, computeEditionUserLists } from '../../utils/comparisonEngine';
 import { getUserStats } from '../../utils/dataTransformers';
 import { GENRE_LABELS } from '../../config/eventConfig';
 import { colors, font, radius, gradients, alpha, transition as tr } from '../../config/designTokens';
@@ -34,7 +34,7 @@ export default function ComparisonTab({ data, filtered, selectedBrand: topSelect
   }, [allBrandStats, selectedGenre]);
 
   const locationStats = useMemo(() => compareLocations(baseData), [baseData]);
-  const multiEditionBrands = useMemo(() => getBrandsWithMultipleEditions(baseData), [baseData]);
+  const trackerBrands = useMemo(() => getBrandsForTracker(baseData), [baseData]);
 
   // Cross-brand mode: user explicitly opted to compare against another brand
   const [crossBrandTarget, setCrossBrandTarget] = useState(null);
@@ -135,8 +135,8 @@ export default function ComparisonTab({ data, filtered, selectedBrand: topSelect
     setCrossBrandTarget(null);
     setManualCount('');
     setDailyCounts({});
-    const brandInfo = multiEditionBrands.find(b => b.brand === brand);
-    if (brandInfo && brandInfo.editions.length >= 2) {
+    const brandInfo = trackerBrands.find(b => b.brand === brand);
+    if (brandInfo && brandInfo.editions.length >= 1) {
       setSelectedEdition(brandInfo.editions[brandInfo.editions.length - 1]);
       setView('tracker');
     }
@@ -148,12 +148,12 @@ export default function ComparisonTab({ data, filtered, selectedBrand: topSelect
   // Auto-select latest edition when entering tracker with a brand from top bar
   useEffect(() => {
     if (view === 'tracker' && highlightBrand && !selectedBrand && !selectedEdition) {
-      const brandInfo = multiEditionBrands.find(b => b.brand === highlightBrand);
+      const brandInfo = trackerBrands.find(b => b.brand === highlightBrand);
       if (brandInfo && brandInfo.editions.length > 0) {
         setSelectedEdition(brandInfo.editions[brandInfo.editions.length - 1]);
       }
     }
-  }, [view, highlightBrand, selectedBrand, selectedEdition, multiEditionBrands]);
+  }, [view, highlightBrand, selectedBrand, selectedEdition, trackerBrands]);
 
   const tabs = [
     { key: 'genre', label: 'Per Genere' },
@@ -235,10 +235,10 @@ export default function ComparisonTab({ data, filtered, selectedBrand: topSelect
           {!effectiveBrand && (
             <div>
               <div style={{ fontSize: font.size.sm, color: colors.text.muted, marginBottom: 8 }}>
-                Seleziona un brand con più edizioni per vedere il Live Tracker:
+                Seleziona un brand per vedere il Live Tracker:
               </div>
               <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                {multiEditionBrands.map(b => (
+                {trackerBrands.map(b => (
                   <button key={b.brand} onClick={() => handleSelectBrand(b.brand)} style={{
                     padding: "8px 16px", borderRadius: radius.lg, fontSize: font.size.sm,
                     border: `1px solid ${colors.border.default}`,
@@ -254,7 +254,7 @@ export default function ComparisonTab({ data, filtered, selectedBrand: topSelect
 
           {/* Edition selector + cross-brand option */}
           {effectiveBrand && !isCrossBrandMode && (() => {
-            const brandInfo = multiEditionBrands.find(b => b.brand === effectiveBrand);
+            const brandInfo = trackerBrands.find(b => b.brand === effectiveBrand);
             const editions = brandInfo?.editions || [];
             // Auto-select latest edition if none selected
             const activeEdition = selectedEdition || (editions.length > 0 ? editions[editions.length - 1] : null);

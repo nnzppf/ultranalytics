@@ -151,6 +151,7 @@ export const EXCLUDED_EVENTS = [
   "evento registrazione gratuita",
   "evento test scanner",
   "besame summer tour",
+  "deco 90",
 ];
 
 export const SENIOR_EVENTS = [

@@ -87,7 +87,7 @@ function isBigliettiFormat(keys) {
 /**
  * Process rows from biglietti CSV format into enriched records.
  */
-function processBigliettiRows(rows) {
+function processBigliettiRows(rows, customConfig) {
   const keys = rows.length > 0 ? Object.keys(rows[0]) : [];
   const dateCol = findCol(keys, ['data_acquisto_biglietto', 'data_acquisto']);
   const scanCol = findCol(keys, ['data_scansione', 'scansione']);
@@ -109,7 +109,7 @@ function processBigliettiRows(rows) {
     if (!rawEventName) continue;
 
     // Match brand
-    const brandMatch = matchBrand(rawEventName);
+    const brandMatch = matchBrand(rawEventName, customConfig);
     if (!brandMatch) continue; // excluded
     if (brandMatch.category === 'senior') continue; // skip senior for now
 
@@ -166,7 +166,7 @@ function processBigliettiRows(rows) {
 /**
  * Process rows from a generic/legacy CSV format (like the old app expected).
  */
-function processGenericRows(rows, eventName) {
+function processGenericRows(rows, eventName, customConfig) {
   const keys = rows.length > 0 ? Object.keys(rows[0]) : [];
   const dateCol = findCol(keys, ['data', 'date', 'data_acquisto']) || keys[0];
   const timeCol = findCol(keys, ['ora', 'time', 'orario']) || keys[1];
@@ -188,7 +188,7 @@ function processGenericRows(rows, eventName) {
     const attended = ['s', 'si', 'sì', '1', 'true', 'yes'].includes(rawPart);
 
     const fullName = (row[nameCol] || '').trim();
-    const brandMatch = matchBrand(eventName);
+    const brandMatch = matchBrand(eventName, customConfig);
 
     records.push({
       rawEventName: eventName,
@@ -295,11 +295,11 @@ export async function processFiles(fileList) {
 /**
  * Process raw rows (already parsed) - for when files are already loaded.
  */
-export function processRawRows(rows, eventName) {
+export function processRawRows(rows, eventName, customConfig) {
   const keys = rows.length > 0 ? Object.keys(rows[0]) : [];
 
   if (isBigliettiFormat(keys)) {
-    return processBigliettiRows(rows);
+    return processBigliettiRows(rows, customConfig);
   }
-  return processGenericRows(rows, eventName);
+  return processGenericRows(rows, eventName, customConfig);
 }

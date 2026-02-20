@@ -2,13 +2,15 @@
 import { useState, useMemo, useEffect, useCallback } from "react";
 import Papa from "papaparse";
 import * as XLSX from "xlsx";
-import { Users, Check, TrendingUp, X, Calendar, Gift, Cloud, CloudOff, Loader, Database, LogOut } from "lucide-react";
+import { Users, Check, TrendingUp, X, Calendar, Gift, Cloud, CloudOff, Loader, Database, LogOut, Settings } from "lucide-react";
 
 import { useAuth } from "./contexts/AuthContext";
 import LoginScreen from "./components/screens/LoginScreen";
 import { processRawRows, isUtentiFormat, processUtentiRows } from "./utils/csvProcessor";
 import { getHourlyData, getHourlyDataByGroup, getDowData, getFasciaData, getDaysBeforeData, getTrendData, getTrendDataByGroup, getConversionByFascia, getHeatmapData, getUserStats, getEventStats } from "./utils/dataTransformers";
 import { saveDataset, loadAllData, deleteDataset, hasStoredData } from "./services/firebaseDataService";
+import { loadEventConfig, saveEventConfig } from "./services/eventConfigService";
+import EventManagerModal from "./components/screens/EventManagerModal";
 
 import { GENRE_LABELS, BRAND_REGISTRY } from "./config/eventConfig";
 import { colors, font, radius, gradients, transition as tr } from "./config/designTokens";
@@ -64,6 +66,8 @@ function AuthenticatedApp({ user, logout }) {
   const [selectedEdition, setSelectedEdition] = useState("all");
   const [cloudStatus, setCloudStatus] = useState("idle"); // idle | saving | saved | error
   const [savedDatasets, setSavedDatasets] = useState([]);
+  const [showEventManager, setShowEventManager] = useState(false);
+  const [eventConfig, setEventConfig] = useState(null);
   const [graphHeights, setGraphHeights] = useState({
     hourly: 250, dowData: 220, daysBeforeData: 220,
     fasciaData: 250, convByFascia: 220,
@@ -81,10 +85,13 @@ function AuthenticatedApp({ user, logout }) {
     try { localStorage.setItem("clubAnalytics_graphHeights", JSON.stringify(graphHeights)); } catch {}
   }, [graphHeights]);
 
-  // On mount: check Firebase for stored data
+  // On mount: check Firebase for stored data + load event config
   useEffect(() => {
     async function checkCloud() {
       try {
+        // Load event config in parallel
+        loadEventConfig().then(cfg => { if (cfg) setEventConfig(cfg); }).catch(() => {});
+
         const hasData = await hasStoredData();
         if (hasData) {
           const { records, utenti, datasets } = await loadAllData();
@@ -220,6 +227,33 @@ function AuthenticatedApp({ user, logout }) {
       console.error("Delete failed:", e);
     }
   }, [reloadFromCloud]);
+
+  // Save event config and apply to data
+  const handleSaveEventConfig = useCallback(async (config) => {
+    const success = await saveEventConfig(config);
+    if (success) {
+      setEventConfig(config);
+      // Apply renames and exclusions to current data in-memory
+      if (config.renames || config.excludedBrands?.length) {
+        setData(prev => prev.map(d => {
+          let brand = d.brand;
+          // Apply renames
+          if (config.renames?.[brand]) {
+            brand = config.renames[brand];
+          }
+          // Apply custom config (category, genres, venue)
+          const brandConfig = config.brands?.[d.brand] || config.brands?.[brand];
+          return {
+            ...d,
+            brand,
+            category: brandConfig?.category || d.category,
+            genres: brandConfig?.genres?.length ? brandConfig.genres : d.genres,
+            location: brandConfig?.venue || d.location,
+          };
+        }).filter(d => !config.excludedBrands?.includes(d.brand)));
+      }
+    }
+  }, []);
 
   // Helper: get genres for a record (from record or BRAND_REGISTRY fallback)
   const getRecordGenres = useCallback((r) => {
@@ -420,6 +454,13 @@ function AuthenticatedApp({ user, logout }) {
 
         {/* Right side: data management + user */}
         <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 8 }}>
+          <button onClick={() => setShowEventManager(true)} title="Gestione eventi" style={{
+            background: colors.bg.elevated, border: "none", borderRadius: radius.md,
+            color: colors.text.muted, fontSize: font.size.xs, padding: "5px 10px", cursor: "pointer",
+            display: "flex", alignItems: "center", gap: 4,
+          }}>
+            <Settings size={13} />
+          </button>
           <button onClick={() => { setStep("upload"); setFiles([]); }} style={{
             background: colors.bg.elevated, border: "none", borderRadius: radius.md,
             color: colors.text.muted, fontSize: font.size.xs, padding: "5px 12px", cursor: "pointer",
@@ -547,6 +588,16 @@ function AuthenticatedApp({ user, logout }) {
 
       {/* AI Assistant */}
       <AiChat data={data} analytics={analytics} userStats={analytics?.userStats} />
+
+      {/* Event Manager Modal */}
+      {showEventManager && (
+        <EventManagerModal
+          data={data}
+          eventConfig={eventConfig}
+          onSave={handleSaveEventConfig}
+          onClose={() => setShowEventManager(false)}
+        />
+      )}
     </div>
   );
 }

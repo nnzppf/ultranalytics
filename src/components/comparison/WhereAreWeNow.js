@@ -197,6 +197,7 @@ function SingleBrandView({ comparisonData }) {
   } = comparisonData;
   const [logScale, setLogScale] = useState(false);
 
+  const hasComparisons = comparisons.length > 0;
   const avgDelta = avgAtSamePoint > 0
     ? parseFloat((((currentRegistrations - avgAtSamePoint) / avgAtSamePoint) * 100).toFixed(1))
     : null;
@@ -245,16 +246,20 @@ function SingleBrandView({ comparisonData }) {
             </div>
           )}
         </div>
-        <div style={{ background: colors.bg.page, borderRadius: radius.xl, padding: 12, textAlign: "center" }}>
-          <div style={{ fontSize: font.size.xs, color: colors.text.muted, marginBottom: 4 }}>Media allo stesso punto</div>
-          <div style={{ fontSize: font.size["4xl"], fontWeight: font.weight.black, color: colors.text.primary }}>{avgAtSamePoint}</div>
-        </div>
-        <div style={{ background: colors.bg.page, borderRadius: radius.xl, padding: 12, textAlign: "center" }}>
-          <div style={{ fontSize: font.size.xs, color: colors.text.muted, marginBottom: 4 }}>Rispetto alla media</div>
-          <div style={{ fontSize: font.size["4xl"], fontWeight: font.weight.black }}>
-            <DeltaBadge value={avgDelta} />
+        {hasComparisons && (
+          <div style={{ background: colors.bg.page, borderRadius: radius.xl, padding: 12, textAlign: "center" }}>
+            <div style={{ fontSize: font.size.xs, color: colors.text.muted, marginBottom: 4 }}>Media allo stesso punto</div>
+            <div style={{ fontSize: font.size["4xl"], fontWeight: font.weight.black, color: colors.text.primary }}>{avgAtSamePoint}</div>
           </div>
-        </div>
+        )}
+        {hasComparisons && (
+          <div style={{ background: colors.bg.page, borderRadius: radius.xl, padding: 12, textAlign: "center" }}>
+            <div style={{ fontSize: font.size.xs, color: colors.text.muted, marginBottom: 4 }}>Rispetto alla media</div>
+            <div style={{ fontSize: font.size["4xl"], fontWeight: font.weight.black }}>
+              <DeltaBadge value={avgDelta} />
+            </div>
+          </div>
+        )}
         {!isEventPast && avgProjectedFinal != null && (
           <div style={{ background: colors.bg.page, borderRadius: radius.xl, padding: 12, textAlign: "center" }}>
             <div style={{ fontSize: font.size.xs, color: colors.text.muted, marginBottom: 4 }}>Proiezione finale</div>
@@ -263,23 +268,25 @@ function SingleBrandView({ comparisonData }) {
         )}
       </div>
 
-      {/* Progress bar */}
-      <div style={{ marginBottom: 16 }}>
-        <div style={{ display: "flex", justifyContent: "space-between", fontSize: font.size.xs, color: colors.text.muted, marginBottom: 4 }}>
-          <span>Progresso vs media finale ({avgFinal})</span>
-          <span>{Math.min(progressPercent, 100)}%</span>
+      {/* Progress bar — only when there are comparisons */}
+      {hasComparisons && (
+        <div style={{ marginBottom: 16 }}>
+          <div style={{ display: "flex", justifyContent: "space-between", fontSize: font.size.xs, color: colors.text.muted, marginBottom: 4 }}>
+            <span>Progresso vs media finale ({avgFinal})</span>
+            <span>{Math.min(progressPercent, 100)}%</span>
+          </div>
+          <div style={{ background: colors.bg.page, borderRadius: radius.md, height: 8, overflow: "hidden" }}>
+            <div style={{
+              width: `${Math.min(progressPercent, 100)}%`, height: "100%", borderRadius: radius.md,
+              background: progressPercent >= 100 ? colors.status.success : gradients.progress,
+              transition: "width 0.5s ease",
+            }} />
+          </div>
         </div>
-        <div style={{ background: colors.bg.page, borderRadius: radius.md, height: 8, overflow: "hidden" }}>
-          <div style={{
-            width: `${Math.min(progressPercent, 100)}%`, height: "100%", borderRadius: radius.md,
-            background: progressPercent >= 100 ? colors.status.success : gradients.progress,
-            transition: "width 0.5s ease",
-          }} />
-        </div>
-      </div>
+      )}
 
-      {/* Comparison table */}
-      {comparisons.length > 0 && (
+      {/* Comparison table — only when there are past editions to compare */}
+      {hasComparisons && (
         <div style={{ marginBottom: 16 }}>
           <div style={{ ...presets.sectionLabel, marginBottom: 8 }}>
             Confronto edizioni precedenti

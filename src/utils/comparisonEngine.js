@@ -400,9 +400,9 @@ export function compareLocations(allData) {
 }
 
 /**
- * Get all brands that have multiple editions (for "Where Are We Now" candidates).
+ * Get all brands available for the Live Tracker (1+ edition).
  */
-export function getBrandsWithMultipleEditions(allData) {
+export function getBrandsForTracker(allData) {
   const brandEditions = {};
   for (const d of allData) {
     if (!d.brand) continue;
@@ -410,7 +410,7 @@ export function getBrandsWithMultipleEditions(allData) {
     brandEditions[d.brand].add(d.editionLabel);
   }
   return Object.entries(brandEditions)
-    .filter(([_, eds]) => eds.size >= 2)
+    .filter(([_, eds]) => eds.size >= 1)
     .map(([brand, eds]) => ({ brand, editions: [...eds] }));
 }
 

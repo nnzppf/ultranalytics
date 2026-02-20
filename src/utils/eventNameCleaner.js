@@ -84,28 +84,53 @@ export function extractEventDate(rawName) {
 /**
  * Match a raw event name to a brand in BRAND_REGISTRY.
  * Returns { brand, editionLabel, category, genres } or null if excluded/senior.
+ *
+ * @param rawEventName - the raw event name from the file
+ * @param customConfig - optional custom config from Firebase with renames, aliases, exclusions
  */
-export function matchBrand(rawEventName) {
+export function matchBrand(rawEventName, customConfig) {
   const lower = rawEventName.toLowerCase().trim();
 
-  // Check exclusions
+  // Check exclusions (static + custom)
   if (EXCLUDED_EVENTS.some(ex => lower.includes(ex))) return null;
+  if (customConfig?.excludedBrands?.some(ex => lower.includes(ex.toLowerCase()))) return null;
 
   // Check senior (skip for now)
   if (SENIOR_EVENTS.some(s => lower.includes(s))) {
     return { brand: null, editionLabel: null, category: 'senior', genres: [] };
   }
 
-  // Try matching against all brands
+  // Try matching against custom aliases first (from merge)
+  if (customConfig?.brands) {
+    for (const [brandName, cfg] of Object.entries(customConfig.brands)) {
+      if (cfg.aliases) {
+        for (const alias of cfg.aliases) {
+          if (lower.includes(alias.toLowerCase())) {
+            return {
+              brand: cfg.displayName || brandName,
+              editionLabel: 'unknown',
+              category: cfg.category || 'standard',
+              genres: cfg.genres || [],
+            };
+          }
+        }
+      }
+    }
+  }
+
+  // Try matching against all brands in BRAND_REGISTRY
   for (const [brandName, config] of Object.entries(BRAND_REGISTRY)) {
     for (const mp of config.matchPatterns) {
       for (const pattern of mp.patterns) {
         if (lower.includes(pattern.toLowerCase())) {
+          // Apply custom config overrides if available
+          const custom = customConfig?.brands?.[brandName];
+          const finalBrand = customConfig?.renames?.[brandName] || custom?.displayName || brandName;
           return {
-            brand: brandName,
+            brand: finalBrand,
             editionLabel: mp.edition,
-            category: config.category,
-            genres: config.genres,
+            category: custom?.category || config.category,
+            genres: custom?.genres?.length ? custom.genres : config.genres,
           };
         }
       }
@@ -116,20 +141,26 @@ export function matchBrand(rawEventName) {
   const cleaned = stripDatePrefix(rawEventName).toLowerCase();
   for (const [brandName, config] of Object.entries(BRAND_REGISTRY)) {
     if (cleaned.includes(brandName.toLowerCase()) || brandName.toLowerCase().includes(cleaned)) {
+      const custom = customConfig?.brands?.[brandName];
+      const finalBrand = customConfig?.renames?.[brandName] || custom?.displayName || brandName;
       return {
-        brand: brandName,
+        brand: finalBrand,
         editionLabel: 'unknown',
-        category: config.category,
-        genres: config.genres,
+        category: custom?.category || config.category,
+        genres: custom?.genres?.length ? custom.genres : config.genres,
       };
     }
   }
 
   // Unmatched - use cleaned name as brand
+  const fallbackBrand = stripDatePrefix(rawEventName);
+  // Check if this fallback brand should be renamed
+  const renamedBrand = customConfig?.renames?.[fallbackBrand] || fallbackBrand;
+  const fallbackCustom = customConfig?.brands?.[fallbackBrand] || customConfig?.brands?.[renamedBrand];
   return {
-    brand: stripDatePrefix(rawEventName),
+    brand: renamedBrand,
     editionLabel: 'single',
-    category: 'unknown',
-    genres: [],
+    category: fallbackCustom?.category || 'unknown',
+    genres: fallbackCustom?.genres || [],
   };
 }
