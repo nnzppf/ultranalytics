@@ -164,6 +164,13 @@ table {
   display: none !important;
 }
 
+/* Tracker: desktop buttons visible, mobile dropdowns hidden by default */
+.tracker-brand-dropdown,
+.tracker-edition-dropdown,
+.tracker-compare-dropdown {
+  display: none !important;
+}
+
 /* Tab bar — scrollable with fade edges */
 .tab-bar {
   position: relative;
@@ -249,6 +256,20 @@ table {
   }
   .edition-dropdown {
     display: block !important;
+  }
+
+  /* Tracker: switch to dropdowns on mobile */
+  .tracker-brand-buttons,
+  .tracker-edition-buttons,
+  .tracker-compare-buttons {
+    display: none !important;
+  }
+  .tracker-brand-dropdown,
+  .tracker-edition-dropdown {
+    display: block !important;
+  }
+  .tracker-compare-dropdown {
+    display: flex !important;
   }
 
   /* Tracker KPI grid — 2 columns on tablet */

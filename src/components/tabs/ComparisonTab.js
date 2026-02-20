@@ -1,5 +1,6 @@
 import { useState, useMemo, useEffect } from 'react';
 import { ChevronRight, Link2, Users, Calendar } from 'lucide-react';
+import Dropdown from '../shared/Dropdown';
 import WhereAreWeNow from '../comparison/WhereAreWeNow';
 import EditionUserLists from '../comparison/EditionUserLists';
 import BrandComparison from '../comparison/BrandComparison';
@@ -240,7 +241,8 @@ export default function ComparisonTab({ data, filtered, selectedBrand: topSelect
               <div style={{ fontSize: font.size.sm, color: colors.text.muted, marginBottom: 8 }}>
                 Seleziona un brand per vedere il Live Tracker:
               </div>
-              <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+              {/* Desktop: buttons */}
+              <div className="tracker-brand-buttons" style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
                 {trackerBrands.map(b => (
                   <button key={b.brand} onClick={() => handleSelectBrand(b.brand)} style={{
                     padding: "8px 16px", borderRadius: radius.lg, fontSize: font.size.sm,
@@ -251,6 +253,15 @@ export default function ComparisonTab({ data, filtered, selectedBrand: topSelect
                     {b.brand} <span style={{ color: colors.text.disabled }}>({b.editions.length} edizioni)</span>
                   </button>
                 ))}
+              </div>
+              {/* Mobile: dropdown */}
+              <div className="tracker-brand-dropdown" style={{ display: "none" }}>
+                <Dropdown
+                  value={null}
+                  onChange={(brand) => handleSelectBrand(brand)}
+                  placeholder="Seleziona brand..."
+                  options={trackerBrands.map(b => ({ value: b.brand, label: b.brand, count: b.editions.length }))}
+                />
               </div>
             </div>
           )}
@@ -268,20 +279,33 @@ export default function ComparisonTab({ data, filtered, selectedBrand: topSelect
             return (
               <div>
                 {editions.length > 0 && (
-                  <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 8, alignItems: "center" }}>
-                    <span style={{ fontSize: font.size.xs, color: colors.text.disabled, marginRight: 4 }}>Edizione:</span>
-                    {editions.map(ed => (
-                      <button key={ed} onClick={() => { setSelectedEdition(ed); setCrossBrandTarget(null); setManualCount(''); setDailyCounts({}); }} style={{
-                        padding: "5px 12px", borderRadius: radius.md, fontSize: font.size.xs, border: "none", cursor: "pointer",
-                        background: (selectedEdition || activeEdition) === ed ? colors.interactive.active : colors.interactive.inactive,
-                        color: (selectedEdition || activeEdition) === ed ? colors.interactive.activeText : colors.interactive.inactiveText,
-                        transition: tr.normal,
-                      }}>{ed}</button>
-                    ))}
-                  </div>
+                  <>
+                    {/* Desktop: edition buttons */}
+                    <div className="tracker-edition-buttons" style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 8, alignItems: "center" }}>
+                      <span style={{ fontSize: font.size.xs, color: colors.text.disabled, marginRight: 4 }}>Edizione:</span>
+                      {editions.map(ed => (
+                        <button key={ed} onClick={() => { setSelectedEdition(ed); setCrossBrandTarget(null); setManualCount(''); setDailyCounts({}); }} style={{
+                          padding: "5px 12px", borderRadius: radius.md, fontSize: font.size.xs, border: "none", cursor: "pointer",
+                          background: (selectedEdition || activeEdition) === ed ? colors.interactive.active : colors.interactive.inactive,
+                          color: (selectedEdition || activeEdition) === ed ? colors.interactive.activeText : colors.interactive.inactiveText,
+                          transition: tr.normal,
+                        }}>{ed}</button>
+                      ))}
+                    </div>
+                    {/* Mobile: edition dropdown */}
+                    <div className="tracker-edition-dropdown" style={{ display: "none", marginBottom: 8 }}>
+                      <Dropdown
+                        value={selectedEdition || activeEdition}
+                        onChange={(ed) => { setSelectedEdition(ed); setCrossBrandTarget(null); setManualCount(''); setDailyCounts({}); }}
+                        placeholder="Edizione"
+                        options={editions.map(ed => ({ value: ed, label: ed }))}
+                      />
+                    </div>
+                  </>
                 )}
                 {/* Confronta con altro brand — compact row */}
-                <div style={{
+                {/* Desktop: buttons */}
+                <div className="tracker-compare-buttons" style={{
                   display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center",
                   marginTop: 8, padding: "8px 12px",
                   background: alpha.pink[8], borderRadius: radius.lg,
@@ -302,6 +326,23 @@ export default function ComparisonTab({ data, filtered, selectedBrand: topSelect
                         {b.brand}
                       </button>
                     ))}
+                </div>
+                {/* Mobile: dropdown */}
+                <div className="tracker-compare-dropdown" style={{
+                  display: "none", marginTop: 8, padding: "8px 12px",
+                  background: alpha.pink[8], borderRadius: radius.lg,
+                  border: `1px solid ${alpha.pink[20]}`,
+                  alignItems: "center", gap: 8,
+                }}>
+                  <span style={{ fontSize: font.size.xs, color: colors.text.muted, fontWeight: font.weight.semibold, whiteSpace: "nowrap" }}>
+                    Confronta con:
+                  </span>
+                  <Dropdown
+                    value={null}
+                    onChange={(brand) => { setCrossBrandTarget(brand); setCrossBrandEdition(null); }}
+                    placeholder="Seleziona brand..."
+                    options={allBrandStats.filter(b => b.brand !== effectiveBrand).map(b => ({ value: b.brand, label: b.brand }))}
+                  />
                 </div>
               </div>
             );
