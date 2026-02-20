@@ -663,21 +663,21 @@ function AuthenticatedApp({ user, logout }) {
               border: `1px solid ${colors.border.default}`, ...glass.card, boxShadow: shadows.sm, cursor: "default",
             }}
           >
-            <div style={{ display: "flex", gap: 16 }}>
-              <div style={{ flex: 1 }}>
-                <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 4 }}>
-                  <TrendingUp size={14} color={colors.brand.cyan} />
-                  <span style={{ fontSize: font.size.xs, color: colors.text.muted, textTransform: "uppercase", letterSpacing: "0.05em" }}>Conv.</span>
+            <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 4, marginBottom: 4 }}>
+                  <TrendingUp size={12} color={colors.brand.cyan} style={{ flexShrink: 0 }} />
+                  <span style={{ fontSize: font.size.xs, color: colors.text.muted, textTransform: "uppercase", letterSpacing: "0.05em", whiteSpace: "nowrap" }}>Conv.</span>
                 </div>
-                <div style={{ fontSize: font.size["3xl"], fontWeight: font.weight.bold, color: colors.text.primary }}>{analytics.conv}%</div>
+                <div style={{ fontSize: font.size["3xl"], fontWeight: font.weight.bold, color: colors.text.primary, whiteSpace: "nowrap" }}>{analytics.conv}%</div>
               </div>
               <div style={{ width: 1, background: colors.border.default, alignSelf: "stretch" }} />
-              <div style={{ flex: 1 }}>
-                <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 4 }}>
-                  <X size={14} color={colors.status.error} />
-                  <span style={{ fontSize: font.size.xs, color: colors.text.muted, textTransform: "uppercase", letterSpacing: "0.05em" }}>No-Show</span>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 4, marginBottom: 4 }}>
+                  <X size={12} color={colors.status.error} style={{ flexShrink: 0 }} />
+                  <span style={{ fontSize: font.size.xs, color: colors.text.muted, textTransform: "uppercase", letterSpacing: "0.05em", whiteSpace: "nowrap" }}>No-Show</span>
                 </div>
-                <div style={{ fontSize: font.size["3xl"], fontWeight: font.weight.bold, color: colors.text.primary }}>{analytics.noShowRate}%</div>
+                <div style={{ fontSize: font.size["3xl"], fontWeight: font.weight.bold, color: colors.text.primary, whiteSpace: "nowrap" }}>{analytics.noShowRate}%</div>
               </div>
             </div>
           </motion.div>

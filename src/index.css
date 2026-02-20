@@ -201,9 +201,14 @@ table {
     margin-left: 0 !important;
     padding: 8px 0 4px;
     border-top: 1px solid var(--border-default);
+    flex-direction: column;
+    gap: 6px;
   }
   .filters-container.open {
     display: flex !important;
+  }
+  .filters-container .filter-row {
+    margin-left: 0 !important;
   }
   .grid-2-col,
   .bento-grid {
@@ -317,6 +322,7 @@ table {
     -webkit-overflow-scrolling: touch;
     flex-wrap: nowrap !important;
     scrollbar-width: none;
+    margin-left: 0 !important;
   }
   .filter-row::-webkit-scrollbar {
     display: none;
