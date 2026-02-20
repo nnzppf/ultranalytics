@@ -111,12 +111,12 @@ export default function OverviewTab({ analytics, filtered, selectedBrand, graphH
         extra={<ScaleToggle isLog={logScale} onToggle={setLogScale} />}
       >
         <ResponsiveContainer width="100%" height={graphHeights.daysBeforeData || 220}>
-          <AreaChart data={daysBeforeData}>
+          <AreaChart data={logScale ? daysBeforeData.map(d => ({ ...d, count: d.count || null })) : daysBeforeData}>
             <CartesianGrid strokeDasharray="3 3" stroke={colors.border.default} />
             <XAxis dataKey="days" tick={{ fill: colors.text.muted, fontSize: 10 }} angle={-20} textAnchor="end" height={45} />
-            <YAxis scale={logScale ? "log" : "auto"} domain={logScale ? ["auto", "auto"] : [0, "auto"]} allowDataOverflow={logScale} tick={{ fill: colors.text.muted, fontSize: 10 }} />
+            <YAxis scale={logScale ? "log" : "auto"} domain={logScale ? [1, "auto"] : [0, "auto"]} allowDataOverflow={logScale} tick={{ fill: colors.text.muted, fontSize: 10 }} />
             <Tooltip {...TOOLTIP_STYLE} />
-            <Area type="monotone" dataKey="count" stroke={colors.brand.purple} fill={alpha.brand[20]} strokeWidth={2} />
+            <Area type="monotone" dataKey="count" stroke={colors.brand.purple} fill={logScale ? "transparent" : alpha.brand[20]} strokeWidth={2} connectNulls />
           </AreaChart>
         </ResponsiveContainer>
         <ResizeHandle chartKey="daysBeforeData" graphHeights={graphHeights} setGraphHeights={setGraphHeights} />
