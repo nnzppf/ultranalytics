@@ -9,9 +9,9 @@ export function SkeletonBlock({ width = "100%", height = 16, style }) {
 export function SkeletonDashboard() {
   return (
     <div style={{ padding: "0 20px" }}>
-      {/* KPI skeleton row */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: 10, padding: "16px 0", marginBottom: 8 }}>
-        {[...Array(5)].map((_, i) => (
+      {/* KPI skeleton row — responsive */}
+      <div className="kpi-grid" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(120px, 1fr))", gap: 10, padding: "16px 0", marginBottom: 8 }}>
+        {[...Array(4)].map((_, i) => (
           <div key={i} style={{
             background: colors.bg.card, borderRadius: 16, padding: "14px 16px",
             border: `1px solid ${colors.border.default}`,
@@ -23,14 +23,14 @@ export function SkeletonDashboard() {
       </div>
 
       {/* Tab skeleton */}
-      <div style={{ display: "flex", gap: 4, marginBottom: 16 }}>
+      <div className="tab-bar" style={{ display: "flex", gap: 4, marginBottom: 16, overflowX: "auto" }}>
         {[90, 70, 100, 60, 80, 55, 90].map((w, i) => (
-          <SkeletonBlock key={i} width={w} height={34} style={{ borderRadius: 8 }} />
+          <SkeletonBlock key={i} width={w} height={34} style={{ borderRadius: 8, flexShrink: 0 }} />
         ))}
       </div>
 
-      {/* Chart skeleton — bento */}
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
+      {/* Chart skeleton — bento, responsive */}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: 16 }}>
         <div style={{ gridColumn: "1 / -1", background: colors.bg.card, borderRadius: 20, padding: 16, border: `1px solid ${colors.border.default}` }}>
           <SkeletonBlock width={200} height={10} style={{ marginBottom: 12 }} />
           <SkeletonBlock height={180} />

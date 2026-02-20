@@ -1,8 +1,9 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine } from 'recharts';
 import { DeltaBadge } from '../shared/Badge';
 import ScaleToggle from '../shared/ScaleToggle';
 import { useSortable, Th } from '../shared/SortableTable';
+import DataCards from '../shared/DataCards';
 import { TOOLTIP_STYLE } from '../../config/constants';
 import { colors, font, radius, gradients, presets, alpha } from '../../config/designTokens';
 
@@ -10,6 +11,7 @@ import { colors, font, radius, gradients, presets, alpha } from '../../config/de
 function CrossBrandView({ comparisonData }) {
   const { brandA, brandB, statsA, statsB, aggA, aggB, overlayData, allEditionLabels, allStats } = comparisonData;
   const [logScale, setLogScale] = useState(false);
+  const [compressed, setCompressed] = useState(true);
   const [hiddenLines, setHiddenLines] = useState(new Set());
   const toggleLine = (label) => {
     setHiddenLines(prev => {
@@ -18,6 +20,25 @@ function CrossBrandView({ comparisonData }) {
       return next;
     });
   };
+
+  // Compressed overlay for cross-brand chart
+  const chartData = useMemo(() => {
+    if (!compressed || !overlayData || overlayData.length === 0) return overlayData;
+    const keep = new Set([0]);
+    for (let i = 0; i < overlayData.length; i++) {
+      const pt = overlayData[i];
+      for (const k of allEditionLabels) {
+        if (pt[k] != null) {
+          let prevVal = null;
+          for (let j = i - 1; j >= 0; j--) {
+            if (overlayData[j][k] != null) { prevVal = overlayData[j][k]; break; }
+          }
+          if (prevVal === null || pt[k] !== prevVal) keep.add(pt.daysBefore);
+        }
+      }
+    }
+    return overlayData.filter(pt => keep.has(pt.daysBefore));
+  }, [overlayData, compressed, allEditionLabels]);
 
   const deltaReg = aggA.avgPerEdition - aggB.avgPerEdition;
   const deltaConv = parseFloat((aggA.avgConversion - aggB.avgConversion).toFixed(1));
@@ -115,7 +136,8 @@ function CrossBrandView({ comparisonData }) {
         <div style={{ ...presets.sectionLabel, marginBottom: 8 }}>
           Tutte le edizioni
         </div>
-        <div style={{ overflowX: "auto" }}>
+        {/* Desktop: table */}
+        <div className="desktop-table" style={{ overflowX: "auto" }}>
           <table style={{ width: "100%", borderCollapse: "collapse", fontSize: font.size.sm }}>
             <thead>
               <tr style={{ borderBottom: `1px solid ${colors.border.default}` }}>
@@ -142,6 +164,17 @@ function CrossBrandView({ comparisonData }) {
             </tbody>
           </table>
         </div>
+        {/* Mobile: cards */}
+        <DataCards
+          items={tableData}
+          fields={[
+            { key: 'brand', label: 'Brand', primary: true, render: s => <span style={{ color: s.isBrandA ? colors.brand.purple : colors.brand.pink }}>{s.brand}</span> },
+            { key: 'editionLabel', label: 'Edizione', badge: true },
+            { key: 'totalRegistrations', label: 'Registrazioni' },
+            { key: 'totalAttended', label: 'Presenze' },
+            { key: 'conversion', label: 'Conv.', render: s => `${s.conversion}%`, color: () => colors.status.success },
+          ]}
+        />
       </div>
 
       {/* Overlay chart */}
@@ -154,14 +187,26 @@ function CrossBrandView({ comparisonData }) {
 
         return (
           <div>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10, flexWrap: "wrap", gap: 8 }}>
               <div style={presets.sectionLabel}>
                 Curve cumulative registrazioni
               </div>
-              <ScaleToggle isLog={logScale} onToggle={setLogScale} />
+              <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+                <button onClick={() => setCompressed(v => !v)} style={{
+                  display: "flex", alignItems: "center", gap: 4,
+                  padding: "3px 10px", borderRadius: radius.md, fontSize: font.size.xs,
+                  border: `1px solid ${compressed ? colors.brand.purple : colors.border.default}`,
+                  background: compressed ? alpha.brand[15] : "transparent",
+                  color: compressed ? colors.brand.purple : colors.text.muted,
+                  cursor: "pointer", fontWeight: font.weight.medium,
+                }}>
+                  Comprimi
+                </button>
+                <ScaleToggle isLog={logScale} onToggle={setLogScale} />
+              </div>
             </div>
             <ResponsiveContainer width="100%" height={300}>
-              <AreaChart data={overlayData} margin={{ top: 5, right: 10, left: 0, bottom: 5 }}>
+              <AreaChart data={chartData} margin={{ top: 5, right: 10, left: 0, bottom: 5 }}>
                 <CartesianGrid strokeDasharray="2 8" stroke={colors.border.subtle} />
                 <XAxis dataKey="label" tick={{ fill: colors.text.disabled, fontSize: 10 }} axisLine={{ stroke: colors.border.subtle }} tickLine={false} />
                 <YAxis scale={logScale ? "log" : "auto"} domain={logScale ? ["auto", "auto"] : [0, "auto"]} allowDataOverflow={logScale} tick={{ fill: colors.text.disabled, fontSize: 10 }} axisLine={false} tickLine={false} />
@@ -241,6 +286,7 @@ function SingleBrandView({ comparisonData }) {
     snapshotHour,
   } = comparisonData;
   const [logScale, setLogScale] = useState(false);
+  const [compressed, setCompressed] = useState(true);
   // Track which lines are visible (all visible by default, plus projection)
   const [hiddenLines, setHiddenLines] = useState(new Set());
   const toggleLine = (label) => {
@@ -250,6 +296,32 @@ function SingleBrandView({ comparisonData }) {
       return next;
     });
   };
+
+  // Compressed overlay: keep only days where at least one edition changes value,
+  // plus always keep day 0 (event), currentDaysBefore (today), and first/last data points
+  const chartData = useMemo(() => {
+    if (!compressed || !overlayData || overlayData.length === 0) return overlayData;
+    const edKeys = allEditionLabels;
+    const keep = new Set([0, currentDaysBefore]);
+    for (let i = 0; i < overlayData.length; i++) {
+      const pt = overlayData[i];
+      for (const k of edKeys) {
+        if (pt[k] != null) {
+          // Keep this point if it's the first non-null or value differs from previous non-null
+          let prevVal = null;
+          for (let j = i - 1; j >= 0; j--) {
+            if (overlayData[j][k] != null) { prevVal = overlayData[j][k]; break; }
+          }
+          if (prevVal === null || pt[k] !== prevVal) {
+            keep.add(pt.daysBefore);
+          }
+        }
+      }
+      // Always keep projection points
+      if (pt._projection != null) keep.add(pt.daysBefore);
+    }
+    return overlayData.filter(pt => keep.has(pt.daysBefore));
+  }, [overlayData, compressed, allEditionLabels, currentDaysBefore]);
 
   const hasComparisons = comparisons.length > 0;
   const { sorted: sortedComparisons, sortKey: cSortKey, sortDir: cSortDir, toggleSort: cToggleSort } = useSortable(comparisons, 'atSamePoint', 'desc');
@@ -362,7 +434,8 @@ function SingleBrandView({ comparisonData }) {
           <div style={{ ...presets.sectionLabel, marginBottom: 8 }}>
             Confronto edizioni precedenti
           </div>
-          <div style={{ overflowX: "auto" }}>
+          {/* Desktop: table */}
+          <div className="desktop-table" style={{ overflowX: "auto" }}>
             <table style={{ width: "100%", borderCollapse: "collapse", fontSize: font.size.sm }}>
               <thead>
                 <tr style={{ borderBottom: `1px solid ${colors.border.default}` }}>
@@ -392,6 +465,18 @@ function SingleBrandView({ comparisonData }) {
               </tbody>
             </table>
           </div>
+          {/* Mobile: cards */}
+          <DataCards
+            items={sortedComparisons}
+            fields={[
+              { key: 'editionLabel', label: 'Edizione', primary: true },
+              { key: 'deltaPercent', label: 'Delta', badge: true, render: c => <DeltaBadge value={c.deltaPercent} /> },
+              { key: 'atSamePointAdj', label: `A -${currentDaysBefore}gg`, render: c => !isEventPast && c.atSamePointAdjusted != null ? c.atSamePointAdjusted : c.atSamePoint },
+              { key: 'totalFinal', label: 'Finale' },
+              { key: 'finalConversion', label: 'Conv.', render: c => `${c.finalConversion}%` },
+              { key: 'completionPercent', label: `Completamento`, render: c => `${c.completionPercent}%` },
+            ]}
+          />
         </div>
       )}
 
@@ -403,14 +488,26 @@ function SingleBrandView({ comparisonData }) {
 
         return (
         <div>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8, flexWrap: "wrap", gap: 8 }}>
             <div style={presets.sectionLabel}>
               Curve cumulative registrazioni
             </div>
-            <ScaleToggle isLog={logScale} onToggle={setLogScale} />
+            <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+              <button onClick={() => setCompressed(v => !v)} style={{
+                display: "flex", alignItems: "center", gap: 4,
+                padding: "3px 10px", borderRadius: radius.md, fontSize: font.size.xs,
+                border: `1px solid ${compressed ? colors.brand.purple : colors.border.default}`,
+                background: compressed ? alpha.brand[15] : "transparent",
+                color: compressed ? colors.brand.purple : colors.text.muted,
+                cursor: "pointer", fontWeight: font.weight.medium,
+              }}>
+                Comprimi
+              </button>
+              <ScaleToggle isLog={logScale} onToggle={setLogScale} />
+            </div>
           </div>
           <ResponsiveContainer width="100%" height={250}>
-            <AreaChart data={overlayData} margin={{ top: 5, right: 10, left: 0, bottom: 5 }}>
+            <AreaChart data={chartData} margin={{ top: 5, right: 10, left: 0, bottom: 5 }}>
               <CartesianGrid strokeDasharray="2 8" stroke={colors.border.subtle} />
               <XAxis dataKey="label" tick={{ fill: colors.text.disabled, fontSize: 10 }} axisLine={{ stroke: colors.border.subtle }} tickLine={false} />
               <YAxis scale={logScale ? "log" : "auto"} domain={logScale ? ["auto", "auto"] : [0, "auto"]} allowDataOverflow={logScale} tick={{ fill: colors.text.disabled, fontSize: 10 }} axisLine={false} tickLine={false} />
@@ -441,7 +538,7 @@ function SingleBrandView({ comparisonData }) {
                 );
               })}
               {/* Projection line */}
-              {!hiddenLines.has('_projection') && overlayData.some(p => p._projection != null) && (
+              {!hiddenLines.has('_projection') && chartData.some(p => p._projection != null) && (
                 <Area
                   type="monotone"
                   dataKey="_projection"
@@ -484,7 +581,7 @@ function SingleBrandView({ comparisonData }) {
               );
             })}
             {/* Projection toggle */}
-            {overlayData.some(p => p._projection != null) && (
+            {chartData.some(p => p._projection != null) && (
               <button onClick={() => toggleLine('_projection')} style={{
                 display: "flex", alignItems: "center", gap: 4, padding: "2px 8px",
                 borderRadius: radius.md, border: "none", cursor: "pointer",

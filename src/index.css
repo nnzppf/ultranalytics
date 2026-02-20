@@ -176,6 +176,11 @@ table {
   display: none !important;
 }
 
+/* Data tables: desktop table visible, mobile cards hidden by default */
+.mobile-cards {
+  display: none !important;
+}
+
 /* Tab bar — scrollable with fade edges */
 .tab-bar {
   position: relative;
@@ -397,13 +402,14 @@ table {
     padding: 10px !important;
   }
 
-  /* Tables on mobile — smaller text, tighter padding */
-  table {
-    font-size: 12px !important;
+  /* Tables on mobile — switch to card layout */
+  .desktop-table {
+    display: none !important;
   }
-
-  table th, table td {
-    padding: 6px 4px !important;
+  .mobile-cards {
+    display: flex !important;
+    flex-direction: column;
+    gap: 8px;
   }
 
   /* Cross-brand comparison — delta row horizontal on mobile */

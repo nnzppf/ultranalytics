@@ -670,7 +670,7 @@ function AuthenticatedApp({ user, logout }) {
 
       {/* KPI Row */}
       <StaggerList className="kpi-grid" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 10, padding: "16px 20px" }}>
-        <StaggerItem><KPI icon={Users} label="Registrazioni" value={analytics.total} color={colors.brand.purple} primary trend={analytics.trend?.total} sub={analytics.trend ? `vs ${analytics.trend.prevEdition}` : undefined} /></StaggerItem>
+        <StaggerItem><KPI icon={Users} label="Registrazioni" value={analytics.total} color={colors.brand.purple} trend={analytics.trend?.total} sub={analytics.trend ? `vs ${analytics.trend.prevEdition}` : undefined} /></StaggerItem>
         <StaggerItem><KPI icon={Check} label="Presenze" value={analytics.entered} color={colors.status.success} trend={analytics.trend?.entered} /></StaggerItem>
         <StaggerItem>
           <motion.div
