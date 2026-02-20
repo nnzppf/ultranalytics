@@ -41,6 +41,7 @@ const BRAND_REGISTRY = {
   '-100 ALLA MATURITÀ': { category: 'young', genres: ['student'], matchPatterns: ['-100 alla maturit', '100 alla maturit', 'maturita'] },
   'GLOCKY': { category: 'young', genres: ['live', 'student'], matchPatterns: ['glocky'] },
   'Euphoria': { category: 'young', genres: ['student'], matchPatterns: ['euphoria'] },
+  'JESUS LOVES DISCO': { category: 'standard', genres: ['commerciale'], matchPatterns: ['jesus loves disco'] },
 };
 
 const EXCLUDED_PATTERNS = ['test app', 'evento test', 'evento registrazione gratuita', 'evento test scanner', 'besame summer tour'];
