@@ -4,7 +4,7 @@ import { SegmentBadge } from '../shared/Badge';
 import { formatWhatsAppUrl } from '../../utils/whatsapp';
 import { Th } from '../shared/SortableTable';
 import DataCards from '../shared/DataCards';
-import { colors, font, radius, shadows, presets, transition as tr } from '../../config/designTokens';
+import { colors, font, radius, presets, transition as tr } from '../../config/designTokens';
 
 function formatBirthDate(d) {
   if (!d || !(d instanceof Date)) return null;
