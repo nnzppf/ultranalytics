@@ -567,9 +567,27 @@ function AuthenticatedApp({ user, logout }) {
             const el = document.querySelector('.app-content');
             if (!el) return;
             toast("Generando screenshot...", "info", 2000);
-            const canvas = await html2canvas(el, { backgroundColor: null, scale: 2 });
+            // Use the resolved CSS variable for background (dark/light aware)
+            const bgColor = getComputedStyle(document.documentElement).getPropertyValue('--bg-solid').trim() || '#1e293b';
+            const canvas = await html2canvas(el, { backgroundColor: bgColor, scale: 2, useCORS: true });
+            const fileName = `ultranalytics-${activeTab}-${new Date().toISOString().slice(0,10)}.png`;
+            // Use Web Share API on mobile (saves to camera roll on iOS)
+            if (navigator.share && navigator.canShare) {
+              try {
+                const blob = await new Promise(r => canvas.toBlob(r, 'image/png'));
+                const file = new File([blob], fileName, { type: 'image/png' });
+                if (navigator.canShare({ files: [file] })) {
+                  await navigator.share({ files: [file], title: 'Ultranalytics' });
+                  toast("Screenshot condiviso", "success");
+                  return;
+                }
+              } catch (e) {
+                if (e.name === 'AbortError') return; // user cancelled share
+              }
+            }
+            // Fallback: direct download
             const link = document.createElement('a');
-            link.download = `ultranalytics-${activeTab}-${new Date().toISOString().slice(0,10)}.png`;
+            link.download = fileName;
             link.href = canvas.toDataURL();
             link.click();
             toast("Screenshot scaricato", "success");
