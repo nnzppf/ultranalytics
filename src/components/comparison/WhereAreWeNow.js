@@ -286,7 +286,7 @@ function SingleBrandView({ comparisonData }) {
     brand, edition, eventDate, currentDaysBefore, isEventPast,
     currentRegistrations, dataRegistrations, isOverridden,
     currentAttended, currentConversion,
-    comparisons, avgAtSamePoint, avgProjectedFinal,
+    comparisons, avgAtSamePoint,
     regressionProjection, ensembleProjection,
     avgFinal, progressPercent, overlayData, allEditionLabels,
     snapshotHour,
