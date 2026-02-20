@@ -116,7 +116,7 @@ export default function OverviewTab({ analytics, filtered, selectedBrand, graphH
             <XAxis dataKey="days" tick={{ fill: colors.text.muted, fontSize: 10 }} angle={-20} textAnchor="end" height={45} />
             <YAxis scale={logScale ? "log" : "auto"} domain={logScale ? [1, "auto"] : [0, "auto"]} allowDataOverflow={logScale} tick={{ fill: colors.text.muted, fontSize: 10 }} />
             <Tooltip {...TOOLTIP_STYLE} />
-            <Area type="monotone" dataKey="count" stroke={colors.brand.purple} fill={logScale ? "transparent" : alpha.brand[20]} strokeWidth={2} connectNulls />
+            <Area type="monotone" dataKey="count" stroke={colors.brand.purple} fill={alpha.brand[20]} strokeWidth={2} connectNulls />
           </AreaChart>
         </ResponsiveContainer>
         <ResizeHandle chartKey="daysBeforeData" graphHeights={graphHeights} setGraphHeights={setGraphHeights} />
