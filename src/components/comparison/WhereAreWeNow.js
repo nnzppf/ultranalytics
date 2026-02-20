@@ -217,6 +217,7 @@ function SingleBrandView({ comparisonData }) {
   const {
     brand, edition, eventDate, currentDaysBefore, isEventPast,
     currentRegistrations, dataRegistrations, isOverridden,
+    currentAttended, currentConversion,
     comparisons, avgAtSamePoint, avgProjectedFinal,
     avgFinal, progressPercent, overlayData, allEditionLabels,
   } = comparisonData;
@@ -242,7 +243,7 @@ function SingleBrandView({ comparisonData }) {
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 16 }}>
         <div>
           <div style={{ ...presets.sectionLabel, marginBottom: 4 }}>
-            A che punto siamo
+            {isEventPast ? "Riepilogo edizione" : "A che punto siamo"}
           </div>
           <div style={{ fontSize: font.size["2xl"], fontWeight: font.weight.bold, color: colors.text.primary }}>
             {brand} <span style={{ color: colors.brand.purple }}>{edition}</span>
@@ -256,10 +257,10 @@ function SingleBrandView({ comparisonData }) {
           <div style={{
             display: "inline-block", marginTop: 4, padding: "2px 10px",
             borderRadius: radius.lg, fontSize: font.size.sm, fontWeight: font.weight.bold,
-            background: currentDaysBefore <= 1 ? colors.status.error : currentDaysBefore <= 3 ? colors.status.warning : colors.bg.elevated,
+            background: isEventPast ? colors.bg.elevated : currentDaysBefore <= 1 ? colors.status.error : currentDaysBefore <= 3 ? colors.status.warning : colors.bg.elevated,
             color: colors.text.inverse,
           }}>
-            {currentDaysBefore === 0 ? "OGGI" : `-${currentDaysBefore} giorni`}
+            {isEventPast ? "Concluso" : currentDaysBefore === 0 ? "OGGI" : `-${currentDaysBefore} giorni`}
           </div>
         </div>
       </div>
@@ -268,27 +269,43 @@ function SingleBrandView({ comparisonData }) {
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(130px, 1fr))", gap: 10, marginBottom: 16 }}>
         <div style={{ background: colors.bg.page, borderRadius: radius.xl, padding: 12, textAlign: "center" }}>
           <div style={{ fontSize: font.size.xs, color: colors.text.muted, marginBottom: 4 }}>
-            Registrazioni attuali
-            {isOverridden && <span style={{ color: colors.status.warning, marginLeft: 4 }}>(live)</span>}
+            {isEventPast ? "Registrazioni totali" : "Registrazioni attuali"}
+            {!isEventPast && isOverridden && <span style={{ color: colors.status.warning, marginLeft: 4 }}>(live)</span>}
           </div>
-          <div style={{ fontSize: font.size["4xl"], fontWeight: font.weight.black, color: isOverridden ? colors.status.warning : colors.brand.purple }}>
+          <div style={{ fontSize: font.size["4xl"], fontWeight: font.weight.black, color: isOverridden && !isEventPast ? colors.status.warning : colors.brand.purple }}>
             {currentRegistrations}
           </div>
-          {isOverridden && (
+          {!isEventPast && isOverridden && (
             <div style={{ fontSize: 10, color: colors.text.disabled, marginTop: 2 }}>
               da file: {dataRegistrations}
             </div>
           )}
         </div>
+        {isEventPast && (
+          <div style={{ background: colors.bg.page, borderRadius: radius.xl, padding: 12, textAlign: "center" }}>
+            <div style={{ fontSize: font.size.xs, color: colors.text.muted, marginBottom: 4 }}>Presenze</div>
+            <div style={{ fontSize: font.size["4xl"], fontWeight: font.weight.black, color: colors.text.primary }}>{currentAttended}</div>
+          </div>
+        )}
+        {isEventPast && (
+          <div style={{ background: colors.bg.page, borderRadius: radius.xl, padding: 12, textAlign: "center" }}>
+            <div style={{ fontSize: font.size.xs, color: colors.text.muted, marginBottom: 4 }}>Conversione</div>
+            <div style={{ fontSize: font.size["4xl"], fontWeight: font.weight.black, color: colors.status.success }}>{currentConversion}%</div>
+          </div>
+        )}
         {hasComparisons && (
           <div style={{ background: colors.bg.page, borderRadius: radius.xl, padding: 12, textAlign: "center" }}>
-            <div style={{ fontSize: font.size.xs, color: colors.text.muted, marginBottom: 4 }}>Media allo stesso punto</div>
+            <div style={{ fontSize: font.size.xs, color: colors.text.muted, marginBottom: 4 }}>
+              {isEventPast ? "Media finale altre edizioni" : "Media allo stesso punto"}
+            </div>
             <div style={{ fontSize: font.size["4xl"], fontWeight: font.weight.black, color: colors.text.primary }}>{avgAtSamePoint}</div>
           </div>
         )}
         {hasComparisons && (
           <div style={{ background: colors.bg.page, borderRadius: radius.xl, padding: 12, textAlign: "center" }}>
-            <div style={{ fontSize: font.size.xs, color: colors.text.muted, marginBottom: 4 }}>Rispetto alla media</div>
+            <div style={{ fontSize: font.size.xs, color: colors.text.muted, marginBottom: 4 }}>
+              {isEventPast ? "vs media finale" : "Rispetto alla media"}
+            </div>
             <div style={{ fontSize: font.size["4xl"], fontWeight: font.weight.black }}>
               <DeltaBadge value={avgDelta} />
             </div>
