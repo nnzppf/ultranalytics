@@ -280,6 +280,29 @@ export default function ComparisonTab({ data, filtered, selectedBrand: topSelect
                     ))}
                   </div>
                 )}
+                {/* Confronta con altro brand — compact row */}
+                <div style={{
+                  display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center",
+                  marginTop: 8, padding: "8px 12px",
+                  background: alpha.pink[8], borderRadius: radius.lg,
+                  border: `1px solid ${alpha.pink[20]}`,
+                }}>
+                  <span style={{ fontSize: font.size.xs, color: colors.text.muted, fontWeight: font.weight.semibold, marginRight: 2, whiteSpace: "nowrap" }}>
+                    Confronta con:
+                  </span>
+                  {allBrandStats
+                    .filter(b => b.brand !== effectiveBrand)
+                    .map(b => (
+                      <button key={b.brand} onClick={() => { setCrossBrandTarget(b.brand); setCrossBrandEdition(null); }} style={{
+                        padding: "4px 10px", borderRadius: radius.md, fontSize: font.size.xs,
+                        border: `1px solid ${alpha.pink[30]}`,
+                        cursor: "pointer", background: "transparent",
+                        color: colors.text.primary, transition: tr.normal,
+                      }}>
+                        {b.brand}
+                      </button>
+                    ))}
+                </div>
               </div>
             );
           })()}
@@ -487,28 +510,14 @@ export default function ComparisonTab({ data, filtered, selectedBrand: topSelect
             </>
           )}
 
-          {/* Cross-brand option: show only in single-brand mode with data loaded */}
-          {effectiveBrand && !isCrossBrandMode && trackerData && (
+          {/* Empty state when cross-brand comparison has no data */}
+          {isCrossBrandMode && !trackerData && (
             <div style={{
-              background: colors.bg.page, borderRadius: radius["2xl"], padding: 16,
+              background: colors.bg.card, borderRadius: radius["2xl"], padding: 24, textAlign: "center",
               border: `1px solid ${colors.border.default}`,
             }}>
-              <div style={{ fontSize: font.size.xs, color: colors.text.muted, textTransform: "uppercase", marginBottom: 10, fontWeight: font.weight.semibold }}>
-                Confronta con altro brand
-              </div>
-              <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-                {allBrandStats
-                  .filter(b => b.brand !== effectiveBrand)
-                  .map(b => (
-                    <button key={b.brand} onClick={() => { setCrossBrandTarget(b.brand); setCrossBrandEdition(null); }} style={{
-                      padding: "6px 14px", borderRadius: radius.lg, fontSize: font.size.xs,
-                      border: `1px solid ${colors.border.default}`,
-                      cursor: "pointer", background: colors.bg.card,
-                      color: colors.text.primary,
-                    }}>
-                      {b.brand} <span style={{ color: colors.text.disabled }}>({b.editionCount} ediz.)</span>
-                    </button>
-                  ))}
+              <div style={{ fontSize: font.size.sm, color: colors.text.muted }}>
+                Nessun dato disponibile per il confronto tra <strong style={{ color: colors.brand.purple }}>{effectiveBrand}</strong> e <strong style={{ color: colors.brand.pink }}>{crossBrandTarget}</strong>.
               </div>
             </div>
           )}
