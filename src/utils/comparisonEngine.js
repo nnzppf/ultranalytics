@@ -3,6 +3,29 @@
  */
 
 /**
+ * Simple linear regression: y = a*x + b
+ * Returns { a, b, r2 } or null if insufficient data.
+ */
+function linReg(points) {
+  const n = points.length;
+  if (n < 2) return null;
+  const xs = points.map(p => p.x), ys = points.map(p => p.y);
+  const xm = xs.reduce((s, v) => s + v, 0) / n;
+  const ym = ys.reduce((s, v) => s + v, 0) / n;
+  let ssxy = 0, ssxx = 0, ssyy = 0;
+  for (let i = 0; i < n; i++) {
+    ssxy += (xs[i] - xm) * (ys[i] - ym);
+    ssxx += (xs[i] - xm) ** 2;
+    ssyy += (ys[i] - ym) ** 2;
+  }
+  if (ssxx === 0) return null;
+  const a = ssxy / ssxx;
+  const b = ym - a * xm;
+  const r2 = ssyy > 0 ? (ssxy ** 2) / (ssxx * ssyy) : 0;
+  return { a, b, r2 };
+}
+
+/**
  * Build a cumulative registration curve for an edition, indexed by days-before-event.
  * Returns { [daysBefore]: cumulativeCount }
  */
@@ -208,6 +231,63 @@ export function computeWhereAreWeNow(allData, targetBrand, targetEdition, overri
     ? Math.round(comparisons.reduce((s, c) => s + c.totalFinal, 0) / comparisons.length)
     : 0;
 
+  // --- Advanced projection models ---
+  // Model A: Regression — linear fit on (atSamePointAdjusted, totalFinal)
+  let regressionProjection = null;
+  if (!isEventPast && validComps.length >= 2) {
+    const regPoints = validComps.map(c => ({ x: c.atSamePointAdjusted, y: c.totalFinal }));
+    const reg = linReg(regPoints);
+    if (reg && reg.a > 0) {
+      regressionProjection = Math.round(reg.a * currentRegistrations + reg.b);
+      if (regressionProjection < currentRegistrations) regressionProjection = null;
+    }
+  }
+
+  // Model B: Ensemble — per-day regressions with exponential decay + current point
+  let ensembleProjection = null;
+  if (!isEventPast && validComps.length >= 2) {
+    const DECAY = 2;
+    const dayPredictions = [];
+
+    // Per-day regressions: for each daysBefore d, fit total = a*cumulative[d] + b
+    const maxDayComp = Math.max(
+      ...comparisons.map(c => Math.max(...Object.keys(c.cumulative).map(Number), 0)), 0
+    );
+    for (let d = maxDayComp; d >= 1; d--) {
+      const pts = [];
+      for (const c of comparisons) {
+        const val = c.cumulative[d];
+        if (val != null && val > 0) {
+          pts.push({ x: val, y: c.totalFinal });
+        }
+      }
+      if (pts.length < 2) continue;
+      const reg = linReg(pts);
+      if (!reg || reg.a <= 0) continue;
+      const currVal = targetCumulative[d];
+      if (currVal == null || currVal <= 0) continue;
+      const pred = Math.round(reg.a * currVal + reg.b);
+      if (pred > currVal) dayPredictions.push({ day: d, pred });
+    }
+
+    // Add time-adjusted current point (regression model) as most recent prediction
+    if (regressionProjection != null) {
+      dayPredictions.push({ day: 0, pred: regressionProjection });
+    }
+
+    if (dayPredictions.length > 0) {
+      const maxDay = Math.max(...dayPredictions.map(p => p.day));
+      let wSum = 0, wTotal = 0;
+      for (const p of dayPredictions) {
+        const w = Math.pow(DECAY, maxDay - p.day);
+        wSum += p.pred * w;
+        wTotal += w;
+      }
+      ensembleProjection = Math.round(wSum / wTotal);
+      if (ensembleProjection < currentRegistrations) ensembleProjection = null;
+    }
+  }
+
   // Build overlay chart data (all editions on same x-axis of days-before)
   const maxDaysAll = Math.max(
     ...comparisons.map(c => Math.max(...Object.keys(c.cumulative).map(Number), 0)),
@@ -222,16 +302,18 @@ export function computeWhereAreWeNow(allData, targetBrand, targetEdition, overri
     for (const comp of comparisons) {
       point[comp.editionLabel] = comp.cumulative[d] != null ? comp.cumulative[d] : null;
     }
-    // Add projection line: from currentDaysBefore to event day (day 0)
-    if (!isEventPast && avgProjectedFinal != null && d <= currentDaysBefore) {
-      if (d === currentDaysBefore) {
-        point._projection = currentRegistrations;
-      } else if (d === 0) {
-        point._projection = avgProjectedFinal;
-      } else {
-        // Linear interpolation between current point and projected final
-        const progress = (currentDaysBefore - d) / currentDaysBefore;
-        point._projection = Math.round(currentRegistrations + (avgProjectedFinal - currentRegistrations) * progress);
+    // Add projection lines for each model: from currentDaysBefore to event day (day 0)
+    const projModels = { _projRegression: regressionProjection, _projEnsemble: ensembleProjection };
+    for (const [key, projVal] of Object.entries(projModels)) {
+      if (!isEventPast && projVal != null && d <= currentDaysBefore) {
+        if (d === currentDaysBefore) {
+          point[key] = currentRegistrations;
+        } else if (d === 0) {
+          point[key] = projVal;
+        } else if (currentDaysBefore > 0) {
+          const progress = (currentDaysBefore - d) / currentDaysBefore;
+          point[key] = Math.round(currentRegistrations + (projVal - currentRegistrations) * progress);
+        }
       }
     }
     overlayData.push(point);
@@ -254,6 +336,8 @@ export function computeWhereAreWeNow(allData, targetBrand, targetEdition, overri
     comparisons,
     avgAtSamePoint,
     avgProjectedFinal,
+    regressionProjection,
+    ensembleProjection,
     avgFinal,
     progressPercent: avgFinal > 0 ? Math.round((currentRegistrations / avgFinal) * 100) : 0,
     overlayData,

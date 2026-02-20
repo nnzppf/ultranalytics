@@ -276,19 +276,29 @@ function CrossBrandView({ comparisonData }) {
 }
 
 // Original single-brand tracker view
+const PROJ_MODELS = [
+  { key: 'regression', label: 'Regressione' },
+  { key: 'ensemble', label: 'Bilanciato' },
+];
+
 function SingleBrandView({ comparisonData }) {
   const {
     brand, edition, eventDate, currentDaysBefore, isEventPast,
     currentRegistrations, dataRegistrations, isOverridden,
     currentAttended, currentConversion,
     comparisons, avgAtSamePoint, avgProjectedFinal,
+    regressionProjection, ensembleProjection,
     avgFinal, progressPercent, overlayData, allEditionLabels,
     snapshotHour,
   } = comparisonData;
   const [logScale, setLogScale] = useState(false);
   const [compressed, setCompressed] = useState(true);
+  const [projModel, setProjModel] = useState('regression');
   // Track which lines are visible (all visible by default, plus projection)
   const [hiddenLines, setHiddenLines] = useState(new Set());
+
+  const activeProjection = projModel === 'ensemble' ? ensembleProjection : regressionProjection;
+  const projDataKey = projModel === 'ensemble' ? '_projEnsemble' : '_projRegression';
   const toggleLine = (label) => {
     setHiddenLines(prev => {
       const next = new Set(prev);
@@ -318,7 +328,7 @@ function SingleBrandView({ comparisonData }) {
         }
       }
       // Always keep projection points
-      if (pt._projection != null) keep.add(pt.daysBefore);
+      if (pt._projRegression != null || pt._projEnsemble != null) keep.add(pt.daysBefore);
     }
     return overlayData.filter(pt => keep.has(pt.daysBefore));
   }, [overlayData, compressed, allEditionLabels, currentDaysBefore]);
@@ -403,10 +413,22 @@ function SingleBrandView({ comparisonData }) {
             </div>
           </div>
         )}
-        {!isEventPast && avgProjectedFinal != null && (
+        {!isEventPast && activeProjection != null && (
           <div style={{ background: colors.bg.page, borderRadius: radius.xl, padding: 12, textAlign: "center" }}>
             <div style={{ fontSize: font.size.xs, color: colors.text.muted, marginBottom: 4 }}>Proiezione finale</div>
-            <div style={{ fontSize: font.size["4xl"], fontWeight: font.weight.black, color: colors.status.success }}>~{avgProjectedFinal}</div>
+            <div style={{ fontSize: font.size["4xl"], fontWeight: font.weight.black, color: colors.status.success }}>~{activeProjection}</div>
+            {/* Model toggle */}
+            <div style={{ display: "flex", gap: 4, justifyContent: "center", marginTop: 6 }}>
+              {PROJ_MODELS.map(m => (
+                <button key={m.key} onClick={() => setProjModel(m.key)} style={{
+                  padding: "2px 8px", borderRadius: radius.md, fontSize: 10, fontWeight: font.weight.medium,
+                  border: `1px solid ${projModel === m.key ? colors.brand.purple : colors.border.default}`,
+                  background: projModel === m.key ? alpha.brand[15] : "transparent",
+                  color: projModel === m.key ? colors.brand.purple : colors.text.disabled,
+                  cursor: "pointer", transition: "all 0.15s ease",
+                }}>{m.label}</button>
+              ))}
+            </div>
           </div>
         )}
       </div>
@@ -537,18 +559,18 @@ function SingleBrandView({ comparisonData }) {
                   />
                 );
               })}
-              {/* Projection line */}
-              {!hiddenLines.has('_projection') && chartData.some(p => p._projection != null) && (
+              {/* Projection line — shows selected model */}
+              {!hiddenLines.has('_projection') && chartData.some(p => p[projDataKey] != null) && (
                 <Area
                   type="monotone"
-                  dataKey="_projection"
+                  dataKey={projDataKey}
                   stroke={colors.status.success}
                   fill="transparent"
                   strokeWidth={2}
                   strokeDasharray="6 4"
                   dot={false}
                   connectNulls
-                  name="Proiezione"
+                  name={`Proiezione (${PROJ_MODELS.find(m => m.key === projModel)?.label || ''})`}
                 />
               )}
             </AreaChart>
@@ -581,7 +603,7 @@ function SingleBrandView({ comparisonData }) {
               );
             })}
             {/* Projection toggle */}
-            {chartData.some(p => p._projection != null) && (
+            {chartData.some(p => p._projRegression != null || p._projEnsemble != null) && (
               <button onClick={() => toggleLine('_projection')} style={{
                 display: "flex", alignItems: "center", gap: 4, padding: "2px 8px",
                 borderRadius: radius.md, border: "none", cursor: "pointer",
