@@ -1,6 +1,45 @@
 /* ===== IMPORT INTER FONT ===== */
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
 
+/* ===== THEME VARIABLES ===== */
+:root {
+  --bg-page: #0a0f1a;
+  --bg-card: rgba(15,23,42,0.65);
+  --bg-solid: #1e293b;
+  --bg-elevated: rgba(30,41,59,0.7);
+  --bg-hover: rgba(51,65,85,0.6);
+  --bg-input: rgba(10,15,26,0.8);
+  --text-primary: #f1f5f9;
+  --text-secondary: #e2e8f0;
+  --text-muted: #94a3b8;
+  --text-disabled: #64748b;
+  --border-default: rgba(148,163,184,0.15);
+  --border-subtle: rgba(148,163,184,0.08);
+  --border-strong: rgba(148,163,184,0.25);
+  --heatmap-empty: rgba(15,23,42,0.4);
+  --interactive-inactive: rgba(30,41,59,0.6);
+  --interactive-inactive-text: #cbd5e1;
+}
+
+:root.light {
+  --bg-page: #faf8f5;
+  --bg-card: rgba(255,255,252,0.75);
+  --bg-solid: #fffffe;
+  --bg-elevated: rgba(250,248,245,0.85);
+  --bg-hover: rgba(240,235,228,0.6);
+  --bg-input: rgba(255,255,253,0.9);
+  --text-primary: #1a1512;
+  --text-secondary: #2d2520;
+  --text-muted: #5c534a;
+  --text-disabled: #9c938a;
+  --border-default: rgba(30,20,10,0.08);
+  --border-subtle: rgba(30,20,10,0.04);
+  --border-strong: rgba(30,20,10,0.14);
+  --heatmap-empty: rgba(245,242,238,0.6);
+  --interactive-inactive: rgba(240,235,228,0.8);
+  --interactive-inactive-text: #3d352e;
+}
+
 /* ===== BASE RESET ===== */
 *, *::before, *::after {
   box-sizing: border-box;
@@ -11,9 +50,10 @@ body {
   font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  background: #0f172a;
-  color: #f1f5f9;
+  background: var(--bg-page);
+  color: var(--text-primary);
   line-height: 1.5;
+  transition: background 0.3s ease, color 0.3s ease;
 }
 
 code {
@@ -50,9 +90,9 @@ code {
   scrollbar-color: rgba(148, 163, 184, 0.2) transparent;
 }
 
-/* ===== SELECTION ===== */
+/* ===== SELECTION — teal ===== */
 ::selection {
-  background: rgba(139, 92, 246, 0.3);
+  background: rgba(13, 148, 136, 0.3);
   color: #f1f5f9;
 }
 
@@ -62,10 +102,49 @@ button, a, select, input {
               box-shadow 0.15s ease, transform 0.15s ease, opacity 0.15s ease;
 }
 
-/* Remove default focus outline, add custom */
+/* Button hover — subtle lift */
+button:hover:not(:disabled) {
+  filter: brightness(1.1);
+}
+
+/* Select — custom chevron */
+select {
+  appearance: none;
+  -webkit-appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%2394a3b8' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 8px center;
+  padding-right: 28px !important;
+  cursor: pointer;
+}
+
+/* Input placeholder */
+input::placeholder {
+  color: var(--text-disabled);
+  opacity: 0.7;
+}
+
+/* Remove default focus outline, add custom — teal */
 button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible {
-  outline: 2px solid rgba(139, 92, 246, 0.5);
+  outline: 2px solid rgba(13, 148, 136, 0.5);
   outline-offset: 2px;
+}
+
+/* ===== SKELETON LOADING ANIMATION ===== */
+@keyframes skeleton-shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+.skeleton {
+  background: linear-gradient(90deg,
+    var(--bg-elevated) 25%,
+    var(--bg-hover) 50%,
+    var(--bg-elevated) 75%
+  );
+  background-size: 200% 100%;
+  animation: skeleton-shimmer 1.5s ease-in-out infinite;
+  border-radius: 8px;
 }
 
 /* ===== SMOOTH SCROLL ===== */
@@ -80,9 +159,37 @@ table {
 
 /* ===== RESPONSIVE MOBILE STYLES ===== */
 
-/* Tablet & below (< 900px) */
+/* Tab bar — scrollable with fade edges */
+.tab-bar {
+  position: relative;
+  scrollbar-width: none;
+}
+.tab-bar::-webkit-scrollbar {
+  display: none;
+}
+
+/* Action buttons — labels hidden on mobile via className */
+.action-btn-label {
+  display: inline;
+}
+
+/* Tablet & below (< 900px) — show filter toggle, collapse filters */
 @media (max-width: 900px) {
-  .grid-2-col {
+  .mobile-filter-toggle {
+    display: flex !important;
+  }
+  .filters-container {
+    display: none !important;
+    width: 100%;
+    margin-left: 0 !important;
+    padding: 8px 0 4px;
+    border-top: 1px solid var(--border-default);
+  }
+  .filters-container.open {
+    display: flex !important;
+  }
+  .grid-2-col,
+  .bento-grid {
     grid-template-columns: 1fr !important;
   }
 
@@ -94,6 +201,11 @@ table {
   .top-bar {
     padding: 8px 12px !important;
     gap: 8px !important;
+  }
+
+  /* Hide button text labels, show only icons */
+  .action-btn-label {
+    display: none !important;
   }
 
   .kpi-grid {
@@ -109,6 +221,9 @@ table {
 
   .tab-bar {
     padding: 0 12px 10px !important;
+    /* Fade edges to indicate scrollability */
+    -webkit-mask-image: linear-gradient(to right, transparent, black 12px, black calc(100% - 12px), transparent);
+    mask-image: linear-gradient(to right, transparent, black 12px, black calc(100% - 12px), transparent);
   }
 
   .bday-kpi-grid {
@@ -122,13 +237,23 @@ table {
   .edition-bar {
     padding: 8px 12px !important;
   }
+
+  /* Cloud indicator - compact */
+  .cloud-indicator span {
+    display: none !important;
+  }
 }
 
 /* Phone (< 600px) */
 @media (max-width: 600px) {
   .top-bar {
-    padding: 8px 10px !important;
-    gap: 6px !important;
+    padding: 6px 10px !important;
+    gap: 4px !important;
+  }
+
+  /* Logo smaller on phone */
+  .top-bar-logo {
+    font-size: 16px !important;
   }
 
   .filter-separator {
@@ -155,6 +280,7 @@ table {
   .kpi-grid {
     grid-template-columns: repeat(2, 1fr) !important;
     padding: 8px !important;
+    gap: 6px !important;
   }
 
   .bday-kpi-grid {
@@ -185,6 +311,10 @@ table {
     grid-template-columns: 1fr !important;
   }
 
+  .tab-bar {
+    gap: 3px !important;
+  }
+
   .tab-bar button {
     padding: 6px 12px !important;
     font-size: 12px !important;
@@ -198,6 +328,21 @@ table {
 
   .bday-extra-controls {
     flex-wrap: wrap !important;
+  }
+
+  /* Action buttons even more compact */
+  .top-bar-actions {
+    gap: 4px !important;
+  }
+
+  .top-bar-actions button {
+    padding: 5px 8px !important;
+  }
+
+  /* User avatar smaller */
+  .user-section img {
+    width: 20px !important;
+    height: 20px !important;
   }
 }
 
@@ -213,5 +358,14 @@ table {
 
   .top-bar {
     padding: 6px 8px !important;
+  }
+
+  .top-bar-logo {
+    font-size: 14px !important;
+  }
+
+  .tab-bar button {
+    padding: 5px 10px !important;
+    font-size: 11px !important;
   }
 }

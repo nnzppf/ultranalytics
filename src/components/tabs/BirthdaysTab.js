@@ -374,6 +374,16 @@ const MESI_NOMI = [
 
 const GIORNI_NOMI = ['Dom', 'Lun', 'Mar', 'Mer', 'Gio', 'Ven', 'Sab'];
 
+// Segment priority for sorting: VIP first, ghost last
+const SEGMENT_ORDER = { vip: 0, fedeli: 1, occasionali: 2, ghost: 3 };
+const SEGMENT_FILTERS = [
+  { key: 'all', label: 'Tutti' },
+  { key: 'vip', label: '👑 VIP' },
+  { key: 'fedeli', label: '🔄 Fedeli' },
+  { key: 'occasionali', label: '🎯 Occasionali' },
+  { key: 'ghost', label: '👻 Ghost' },
+];
+
 export default function BirthdaysTab({ data, allData, userStats, selectedCategory, selectedGenre }) {
   const today = useMemo(() => new Date(), []);
   const [viewMonth, setViewMonth] = useState(today.getMonth());
@@ -383,6 +393,7 @@ export default function BirthdaysTab({ data, allData, userStats, selectedCategor
   const [whatsappUser, setWhatsappUser] = useState(null); // user for modal
   const [browseStartDate, setBrowseStartDate] = useState(null); // null = today
   const [collapseKey, setCollapseKey] = useState(0); // increment to collapse all expanded cards
+  const [segmentFilter, setSegmentFilter] = useState('all');
 
   // Build a lookup: for each user key -> count of participations in selected genre/category
   const filterRelevanceMap = useMemo(() => {
@@ -523,6 +534,24 @@ export default function BirthdaysTab({ data, allData, userStats, selectedCategor
     return upcoming;
   }, [birthdayMap, timeRange, startDate, today]);
 
+  // Apply segment filter + sorting to upcoming birthdays
+  const filteredUpcoming = useMemo(() => {
+    return upcomingBirthdays.map(group => {
+      let users = group.users;
+      // Filter by segment
+      if (segmentFilter !== 'all') {
+        users = users.filter(u => u.segment === segmentFilter);
+      }
+      // Sort by segment priority: VIP > Fedeli > Occasionali > Ghost
+      users = [...users].sort((a, b) => {
+        const aOrder = SEGMENT_ORDER[a.segment] ?? 99;
+        const bOrder = SEGMENT_ORDER[b.segment] ?? 99;
+        return aOrder - bOrder;
+      });
+      return { ...group, users };
+    }).filter(group => group.users.length > 0); // hide empty days
+  }, [upcomingBirthdays, segmentFilter]);
+
   const totalWithBirthday = useMemo(() => {
     return Object.values(birthdayMap).reduce((sum, arr) => sum + arr.length, 0);
   }, [birthdayMap]);
@@ -557,7 +586,12 @@ export default function BirthdaysTab({ data, allData, userStats, selectedCategor
     else setViewMonth(m => m + 1);
   };
 
-  const selectedUsers = selectedDay ? (birthdayMap[selectedDay] || []) : [];
+  const selectedUsers = useMemo(() => {
+    if (!selectedDay) return [];
+    let users = birthdayMap[selectedDay] || [];
+    if (segmentFilter !== 'all') users = users.filter(u => u.segment === segmentFilter);
+    return [...users].sort((a, b) => (SEGMENT_ORDER[a.segment] ?? 99) - (SEGMENT_ORDER[b.segment] ?? 99));
+  }, [selectedDay, birthdayMap, segmentFilter]);
 
   const openWhatsApp = useCallback((user) => {
     setWhatsappUser(user);
@@ -678,7 +712,7 @@ export default function BirthdaysTab({ data, allData, userStats, selectedCategor
             : "Prossimi compleanni"
           }
           extra={
-            <div className="bday-extra-controls" style={{ display: "flex", gap: 6, alignItems: "center" }}>
+            <div className="bday-extra-controls" style={{ display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap" }}>
               {isBrowsing && (
                 <button onClick={() => { setBrowseStartDate(null); setSelectedDay(null); setViewMonth(today.getMonth()); setViewYear(today.getFullYear()); }} style={{
                   padding: "5px 12px", borderRadius: 8, fontSize: 11, border: `1px solid ${colors.brand.purple}`, cursor: "pointer",
@@ -711,13 +745,28 @@ export default function BirthdaysTab({ data, allData, userStats, selectedCategor
             </div>
           }
         >
-          {upcomingBirthdays.length === 0 ? (
+          {/* Segment filter pills */}
+          <div style={{ display: "flex", gap: 4, marginBottom: 12, flexWrap: "wrap" }}>
+            {SEGMENT_FILTERS.map(s => (
+              <button key={s.key} onClick={() => setSegmentFilter(s.key)} style={{
+                padding: "4px 12px", borderRadius: 8, fontSize: 11, border: "none", cursor: "pointer",
+                background: segmentFilter === s.key ? colors.interactive.active : colors.bg.elevated,
+                color: segmentFilter === s.key ? colors.interactive.activeText : colors.text.muted,
+                fontWeight: 600, transition: "all 0.15s",
+              }}>{s.label}</button>
+            ))}
+          </div>
+
+          {filteredUpcoming.length === 0 ? (
             <div style={{ textAlign: "center", color: colors.text.disabled, fontSize: 13, padding: 30 }}>
-              Nessun compleanno {isBrowsing ? 'in questo periodo' : `nei prossimi ${timeRange === 'week' ? '7' : '30'} giorni`}
+              {segmentFilter !== 'all'
+                ? `Nessun compleanno per il segmento "${SEGMENT_FILTERS.find(s => s.key === segmentFilter)?.label}" in questo periodo`
+                : `Nessun compleanno ${isBrowsing ? 'in questo periodo' : `nei prossimi ${timeRange === 'week' ? '7' : '30'} giorni`}`
+              }
             </div>
           ) : (
             <div className="bday-upcoming-list" style={{ display: "flex", flexDirection: "column", gap: 10, maxHeight: 520, overflowY: "auto" }}>
-              {upcomingBirthdays.map((group, gi) => (
+              {filteredUpcoming.map((group, gi) => (
                 <div key={gi}>
                   <div style={{
                     display: "flex", justifyContent: "space-between", alignItems: "center",
@@ -727,7 +776,7 @@ export default function BirthdaysTab({ data, allData, userStats, selectedCategor
                       fontSize: 13, fontWeight: 600,
                       color: group.daysFromToday === 0 ? colors.status.warning : colors.text.secondary,
                     }}>
-                      {group.dateStr}
+                      {group.dateStr} <span style={{ fontSize: 11, color: colors.text.disabled, fontWeight: 400 }}>({group.users.length})</span>
                     </span>
                     <span style={{
                       fontSize: 11, padding: "3px 10px", borderRadius: 8,
@@ -738,7 +787,7 @@ export default function BirthdaysTab({ data, allData, userStats, selectedCategor
                     </span>
                   </div>
                   {group.users.map((u, ui) => (
-                    <UserBirthdayCard key={`${ui}-${collapseKey}`} user={u} compact onWhatsApp={openWhatsApp} relevance={getRelevance(u)} activeFilter={activeFilterLabel} />
+                    <UserBirthdayCard key={`${ui}-${collapseKey}-${segmentFilter}`} user={u} compact onWhatsApp={openWhatsApp} relevance={getRelevance(u)} activeFilter={activeFilterLabel} />
                   ))}
                 </div>
               ))}

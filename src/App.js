@@ -1,8 +1,8 @@
 // Ultranalytics v3.1 - Multi-level comparison dashboard with Firebase persistence & auth
-import { useState, useMemo, useEffect, useCallback } from "react";
+import { useState, useMemo, useEffect, useCallback, useRef } from "react";
 import Papa from "papaparse";
 import * as XLSX from "xlsx";
-import { Users, Check, TrendingUp, X, Calendar, Gift, Cloud, CloudOff, Loader, Database, LogOut, Settings } from "lucide-react";
+import { Users, Check, TrendingUp, X, Calendar, Gift, Cloud, CloudOff, Loader, Database, LogOut, Settings, Sun, Moon, SlidersHorizontal, Download } from "lucide-react";
 
 import { useAuth } from "./contexts/AuthContext";
 import LoginScreen from "./components/screens/LoginScreen";
@@ -24,6 +24,10 @@ import UsersTab from "./components/tabs/UsersTab";
 import ComparisonTab from "./components/tabs/ComparisonTab";
 import BirthdaysTab from "./components/tabs/BirthdaysTab";
 import AiChat from "./components/AiChat";
+import { StaggerList, StaggerItem, TabTransition } from "./components/shared/Motion";
+import { ToastProvider, useToast } from "./components/shared/Toast";
+import { SkeletonDashboard } from "./components/shared/Skeleton";
+import Dropdown from "./components/shared/Dropdown";
 
 function eventNameFromFile(filename) {
   return filename.replace(/\.(csv|xlsx|xls|tsv)$/i, "").replace(/registrazioni[_\s]*/i, "").replace(/_/g, " ").trim();
@@ -60,6 +64,14 @@ function applyEventConfig(records, config) {
 }
 
 export default function ClubAnalytics() {
+  return (
+    <ToastProvider>
+      <ClubAnalyticsInner />
+    </ToastProvider>
+  );
+}
+
+function ClubAnalyticsInner() {
   const { isAuthenticated, loading: authLoading, user, logout } = useAuth();
 
   // Show login screen if not authenticated
@@ -84,6 +96,7 @@ export default function ClubAnalytics() {
 }
 
 function AuthenticatedApp({ user, logout }) {
+  const toast = useToast();
   const [step, setStep] = useState("loading"); // loading | upload | dashboard
   const [files, setFiles] = useState([]);
   const [data, setData] = useState([]);
@@ -97,7 +110,17 @@ function AuthenticatedApp({ user, logout }) {
   const [cloudStatus, setCloudStatus] = useState("idle"); // idle | saving | saved | error
   const [savedDatasets, setSavedDatasets] = useState([]);
   const [showEventManager, setShowEventManager] = useState(false);
+  const [showMobileFilters, setShowMobileFilters] = useState(false);
   const [eventConfig, setEventConfig] = useState(null);
+  const [theme, setTheme] = useState(() => localStorage.getItem("ua_theme") || "dark");
+  const [tabDirection, setTabDirection] = useState(1);
+  const prevTabRef = useRef("overview");
+
+  // Apply theme class on mount and changes
+  useEffect(() => {
+    document.documentElement.classList.toggle("light", theme === "light");
+    localStorage.setItem("ua_theme", theme);
+  }, [theme]);
   const [graphHeights, setGraphHeights] = useState({
     hourly: 250, dowData: 220, daysBeforeData: 220,
     fasciaData: 250, convByFascia: 220,
@@ -231,9 +254,10 @@ function AuthenticatedApp({ user, logout }) {
     setData(prev => prev.length > 0 ? [...prev, ...allRecords] : allRecords);
     setUtentiData(prev => prev.length > 0 ? [...prev, ...allUtenti] : allUtenti);
     setCloudStatus("saved");
+    toast("Dati salvati nel cloud", "success");
     setStep("dashboard");
     setActiveTab("overview");
-  }, [files]);
+  }, [files, toast]);
 
   // Reload from Firebase
   const reloadFromCloud = useCallback(async () => {
@@ -244,14 +268,16 @@ function AuthenticatedApp({ user, logout }) {
       setUtentiData(utenti);
       setSavedDatasets(datasets);
       setCloudStatus("saved");
+      toast("Dati ricaricati dal cloud", "success");
       if (records.length > 0 || utenti.length > 0) {
         setStep("dashboard");
       }
     } catch (e) {
       console.error("Reload failed:", e);
       setCloudStatus("error");
+      toast("Errore nel caricamento dati", "error");
     }
-  }, []);
+  }, [toast]);
 
   // Delete a dataset from Firebase
   const handleDeleteDataset = useCallback(async (datasetId) => {
@@ -269,8 +295,9 @@ function AuthenticatedApp({ user, logout }) {
     if (success) {
       setEventConfig(config);
       setData(prev => applyEventConfig(prev, config));
+      toast("Configurazione eventi salvata", "success");
     }
-  }, []);
+  }, [toast]);
 
   // Helper: get genres for a record (from record or BRAND_REGISTRY fallback)
   const getRecordGenres = useCallback((r) => {
@@ -313,10 +340,38 @@ function AuthenticatedApp({ user, logout }) {
     const hourlyRegByEvent = getHourlyDataByGroup(filtered, groupKey);
     const hourlyPeak = hourlyReg.reduce((max, h) => h.registrazioni > (max?.registrazioni || 0) ? h : max, null);
 
+    // Compute trend vs previous edition (if a single edition is selected)
+    let trend = null;
+    if (selectedEdition !== "all" && selectedBrand !== "all") {
+      // Find all editions of this brand sorted by date
+      const brandRecords = data.filter(r => r.brand === selectedBrand);
+      const editions = [...new Set(brandRecords.map(r => r.editionLabel))].filter(Boolean);
+      const editionsByDate = editions.sort((a, b) => {
+        const aRow = brandRecords.find(r => r.editionLabel === a);
+        const bRow = brandRecords.find(r => r.editionLabel === b);
+        return (aRow?.eventDate || 0) - (bRow?.eventDate || 0);
+      });
+      const currentIdx = editionsByDate.indexOf(selectedEdition);
+      if (currentIdx > 0) {
+        const prevEdition = editionsByDate[currentIdx - 1];
+        const prevRecords = brandRecords.filter(r => r.editionLabel === prevEdition);
+        const prevTotal = prevRecords.length;
+        const prevEntered = prevRecords.filter(r => r.attended).length;
+        const prevConv = prevTotal > 0 ? parseFloat(((prevEntered / prevTotal) * 100).toFixed(1)) : 0;
+        trend = {
+          prevEdition,
+          total: prevTotal > 0 ? parseFloat((((total - prevTotal) / prevTotal) * 100).toFixed(1)) : null,
+          entered: prevEntered > 0 ? parseFloat((((entered - prevEntered) / prevEntered) * 100).toFixed(1)) : null,
+          conv: prevConv > 0 ? parseFloat((conv - prevConv).toFixed(1)) : null,
+        };
+      }
+    }
+
     return {
       total, entered, conv, noShowRate,
       brands,
       eventStats,
+      trend,
       hourlyReg,
       hourlyRegByEvent,
       hourlyPeak,
@@ -330,7 +385,7 @@ function AuthenticatedApp({ user, logout }) {
       userStats: getUserStats(filtered),
       multiEvent: brands.length > 1,
     };
-  }, [filtered, selectedBrand]);
+  }, [filtered, selectedBrand, selectedEdition, data]);
 
   // Available categories and brands for filters (exclude senior)
   const categories = useMemo(() => {
@@ -368,16 +423,30 @@ function AuthenticatedApp({ user, logout }) {
     { key: "compleanni", label: "Compleanni", icon: Gift },
   ];
 
-  // Loading screen
+  // Direction-aware tab switch
+  const switchTab = (newKey) => {
+    const oldIdx = tabs.findIndex(t => t.key === activeTab);
+    const newIdx = tabs.findIndex(t => t.key === newKey);
+    setTabDirection(newIdx >= oldIdx ? 1 : -1);
+    prevTabRef.current = activeTab;
+    setActiveTab(newKey);
+  };
+
+  // Loading screen — skeleton dashboard
   if (step === "loading") {
     return (
-      <div style={{
-        minHeight: "100vh", background: colors.bg.page, display: "flex",
-        alignItems: "center", justifyContent: "center", flexDirection: "column", gap: 16,
-      }}>
-        <Loader size={32} color={colors.brand.purple} style={{ animation: "spin 1s linear infinite" }} />
-        <div style={{ color: colors.text.muted, fontSize: font.size.md }}>Caricamento dati dal cloud...</div>
-        <style>{`@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }`}</style>
+      <div style={{ minHeight: "100vh", background: colors.bg.page, color: colors.text.primary }}>
+        {/* Skeleton top bar */}
+        <div style={{
+          display: "flex", alignItems: "center", gap: 12, padding: "10px 20px",
+          background: colors.bg.solid, borderBottom: `1px solid ${colors.border.default}`,
+        }}>
+          <div style={{ fontWeight: 900, fontSize: font.size.lg, background: gradients.brand, WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>
+            Ultranalytics
+          </div>
+          <span style={{ fontSize: font.size.xs, color: colors.text.disabled }}>Caricamento dati...</span>
+        </div>
+        <SkeletonDashboard />
       </div>
     );
   }
@@ -404,7 +473,7 @@ function AuthenticatedApp({ user, logout }) {
 
   // Cloud status indicator
   const CloudIndicator = () => (
-    <div style={{ display: "flex", alignItems: "center", gap: 6, marginLeft: 8 }}>
+    <div className="cloud-indicator" style={{ display: "flex", alignItems: "center", gap: 6, marginLeft: 8 }}>
       {cloudStatus === "saving" && <Loader size={12} color={colors.status.warning} style={{ animation: "spin 1s linear infinite" }} />}
       {cloudStatus === "saved" && <Cloud size={12} color={colors.status.success} />}
       {cloudStatus === "error" && <CloudOff size={12} color={colors.status.error} />}
@@ -428,49 +497,88 @@ function AuthenticatedApp({ user, logout }) {
       {/* Top Bar */}
       <div className="top-bar" style={{
         display: "flex", alignItems: "center", gap: 12, padding: "10px 20px",
-        background: colors.bg.card, borderBottom: `1px solid ${colors.border.default}`, flexWrap: "wrap",
+        background: colors.bg.solid, borderBottom: `1px solid ${colors.border.default}`, flexWrap: "wrap",
       }}>
-        <div style={{ fontWeight: font.weight.black, fontSize: font.size.lg, background: gradients.brand, WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>
+        <div className="top-bar-logo" style={{ fontWeight: font.weight.black, fontSize: font.size.lg, background: gradients.brand, WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", flexShrink: 0 }}>
           Ultranalytics
         </div>
         <CloudIndicator />
 
-        {/* Category filter */}
-        <div className="filter-row" style={{ display: "flex", gap: 4, marginLeft: 16, alignItems: "center" }}>
-          <button onClick={() => { setSelectedCategory("all"); setSelectedGenre("all"); setSelectedBrand("all"); setSelectedEdition("all"); }}
-            style={filterBtn(selectedCategory === "all" && selectedGenre === "all")}>Tutti</button>
-          {categories.map(c => (
-            <button key={c} onClick={() => { setSelectedCategory(c); setSelectedGenre("all"); setSelectedBrand("all"); setSelectedEdition("all"); }}
-              style={{ ...filterBtn(selectedCategory === c && selectedGenre === "all"), textTransform: "capitalize" }}>{c}</button>
-          ))}
-        </div>
+        {/* Mobile filter toggle */}
+        <button className="mobile-filter-toggle" onClick={() => setShowMobileFilters(v => !v)} style={{
+          background: showMobileFilters ? colors.interactive.active : colors.bg.elevated,
+          border: "none", borderRadius: radius.md, padding: "5px 10px", cursor: "pointer",
+          display: "none", alignItems: "center", gap: 4,
+          color: showMobileFilters ? colors.interactive.activeText : colors.text.muted,
+          fontSize: font.size.xs,
+        }}>
+          <SlidersHorizontal size={13} /> Filtri
+        </button>
 
-        {/* Genre filter */}
-        <div className="filter-row filter-separator" style={{ display: "flex", gap: 4, alignItems: "center", borderLeft: `1px solid ${colors.border.strong}`, paddingLeft: 8 }}>
-          {Object.entries(GENRE_LABELS).map(([g, genreInfo]) => (
-            <button key={g} onClick={() => { setSelectedGenre(g); setSelectedCategory("all"); setSelectedBrand("all"); setSelectedEdition("all"); }} style={{
-              ...filterBtn(selectedGenre === g),
-              background: selectedGenre === g ? (genreInfo.color || colors.interactive.active) : colors.interactive.inactive,
-              whiteSpace: "nowrap",
-            }}>{genreInfo.label}</button>
-          ))}
-        </div>
+        {/* Filters container — collapses on mobile */}
+        <div className={`filters-container${showMobileFilters ? " open" : ""}`} style={{
+          display: "flex", gap: 4, alignItems: "center", flexWrap: "wrap", flex: 1,
+        }}>
+          {/* Category filter */}
+          <div className="filter-row" style={{ display: "flex", gap: 4, marginLeft: 16, alignItems: "center" }}>
+            <button onClick={() => { setSelectedCategory("all"); setSelectedGenre("all"); setSelectedBrand("all"); setSelectedEdition("all"); }}
+              style={filterBtn(selectedCategory === "all" && selectedGenre === "all")}>Tutti</button>
+            {categories.map(c => (
+              <button key={c} onClick={() => { setSelectedCategory(c); setSelectedGenre("all"); setSelectedBrand("all"); setSelectedEdition("all"); }}
+                style={{ ...filterBtn(selectedCategory === c && selectedGenre === "all"), textTransform: "capitalize" }}>{c}</button>
+            ))}
+          </div>
 
-        {/* Brand filter */}
-        <select
-          value={selectedBrand}
-          onChange={e => { setSelectedBrand(e.target.value); setSelectedEdition("all"); }}
-          style={{
-            background: colors.bg.elevated, border: `1px solid ${colors.border.strong}`, borderRadius: radius.md,
-            color: colors.text.primary, fontSize: font.size.xs, padding: "4px 8px", outline: "none",
-          }}
-        >
-          <option value="all">Tutti i brand ({availableBrands.length})</option>
-          {availableBrands.map(b => <option key={b} value={b}>{b}</option>)}
-        </select>
+          {/* Genre filter */}
+          <div className="filter-row filter-separator" style={{ display: "flex", gap: 4, alignItems: "center", borderLeft: `1px solid ${colors.border.strong}`, paddingLeft: 8 }}>
+            {Object.entries(GENRE_LABELS).map(([g, genreInfo]) => (
+              <button key={g} onClick={() => { setSelectedGenre(g); setSelectedCategory("all"); setSelectedBrand("all"); setSelectedEdition("all"); }} style={{
+                ...filterBtn(selectedGenre === g),
+                background: selectedGenre === g ? (genreInfo.color || colors.interactive.active) : colors.interactive.inactive,
+                whiteSpace: "nowrap",
+              }}>{genreInfo.label}</button>
+            ))}
+          </div>
+
+          {/* Brand filter */}
+          <Dropdown
+            value={selectedBrand}
+            onChange={v => { setSelectedBrand(v); setSelectedEdition("all"); }}
+            placeholder="Brand"
+            options={[
+              { value: "all", label: "Tutti i brand", count: availableBrands.length },
+              ...availableBrands.map(b => ({ value: b, label: b })),
+            ]}
+          />
+        </div>
 
         {/* Right side: data management + user */}
-        <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 8 }}>
+        <div className="top-bar-actions" style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 6 }}>
+          <button onClick={() => setTheme(t => t === "dark" ? "light" : "dark")} title={theme === "dark" ? "Tema chiaro" : "Tema scuro"} style={{
+            background: colors.bg.elevated, border: "none", borderRadius: radius.md,
+            color: colors.text.muted, fontSize: font.size.xs, padding: "5px 10px", cursor: "pointer",
+            display: "flex", alignItems: "center", gap: 4,
+          }}>
+            {theme === "dark" ? <Sun size={13} /> : <Moon size={13} />}
+          </button>
+          <button onClick={async () => {
+            const { default: html2canvas } = await import('html2canvas');
+            const el = document.querySelector('.app-content');
+            if (!el) return;
+            toast("Generando screenshot...", "info", 2000);
+            const canvas = await html2canvas(el, { backgroundColor: null, scale: 2 });
+            const link = document.createElement('a');
+            link.download = `ultranalytics-${activeTab}-${new Date().toISOString().slice(0,10)}.png`;
+            link.href = canvas.toDataURL();
+            link.click();
+            toast("Screenshot scaricato", "success");
+          }} title="Esporta screenshot" style={{
+            background: colors.bg.elevated, border: "none", borderRadius: radius.md,
+            color: colors.text.muted, fontSize: font.size.xs, padding: "5px 10px", cursor: "pointer",
+            display: "flex", alignItems: "center", gap: 4,
+          }}>
+            <Download size={13} />
+          </button>
           <button onClick={() => setShowEventManager(true)} title="Gestione eventi" style={{
             background: colors.bg.elevated, border: "none", borderRadius: radius.md,
             color: colors.text.muted, fontSize: font.size.xs, padding: "5px 10px", cursor: "pointer",
@@ -483,11 +591,11 @@ function AuthenticatedApp({ user, logout }) {
             color: colors.text.muted, fontSize: font.size.xs, padding: "5px 12px", cursor: "pointer",
             display: "flex", alignItems: "center", gap: 4,
           }}>
-            <Database size={11} /> Gestisci dati
+            <Database size={11} /> <span className="action-btn-label">Gestisci dati</span>
           </button>
 
           {/* User avatar + logout */}
-          <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+          <div className="user-section" style={{ display: "flex", alignItems: "center", gap: 6, marginLeft: 2 }}>
             {user?.photoURL && (
               <img src={user.photoURL} alt="" style={{
                 width: 24, height: 24, borderRadius: "50%",
@@ -527,32 +635,38 @@ function AuthenticatedApp({ user, logout }) {
       )}
 
       {/* KPI Row */}
-      <div className="kpi-grid" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 10, padding: "16px 20px" }}>
-        <KPI icon={Users} label="Registrazioni" value={analytics.total} color={colors.brand.purple} primary />
-        <KPI icon={Check} label="Presenze" value={analytics.entered} sub={`${analytics.conv}% conversione`} color={colors.status.success} />
-        <KPI icon={TrendingUp} label="Conversione" value={`${analytics.conv}%`} color={colors.brand.cyan} />
-        <KPI icon={X} label="No-Show" value={`${analytics.noShowRate}%`} color={colors.status.error} />
-        <KPI icon={Calendar} label="Brand" value={analytics.brands.length} color={colors.status.warning} />
-      </div>
+      <StaggerList className="kpi-grid" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 10, padding: "16px 20px" }}>
+        <StaggerItem><KPI icon={Users} label="Registrazioni" value={analytics.total} color={colors.brand.purple} primary trend={analytics.trend?.total} sub={analytics.trend ? `vs ${analytics.trend.prevEdition}` : undefined} /></StaggerItem>
+        <StaggerItem><KPI icon={Check} label="Presenze" value={analytics.entered} color={colors.status.success} trend={analytics.trend?.entered} /></StaggerItem>
+        <StaggerItem><KPI icon={TrendingUp} label="Conversione" value={`${analytics.conv}%`} color={colors.brand.cyan} trend={analytics.trend?.conv} trendSuffix="pp" /></StaggerItem>
+        <StaggerItem><KPI icon={X} label="No-Show" value={`${analytics.noShowRate}%`} color={colors.status.error} /></StaggerItem>
+        <StaggerItem><KPI icon={Calendar} label="Brand" value={analytics.brands.length} color={colors.status.warning} /></StaggerItem>
+      </StaggerList>
 
       {/* Tab Navigation */}
       <div className="tab-bar" style={{ display: "flex", gap: 4, padding: "0 20px 12px", overflowX: "auto" }}>
-        {tabs.map(t => (
-          <button key={t.key} onClick={() => setActiveTab(t.key)} style={{
-            padding: "8px 18px", borderRadius: radius.lg, fontSize: font.size.base, border: "none", cursor: "pointer",
-            background: activeTab === t.key
-              ? (t.highlight ? gradients.brand : colors.interactive.active)
-              : colors.bg.card,
-            color: activeTab === t.key ? colors.interactive.activeText : colors.interactive.inactiveText,
-            fontWeight: activeTab === t.key ? font.weight.semibold : font.weight.medium,
-            whiteSpace: "nowrap",
-            transition: tr.normal,
-          }}>{t.label}</button>
-        ))}
+        {tabs.map(t => {
+          const isActive = activeTab === t.key;
+          return (
+            <button key={t.key} onClick={() => switchTab(t.key)} style={{
+              padding: "8px 18px", borderRadius: radius.lg, fontSize: font.size.base, border: "none", cursor: "pointer",
+              background: isActive
+                ? (t.highlight ? gradients.brand : colors.interactive.active)
+                : colors.bg.card,
+              color: isActive ? colors.interactive.activeText : colors.interactive.inactiveText,
+              fontWeight: isActive ? font.weight.semibold : font.weight.medium,
+              whiteSpace: "nowrap",
+              transition: "all 0.2s ease",
+              boxShadow: isActive ? "0 0 16px rgba(13,148,136,0.25)" : "none",
+              transform: isActive ? "translateY(-1px)" : "none",
+            }}>{t.label}</button>
+          );
+        })}
       </div>
 
       {/* Tab Content */}
       <div className="app-content" style={{ padding: "0 20px 40px" }}>
+        <TabTransition tabKey={activeTab} direction={tabDirection}>
         {activeTab === "overview" && (
           <OverviewTab
             analytics={analytics}
@@ -601,6 +715,7 @@ function AuthenticatedApp({ user, logout }) {
             selectedGenre={selectedGenre}
           />
         )}
+        </TabTransition>
       </div>
 
       {/* AI Assistant */}

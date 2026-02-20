@@ -13,10 +13,18 @@ export default function Heatmap({ heatmapGrid }) {
     return mx || 1;
   }, [heatmapGrid]);
 
+  // Teal → Emerald → Amber gradient for intensity
   const heatColor = v => {
     if (!v) return colors.heatmap.empty;
     const t = v / max;
-    return `rgb(${Math.round(30 + t * 109)},${Math.round(20 + t * 52)},${Math.round(60 + t * 186)})`;
+    if (t < 0.5) {
+      // Dark teal → Bright teal
+      const s = t * 2;
+      return `rgb(${Math.round(15 + s * 0)},${Math.round(60 + s * 88)},${Math.round(55 + s * 81)})`;
+    }
+    // Bright teal → Amber/Orange
+    const s = (t - 0.5) * 2;
+    return `rgb(${Math.round(15 + s * 230)},${Math.round(148 - s * 0)},${Math.round(136 - s * 125)})`;
   };
 
   return (

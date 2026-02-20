@@ -1,7 +1,8 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { Phone, Mail, MessageCircle, Calendar } from 'lucide-react';
 import { SegmentBadge } from '../shared/Badge';
 import { formatWhatsAppUrl } from '../../utils/whatsapp';
+import { Th } from '../shared/SortableTable';
 import { colors, font, radius, shadows, presets, transition as tr } from '../../config/designTokens';
 
 function formatBirthDate(d) {
@@ -53,9 +54,12 @@ export default function UsersTab({ userStats }) {
     else { setSortBy(key); setSortDir('desc'); }
   };
 
-  const sortIcon = (key) => sortBy === key ? (sortDir === 'asc' ? ' \u25b2' : ' \u25bc') : '';
-
-  const thStyle = { padding: "10px 8px", color: colors.text.muted, fontWeight: font.weight.medium, cursor: "pointer" };
+  // Pagination — reset to first page when filters change
+  const [page, setPage] = useState(0);
+  const pageSize = 50;
+  useEffect(() => { setPage(0); }, [segmentFilter, searchTerm, sortBy, sortDir]);
+  const totalPages = Math.ceil(filtered.length / pageSize);
+  const paginatedUsers = filtered.slice(page * pageSize, (page + 1) * pageSize);
 
   return (
     <div>
@@ -89,24 +93,16 @@ export default function UsersTab({ userStats }) {
         <table style={{ width: "100%", borderCollapse: "collapse", fontSize: font.size.sm }}>
           <thead>
             <tr style={{ borderBottom: `1px solid ${colors.border.default}` }}>
-              <th onClick={() => toggleSort('name')} style={{ ...thStyle, textAlign: "left", paddingLeft: 12 }}>
-                Nome{sortIcon('name')}
-              </th>
-              <th style={{ ...thStyle, cursor: "default" }}>Segmento</th>
-              <th onClick={() => toggleSort('totalRegs')} style={{ ...thStyle, textAlign: "center" }}>
-                Registrazioni{sortIcon('totalRegs')}
-              </th>
-              <th onClick={() => toggleSort('totalParticipated')} style={{ ...thStyle, textAlign: "center" }}>
-                Presenze{sortIcon('totalParticipated')}
-              </th>
-              <th onClick={() => toggleSort('conversion')} style={{ ...thStyle, textAlign: "center" }}>
-                Conv.{sortIcon('conversion')}
-              </th>
-              <th style={{ ...thStyle, textAlign: "center", cursor: "default" }}>Eventi</th>
+              <Th columnKey="name" sortKey={sortBy} sortDir={sortDir} onSort={toggleSort} style={{ paddingLeft: 12 }}>Nome</Th>
+              <Th align="center">Segmento</Th>
+              <Th columnKey="totalRegs" sortKey={sortBy} sortDir={sortDir} onSort={toggleSort} align="center">Registrazioni</Th>
+              <Th columnKey="totalParticipated" sortKey={sortBy} sortDir={sortDir} onSort={toggleSort} align="center">Presenze</Th>
+              <Th columnKey="conversion" sortKey={sortBy} sortDir={sortDir} onSort={toggleSort} align="center">Conv.</Th>
+              <Th align="center">Eventi</Th>
             </tr>
           </thead>
           <tbody>
-            {filtered.slice(0, 100).map((u, i) => (
+            {paginatedUsers.map((u, i) => (
               <tr
                 key={i}
                 onClick={() => setSelectedUser(u)}
@@ -129,9 +125,34 @@ export default function UsersTab({ userStats }) {
             ))}
           </tbody>
         </table>
-        {filtered.length > 100 && (
-          <div style={{ padding: 12, textAlign: "center", fontSize: font.size.xs, color: colors.text.disabled }}>
-            Mostrati 100 di {filtered.length} utenti
+
+        {/* Pagination */}
+        {totalPages > 1 && (
+          <div style={{
+            display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
+            padding: "10px 12px", borderTop: `1px solid ${colors.border.default}`,
+          }}>
+            <button
+              onClick={() => setPage(p => Math.max(0, p - 1))}
+              disabled={page === 0}
+              style={{
+                background: colors.bg.elevated, border: "none", borderRadius: radius.md,
+                padding: "4px 10px", fontSize: font.size.xs, color: colors.text.muted,
+                cursor: page === 0 ? "not-allowed" : "pointer", opacity: page === 0 ? 0.4 : 1,
+              }}
+            >← Prec.</button>
+            <span style={{ fontSize: font.size.xs, color: colors.text.disabled }}>
+              {page * pageSize + 1}–{Math.min((page + 1) * pageSize, filtered.length)} di {filtered.length}
+            </span>
+            <button
+              onClick={() => setPage(p => Math.min(totalPages - 1, p + 1))}
+              disabled={page >= totalPages - 1}
+              style={{
+                background: colors.bg.elevated, border: "none", borderRadius: radius.md,
+                padding: "4px 10px", fontSize: font.size.xs, color: colors.text.muted,
+                cursor: page >= totalPages - 1 ? "not-allowed" : "pointer", opacity: page >= totalPages - 1 ? 0.4 : 1,
+              }}
+            >Succ. →</button>
           </div>
         )}
       </div>

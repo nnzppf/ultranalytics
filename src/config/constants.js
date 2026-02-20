@@ -18,9 +18,18 @@ export const MESI_IT = {
 };
 
 export const TOOLTIP_STYLE = {
-  contentStyle: { background: colors.bg.card, border: `1px solid ${colors.border.default}`, borderRadius: radius.lg, color: colors.text.primary },
-  itemStyle: { color: colors.text.primary },
-  labelStyle: { color: colors.text.muted }
+  contentStyle: {
+    background: colors.bg.solid,
+    border: `1px solid ${colors.border.default}`,
+    borderRadius: radius.xl,
+    color: colors.text.primary,
+    boxShadow: "0 8px 32px rgba(0,0,0,0.25)",
+    padding: "8px 12px",
+    fontSize: 12,
+  },
+  itemStyle: { color: colors.text.primary, fontSize: 12, padding: "2px 0" },
+  labelStyle: { color: colors.text.muted, fontWeight: 600, marginBottom: 2 },
+  cursor: { stroke: colors.brand.purple, strokeWidth: 1, strokeDasharray: "4 4" },
 };
 
 export const getFascia = (hour) => {

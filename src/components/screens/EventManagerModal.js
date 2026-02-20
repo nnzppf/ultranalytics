@@ -1,7 +1,8 @@
 import { useState, useMemo } from 'react';
 import { X, Search, Edit3, Save, Merge, EyeOff, Eye } from 'lucide-react';
+import { motion } from 'framer-motion';
 import { BRAND_REGISTRY, GENRE_LABELS, CATEGORY_LABELS } from '../../config/eventConfig';
-import { colors, font, radius, shadows, alpha, transition as tr } from '../../config/designTokens';
+import { colors, font, radius, shadows, alpha, glass, transition as tr } from '../../config/designTokens';
 
 const GENRE_OPTIONS = Object.entries(GENRE_LABELS).map(([key, val]) => ({ key, label: val.label, color: val.color }));
 const CATEGORY_OPTIONS = Object.entries(CATEGORY_LABELS).map(([key, val]) => ({ key, label: val.label }));
@@ -261,13 +262,14 @@ export default function EventManagerModal({ data, eventConfig, onSave, onClose }
   };
 
   const panelStyle = {
-    background: colors.bg.page,
+    background: colors.bg.solid,
     borderRadius: radius["4xl"],
     width: "100%", maxWidth: 900,
     maxHeight: "90vh",
     display: "flex", flexDirection: "column",
     border: `1px solid ${colors.border.default}`,
     boxShadow: shadows.xl,
+    ...glass.heavy,
     overflow: "hidden",
   };
 
@@ -286,8 +288,16 @@ export default function EventManagerModal({ data, eventConfig, onSave, onClose }
   };
 
   return (
-    <div style={overlayStyle} onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
-      <div style={panelStyle} onClick={e => e.stopPropagation()}>
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      style={overlayStyle} onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
+      <motion.div
+        initial={{ opacity: 0, y: 20, scale: 0.97 }}
+        animate={{ opacity: 1, y: 0, scale: 1 }}
+        transition={{ type: "spring", stiffness: 400, damping: 30 }}
+        style={panelStyle} onClick={e => e.stopPropagation()}>
         {/* Header */}
         <div style={headerStyle}>
           <div>
@@ -437,8 +447,8 @@ export default function EventManagerModal({ data, eventConfig, onSave, onClose }
             onCancel={() => setShowMergeConfirm(false)}
           />
         )}
-      </div>
-    </div>
+      </motion.div>
+    </motion.div>
   );
 }
 
@@ -706,9 +716,10 @@ function MergeConfirmModal({ selected, allBrands, primaryName, onChangePrimary, 
       zIndex: 10,
     }}>
       <div style={{
-        background: colors.bg.card, borderRadius: radius["3xl"], padding: 24,
+        background: colors.bg.solid, borderRadius: radius["3xl"], padding: 24,
         maxWidth: 420, width: "100%",
         border: `1px solid ${colors.border.default}`, boxShadow: shadows.lg,
+        ...glass.heavy,
       }}>
         <div style={{ fontSize: font.size.lg, fontWeight: font.weight.bold, color: colors.text.primary, marginBottom: 12 }}>
           Conferma unione brand

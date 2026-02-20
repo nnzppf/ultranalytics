@@ -7,6 +7,7 @@ import ScaleToggle from '../shared/ScaleToggle';
 import { COLORS, TOOLTIP_STYLE } from '../../config/constants';
 import { colors, font, radius, alpha, transition as tr } from '../../config/designTokens';
 import { getHourlyData, getHourlyDataByGroup } from '../../utils/dataTransformers';
+import { FadeIn } from '../shared/Motion';
 
 export default function OverviewTab({ analytics, filtered, selectedBrand, graphHeights, setGraphHeights }) {
   const [timeGranularity, setTimeGranularity] = useState('hourly');
@@ -43,9 +44,9 @@ export default function OverviewTab({ analytics, filtered, selectedBrand, graphH
   ];
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
-      {/* Registrazioni per ora */}
-      <Section
+    <div className="bento-grid" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, alignItems: "start" }}>
+      {/* Registrazioni per ora — full width */}
+      <FadeIn style={{ gridColumn: "1 / -1" }}><Section
         title="Registrazioni per ora del giorno"
         extra={
           <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
@@ -88,10 +89,10 @@ export default function OverviewTab({ analytics, filtered, selectedBrand, graphH
           </BarChart>
         </ResponsiveContainer>
         <ResizeHandle chartKey="hourly" graphHeights={graphHeights} setGraphHeights={setGraphHeights} />
-      </Section>
+      </Section></FadeIn>
 
-      {/* Registrazioni per giorno */}
-      <Section title="Registrazioni per giorno della settimana">
+      {/* Registrazioni per giorno — half width */}
+      <FadeIn delay={0.1}><Section title="Registrazioni per giorno della settimana">
         <ResponsiveContainer width="100%" height={graphHeights.dowData || 220}>
           <BarChart data={dowData}>
             <CartesianGrid strokeDasharray="3 3" stroke={colors.border.default} />
@@ -103,10 +104,10 @@ export default function OverviewTab({ analytics, filtered, selectedBrand, graphH
           </BarChart>
         </ResponsiveContainer>
         <ResizeHandle chartKey="dowData" graphHeights={graphHeights} setGraphHeights={setGraphHeights} />
-      </Section>
+      </Section></FadeIn>
 
-      {/* Quando si registrano */}
-      <Section
+      {/* Quando si registrano — half width */}
+      <FadeIn delay={0.15}><Section
         title="Quando si registrano (giorni prima dell'evento)"
         extra={<ScaleToggle isLog={logScale} onToggle={setLogScale} />}
       >
@@ -120,7 +121,7 @@ export default function OverviewTab({ analytics, filtered, selectedBrand, graphH
           </AreaChart>
         </ResponsiveContainer>
         <ResizeHandle chartKey="daysBeforeData" graphHeights={graphHeights} setGraphHeights={setGraphHeights} />
-      </Section>
+      </Section></FadeIn>
     </div>
   );
 }

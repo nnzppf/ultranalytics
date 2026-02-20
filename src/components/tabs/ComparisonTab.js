@@ -11,7 +11,7 @@ import { GENRE_LABELS } from '../../config/eventConfig';
 import { colors, font, radius, gradients, alpha, transition as tr } from '../../config/designTokens';
 
 export default function ComparisonTab({ data, filtered, selectedBrand: topSelectedBrand, selectedCategory }) {
-  const [view, setView] = useState('genre'); // genre | brand | location | tracker
+  const [view, setView] = useState('tracker'); // genre | brand | location | tracker
   const [selectedGenre, setSelectedGenre] = useState(null);
   const [selectedBrand, setSelectedBrand] = useState(null);
   const [selectedEdition, setSelectedEdition] = useState(null);
@@ -158,10 +158,10 @@ export default function ComparisonTab({ data, filtered, selectedBrand: topSelect
   }, [view, highlightBrand, selectedBrand, selectedEdition, trackerBrands]);
 
   const tabs = [
+    { key: 'tracker', label: 'Live Tracker', highlight: true },
     { key: 'genre', label: 'Per Genere' },
     { key: 'brand', label: 'Per Brand' },
     { key: 'location', label: 'Per Location' },
-    { key: 'tracker', label: 'Live Tracker', highlight: true },
   ];
 
   return (

@@ -2,12 +2,13 @@ import { useState } from 'react';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine } from 'recharts';
 import { DeltaBadge } from '../shared/Badge';
 import ScaleToggle from '../shared/ScaleToggle';
+import { useSortable, Th } from '../shared/SortableTable';
 import { TOOLTIP_STYLE } from '../../config/constants';
 import { colors, font, radius, gradients, presets, alpha } from '../../config/designTokens';
 
 // Cross-brand comparison view
 function CrossBrandView({ comparisonData }) {
-  const { brandA, brandB, statsA, aggA, aggB, overlayData, allEditionLabels, allStats } = comparisonData;
+  const { brandA, brandB, statsA, statsB, aggA, aggB, overlayData, allEditionLabels, allStats } = comparisonData;
   const [logScale, setLogScale] = useState(false);
   const [hiddenLines, setHiddenLines] = useState(new Set());
   const toggleLine = (label) => {
@@ -22,12 +23,11 @@ function CrossBrandView({ comparisonData }) {
   const deltaConv = parseFloat((aggA.avgConversion - aggB.avgConversion).toFixed(1));
 
   // Table data: all editions of both brands
-  const tableData = allStats
-    .sort((a, b) => (a.eventDate || 0) - (b.eventDate || 0))
-    .map(s => ({
-      ...s,
-      isBrandA: s.brand === brandA,
-    }));
+  const tableDataRaw = allStats.map(s => ({
+    ...s,
+    isBrandA: s.brand === brandA,
+  }));
+  const { sorted: tableData, sortKey: tSortKey, sortDir: tSortDir, toggleSort: tToggleSort } = useSortable(tableDataRaw, 'eventDate', 'asc');
 
   return (
     <div style={{ ...presets.card, borderRadius: radius["4xl"], padding: 20 }}>
@@ -119,11 +119,11 @@ function CrossBrandView({ comparisonData }) {
           <table style={{ width: "100%", borderCollapse: "collapse", fontSize: font.size.sm }}>
             <thead>
               <tr style={{ borderBottom: `1px solid ${colors.border.default}` }}>
-                <th style={{ textAlign: "left", padding: "6px 8px", color: colors.text.muted, fontWeight: font.weight.medium }}>Brand</th>
-                <th style={{ textAlign: "left", padding: "6px 8px", color: colors.text.muted, fontWeight: font.weight.medium }}>Edizione</th>
-                <th style={{ textAlign: "center", padding: "6px 8px", color: colors.text.muted, fontWeight: font.weight.medium }}>Registrazioni</th>
-                <th style={{ textAlign: "center", padding: "6px 8px", color: colors.text.muted, fontWeight: font.weight.medium }}>Presenze</th>
-                <th style={{ textAlign: "center", padding: "6px 8px", color: colors.text.muted, fontWeight: font.weight.medium }}>Conv.</th>
+                <Th columnKey="brand" sortKey={tSortKey} sortDir={tSortDir} onSort={tToggleSort}>Brand</Th>
+                <Th columnKey="editionLabel" sortKey={tSortKey} sortDir={tSortDir} onSort={tToggleSort}>Edizione</Th>
+                <Th columnKey="totalRegistrations" sortKey={tSortKey} sortDir={tSortDir} onSort={tToggleSort} align="center">Registrazioni</Th>
+                <Th columnKey="totalAttended" sortKey={tSortKey} sortDir={tSortDir} onSort={tToggleSort} align="center">Presenze</Th>
+                <Th columnKey="conversion" sortKey={tSortKey} sortDir={tSortDir} onSort={tToggleSort} align="center">Conv.</Th>
               </tr>
             </thead>
             <tbody>
@@ -145,69 +145,87 @@ function CrossBrandView({ comparisonData }) {
       </div>
 
       {/* Overlay chart */}
-      {overlayData.length > 0 && (
-        <div>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
-            <div style={presets.sectionLabel}>
-              Curve cumulative registrazioni (giorni prima dell'evento)
+      {overlayData.length > 0 && (() => {
+        // Assign a unique color to each edition from the chart palette
+        const editionColorMap = {};
+        let colorIdx = 0;
+        statsA.forEach((s) => { editionColorMap[s.displayLabel] = colors.chart[colorIdx % colors.chart.length]; colorIdx++; });
+        statsB.forEach((s) => { editionColorMap[s.displayLabel] = colors.chart[colorIdx % colors.chart.length]; colorIdx++; });
+
+        return (
+          <div>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
+              <div style={presets.sectionLabel}>
+                Curve cumulative registrazioni
+              </div>
+              <ScaleToggle isLog={logScale} onToggle={setLogScale} />
             </div>
-            <ScaleToggle isLog={logScale} onToggle={setLogScale} />
+            <ResponsiveContainer width="100%" height={300}>
+              <AreaChart data={overlayData} margin={{ top: 5, right: 10, left: 0, bottom: 5 }}>
+                <CartesianGrid strokeDasharray="2 8" stroke={colors.border.subtle} />
+                <XAxis dataKey="label" tick={{ fill: colors.text.disabled, fontSize: 10 }} axisLine={{ stroke: colors.border.subtle }} tickLine={false} />
+                <YAxis scale={logScale ? "log" : "auto"} domain={logScale ? ["auto", "auto"] : [0, "auto"]} allowDataOverflow={logScale} tick={{ fill: colors.text.disabled, fontSize: 10 }} axisLine={false} tickLine={false} />
+                <Tooltip {...TOOLTIP_STYLE} />
+                {allEditionLabels.map((label) => {
+                  if (hiddenLines.has(label)) return null;
+                  const stat = allStats.find(s => s.displayLabel === label);
+                  const isBrandA = stat?.brand === brandA;
+                  const group = isBrandA ? statsA : statsB;
+                  const isLatest = group[group.length - 1]?.displayLabel === label;
+                  const edColor = editionColorMap[label] || colors.text.muted;
+                  return (
+                    <Area
+                      key={label}
+                      type="monotone"
+                      dataKey={label}
+                      stroke={edColor}
+                      fill="transparent"
+                      strokeWidth={isLatest ? 2.5 : 1.5}
+                      strokeDasharray={isLatest ? "" : "5 3"}
+                      dot={false}
+                      connectNulls
+                    />
+                  );
+                })}
+              </AreaChart>
+            </ResponsiveContainer>
+            {/* Legend grouped by brand */}
+            <div style={{ display: "flex", gap: 24, justifyContent: "center", marginTop: 12, flexWrap: "wrap" }}>
+              {[{ brand: brandA, stats: statsA, color: colors.brand.purple },
+                { brand: brandB, stats: statsB, color: colors.brand.pink }].map(({ brand, stats, color }) => (
+                <div key={brand} style={{ display: "flex", flexDirection: "column", gap: 3 }}>
+                  <span style={{ fontSize: 10, fontWeight: font.weight.bold, color, textTransform: "uppercase", letterSpacing: "0.05em" }}>
+                    {brand}
+                  </span>
+                  {stats.map((st) => {
+                    const isHidden = hiddenLines.has(st.displayLabel);
+                    const edColor = editionColorMap[st.displayLabel];
+                    const isLatest = stats[stats.length - 1]?.displayLabel === st.displayLabel;
+                    return (
+                      <button key={st.displayLabel} onClick={() => toggleLine(st.displayLabel)} style={{
+                        display: "flex", alignItems: "center", gap: 6, padding: "1px 4px",
+                        borderRadius: radius.sm, border: "none", cursor: "pointer",
+                        background: "transparent", opacity: isHidden ? 0.3 : 1,
+                        transition: "all 0.2s ease",
+                      }}>
+                        <span style={{
+                          width: 16, height: isLatest ? 3 : 2, flexShrink: 0,
+                          background: edColor, display: "inline-block", borderRadius: 1,
+                        }} />
+                        <span style={{
+                          fontSize: 10, color: isHidden ? colors.text.disabled : colors.text.muted,
+                          textDecoration: isHidden ? "line-through" : "none",
+                          whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", maxWidth: 200,
+                        }}>{st.editionLabel}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              ))}
+            </div>
           </div>
-          <ResponsiveContainer width="100%" height={300}>
-            <AreaChart data={overlayData}>
-              <CartesianGrid strokeDasharray="3 3" stroke={colors.border.default} />
-              <XAxis dataKey="label" tick={{ fill: colors.text.muted, fontSize: 10 }} />
-              <YAxis scale={logScale ? "log" : "auto"} domain={logScale ? ["auto", "auto"] : [0, "auto"]} allowDataOverflow={logScale} tick={{ fill: colors.text.muted, fontSize: 10 }} />
-              <Tooltip {...TOOLTIP_STYLE} />
-              {allEditionLabels.map((label, i) => {
-                if (hiddenLines.has(label)) return null;
-                const stat = allStats.find(s => s.displayLabel === label);
-                const isBrandA = stat?.brand === brandA;
-                return (
-                  <Area
-                    key={label}
-                    type="monotone"
-                    dataKey={label}
-                    stroke={isBrandA ? colors.brand.purple : colors.brand.pink}
-                    fill={isBrandA ? alpha.brand[8] : alpha.pink[8]}
-                    strokeWidth={2}
-                    strokeDasharray={i < statsA.length ? "" : "5 5"}
-                    dot={false}
-                    connectNulls
-                  />
-                );
-              })}
-            </AreaChart>
-          </ResponsiveContainer>
-          {/* Clickable legend */}
-          <div style={{ display: "flex", gap: 8, flexWrap: "wrap", justifyContent: "center", marginTop: 8 }}>
-            {allEditionLabels.map((label) => {
-              const stat = allStats.find(s => s.displayLabel === label);
-              const isBrandA = stat?.brand === brandA;
-              const lineColor = isBrandA ? colors.brand.purple : colors.brand.pink;
-              const isHidden = hiddenLines.has(label);
-              return (
-                <button key={label} onClick={() => toggleLine(label)} style={{
-                  display: "flex", alignItems: "center", gap: 4, padding: "2px 8px",
-                  borderRadius: radius.md, border: "none", cursor: "pointer",
-                  background: isHidden ? colors.bg.page : "transparent",
-                  opacity: isHidden ? 0.4 : 1,
-                  transition: "all 0.2s ease",
-                }}>
-                  <span style={{
-                    width: 14, height: 3, background: lineColor, display: "inline-block", borderRadius: 1,
-                  }} />
-                  <span style={{
-                    fontSize: font.size.xs,
-                    color: isHidden ? colors.text.disabled : colors.text.muted,
-                    textDecoration: isHidden ? "line-through" : "none",
-                  }}>{label}</span>
-                </button>
-              );
-            })}
-          </div>
-        </div>
-      )}
+        );
+      })()}
     </div>
   );
 }
@@ -233,6 +251,7 @@ function SingleBrandView({ comparisonData }) {
   };
 
   const hasComparisons = comparisons.length > 0;
+  const { sorted: sortedComparisons, sortKey: cSortKey, sortDir: cSortDir, toggleSort: cToggleSort } = useSortable(comparisons, 'atSamePoint', 'desc');
   const avgDelta = avgAtSamePoint > 0
     ? parseFloat((((currentRegistrations - avgAtSamePoint) / avgAtSamePoint) * 100).toFixed(1))
     : null;
@@ -346,16 +365,16 @@ function SingleBrandView({ comparisonData }) {
             <table style={{ width: "100%", borderCollapse: "collapse", fontSize: font.size.sm }}>
               <thead>
                 <tr style={{ borderBottom: `1px solid ${colors.border.default}` }}>
-                  <th style={{ textAlign: "left", padding: "6px 8px", color: colors.text.muted, fontWeight: font.weight.medium }}>Edizione</th>
-                  <th style={{ textAlign: "center", padding: "6px 8px", color: colors.text.muted, fontWeight: font.weight.medium }}>A -{currentDaysBefore}gg</th>
-                  <th style={{ textAlign: "center", padding: "6px 8px", color: colors.text.muted, fontWeight: font.weight.medium }}>Delta</th>
-                  <th style={{ textAlign: "center", padding: "6px 8px", color: colors.text.muted, fontWeight: font.weight.medium }}>Finale</th>
-                  <th style={{ textAlign: "center", padding: "6px 8px", color: colors.text.muted, fontWeight: font.weight.medium }}>Conv.</th>
-                  <th style={{ textAlign: "center", padding: "6px 8px", color: colors.text.muted, fontWeight: font.weight.medium }}>% a -{currentDaysBefore}gg</th>
+                  <Th columnKey="editionLabel" sortKey={cSortKey} sortDir={cSortDir} onSort={cToggleSort}>Edizione</Th>
+                  <Th columnKey="atSamePoint" sortKey={cSortKey} sortDir={cSortDir} onSort={cToggleSort} align="center">A -{currentDaysBefore}gg</Th>
+                  <Th columnKey="deltaPercent" sortKey={cSortKey} sortDir={cSortDir} onSort={cToggleSort} align="center">Delta</Th>
+                  <Th columnKey="totalFinal" sortKey={cSortKey} sortDir={cSortDir} onSort={cToggleSort} align="center">Finale</Th>
+                  <Th columnKey="finalConversion" sortKey={cSortKey} sortDir={cSortDir} onSort={cToggleSort} align="center">Conv.</Th>
+                  <Th columnKey="completionPercent" sortKey={cSortKey} sortDir={cSortDir} onSort={cToggleSort} align="center">% a -{currentDaysBefore}gg</Th>
                 </tr>
               </thead>
               <tbody>
-                {comparisons.map((c, i) => (
+                {sortedComparisons.map((c, i) => (
                   <tr key={i} style={{ borderBottom: `1px solid ${colors.border.subtle}` }}>
                     <td style={{ padding: "8px", color: colors.text.primary, fontWeight: font.weight.semibold }}>{c.editionLabel}</td>
                     <td style={{ padding: "8px", color: colors.text.primary, textAlign: "center" }}>{c.atSamePoint}</td>
@@ -374,7 +393,12 @@ function SingleBrandView({ comparisonData }) {
       )}
 
       {/* Overlay chart */}
-      {overlayData.length > 0 && (
+      {overlayData.length > 0 && (() => {
+        // Assign distinct color per edition: current = first chart color, past = subsequent
+        const edColorMap = {};
+        allEditionLabels.forEach((label, i) => { edColorMap[label] = colors.chart[i % colors.chart.length]; });
+
+        return (
         <div>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
             <div style={presets.sectionLabel}>
@@ -383,10 +407,10 @@ function SingleBrandView({ comparisonData }) {
             <ScaleToggle isLog={logScale} onToggle={setLogScale} />
           </div>
           <ResponsiveContainer width="100%" height={250}>
-            <AreaChart data={overlayData}>
-              <CartesianGrid strokeDasharray="3 3" stroke={colors.border.default} />
-              <XAxis dataKey="label" tick={{ fill: colors.text.muted, fontSize: 10 }} />
-              <YAxis scale={logScale ? "log" : "auto"} domain={logScale ? ["auto", "auto"] : [0, "auto"]} allowDataOverflow={logScale} tick={{ fill: colors.text.muted, fontSize: 10 }} />
+            <AreaChart data={overlayData} margin={{ top: 5, right: 10, left: 0, bottom: 5 }}>
+              <CartesianGrid strokeDasharray="2 8" stroke={colors.border.subtle} />
+              <XAxis dataKey="label" tick={{ fill: colors.text.disabled, fontSize: 10 }} axisLine={{ stroke: colors.border.subtle }} tickLine={false} />
+              <YAxis scale={logScale ? "log" : "auto"} domain={logScale ? ["auto", "auto"] : [0, "auto"]} allowDataOverflow={logScale} tick={{ fill: colors.text.disabled, fontSize: 10 }} axisLine={false} tickLine={false} />
               <Tooltip {...TOOLTIP_STYLE} />
               {currentDaysBefore > 0 && (
                 <ReferenceLine
@@ -398,16 +422,16 @@ function SingleBrandView({ comparisonData }) {
               {allEditionLabels.map((label, i) => {
                 if (hiddenLines.has(label)) return null;
                 const isCurrent = i === 0;
-                const pastOpacity = Math.max(0.25, 1 - (i * 0.15));
+                const edColor = edColorMap[label];
                 return (
                   <Area
                     key={label}
                     type="monotone"
                     dataKey={label}
-                    stroke={isCurrent ? colors.brand.purple : `rgba(148, 163, 184, ${pastOpacity})`}
-                    fill={isCurrent ? alpha.brand[15] : "transparent"}
+                    stroke={edColor}
+                    fill={isCurrent ? `${edColor}18` : "transparent"}
                     strokeWidth={isCurrent ? 3 : 1.5}
-                    strokeDasharray={isCurrent ? "" : "5 5"}
+                    strokeDasharray={isCurrent ? "" : "5 3"}
                     dot={false}
                     connectNulls
                   />
@@ -434,20 +458,18 @@ function SingleBrandView({ comparisonData }) {
             {allEditionLabels.map((label, i) => {
               const isCurrent = i === 0;
               const isHidden = hiddenLines.has(label);
-              const pastOpacity = Math.max(0.25, 1 - (i * 0.15));
-              const lineColor = isCurrent ? colors.brand.purple : `rgba(148, 163, 184, ${pastOpacity})`;
+              const edColor = edColorMap[label];
               return (
                 <button key={label} onClick={() => toggleLine(label)} style={{
                   display: "flex", alignItems: "center", gap: 4, padding: "2px 8px",
                   borderRadius: radius.md, border: "none", cursor: "pointer",
-                  background: isHidden ? colors.bg.page : "transparent",
-                  opacity: isHidden ? 0.4 : 1,
+                  background: "transparent",
+                  opacity: isHidden ? 0.3 : 1,
                   transition: "all 0.2s ease",
                 }}>
                   <span style={{
-                    width: 14, height: isCurrent ? 3 : 2,
-                    background: lineColor, display: "inline-block", borderRadius: 1,
-                    borderBottom: isCurrent ? "none" : `1px dashed ${lineColor}`,
+                    width: 16, height: isCurrent ? 3 : 2,
+                    background: edColor, display: "inline-block", borderRadius: 1,
                   }} />
                   <span style={{
                     fontSize: font.size.xs,
@@ -480,7 +502,8 @@ function SingleBrandView({ comparisonData }) {
             )}
           </div>
         </div>
-      )}
+        );
+      })()}
     </div>
   );
 }

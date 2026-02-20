@@ -1,5 +1,6 @@
 import { Upload, Plus, X, Cloud, Trash2, RefreshCw } from 'lucide-react';
-import { colors, font, radius, gradients, transition as tr, alpha } from '../../config/designTokens';
+import { motion } from 'framer-motion';
+import { colors, font, radius, gradients, transition as tr, alpha, glass, shadows } from '../../config/designTokens';
 
 export default function UploadScreen({
   files, isDragging, onFilesAdded, onRemoveFile, onUpdateEventName, onAnalyze, onDragState,
@@ -20,25 +21,48 @@ export default function UploadScreen({
   const hasSavedData = savedDatasets && savedDatasets.length > 0;
 
   return (
-    <div style={{ minHeight: "100vh", background: colors.bg.page, display: "flex", flexDirection: "column", alignItems: "center" }}>
-      {/* Header */}
+    <div style={{
+      minHeight: "100vh", background: colors.bg.page,
+      display: "flex", flexDirection: "column", alignItems: "center",
+      position: "relative", overflow: "hidden",
+    }}>
+      {/* Background glow */}
       <div style={{
-        width: "100%", padding: "32px 0 24px", textAlign: "center",
-        background: gradients.brand,
-      }}>
-        <div style={{ fontSize: 28, fontWeight: font.weight.black, color: colors.text.inverse, letterSpacing: "-0.02em" }}>
+        position: "absolute", top: "-5%", left: "50%", transform: "translateX(-50%)",
+        width: 600, height: 200,
+        background: "radial-gradient(ellipse, rgba(13,148,136,0.1) 0%, transparent 70%)",
+        filter: "blur(40px)", pointerEvents: "none",
+      }} />
+
+      {/* Header */}
+      <motion.div
+        initial={{ opacity: 0, y: -10 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.4 }}
+        style={{ width: "100%", padding: "28px 0 20px", textAlign: "center" }}
+      >
+        <div style={{
+          fontSize: 28, fontWeight: font.weight.black, letterSpacing: "-0.02em",
+          background: gradients.brand,
+          WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent",
+        }}>
           Ultranalytics
         </div>
-        <div style={{ color: alpha.white[70], fontSize: font.size.base, marginTop: 4 }}>
+        <div style={{ color: colors.text.muted, fontSize: font.size.base, marginTop: 4 }}>
           Dashboard eventi &amp; registrazioni
         </div>
-      </div>
+      </motion.div>
 
-      <div style={{ width: "100%", maxWidth: 520, padding: "32px 16px" }}>
+      <div style={{ width: "100%", maxWidth: 520, padding: "16px 16px 40px", position: "relative", zIndex: 1 }}>
 
         {/* Saved datasets from Firebase */}
         {hasSavedData && (
-          <div style={{ marginBottom: 24 }}>
+          <motion.div
+            initial={{ opacity: 0, y: 12 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.1 }}
+            style={{ marginBottom: 24 }}
+          >
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
               <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
                 <Cloud size={14} color={colors.status.success} />
@@ -56,16 +80,22 @@ export default function UploadScreen({
               </button>
             </div>
 
-            {savedDatasets.map(ds => (
-              <div key={ds.id} style={{
-                background: colors.bg.card, borderRadius: radius.xl, padding: "10px 14px",
-                border: `1px solid ${colors.border.default}`, display: "flex", alignItems: "center", gap: 10,
-                marginBottom: 6,
-              }}>
+            {savedDatasets.map((ds, i) => (
+              <motion.div
+                key={ds.id}
+                initial={{ opacity: 0, x: -10 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ delay: 0.15 + i * 0.05 }}
+                style={{
+                  background: colors.bg.card, borderRadius: radius.xl, padding: "10px 14px",
+                  border: `1px solid ${colors.border.default}`, display: "flex", alignItems: "center", gap: 10,
+                  marginBottom: 6, ...glass.light,
+                }}
+              >
                 <div style={{ flex: 1 }}>
                   <div style={{ fontSize: font.size.base, fontWeight: font.weight.medium, color: colors.text.primary }}>{ds.fileName}</div>
                   <div style={{ fontSize: font.size.xs, color: colors.text.disabled, marginTop: 2 }}>
-                    {ds.fileType === 'utenti' ? '👤 Utenti' : '🎫 Biglietti'} — {ds.recordCount} record
+                    {ds.fileType === 'utenti' ? 'Utenti' : 'Biglietti'} — {ds.recordCount} record
                     {ds.uploadedAt && ` — ${new Date(ds.uploadedAt.seconds * 1000).toLocaleDateString('it')}`}
                   </div>
                 </div>
@@ -76,20 +106,23 @@ export default function UploadScreen({
                 >
                   <Trash2 size={14} color={colors.status.error} />
                 </button>
-              </div>
+              </motion.div>
             ))}
 
-            <button
+            <motion.button
+              whileHover={{ scale: 1.01, boxShadow: shadows.brand }}
+              whileTap={{ scale: 0.98 }}
               onClick={onReloadCloud}
               style={{
-                marginTop: 8, padding: "10px 0", borderRadius: radius.xl, width: "100%",
-                background: colors.status.success, color: colors.text.inverse, fontWeight: font.weight.semibold, fontSize: font.size.base,
+                marginTop: 10, padding: "11px 0", borderRadius: radius.xl, width: "100%",
+                background: colors.status.success, color: colors.text.inverse,
+                fontWeight: font.weight.semibold, fontSize: font.size.base,
                 border: "none", cursor: "pointer",
               }}
             >
               Apri dashboard con dati salvati
-            </button>
-          </div>
+            </motion.button>
+          </motion.div>
         )}
 
         {/* Separator */}
@@ -105,7 +138,10 @@ export default function UploadScreen({
         )}
 
         {/* Drop zone */}
-        <div
+        <motion.div
+          initial={{ opacity: 0, y: 12 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: hasSavedData ? 0.3 : 0.1 }}
           onDragOver={e => { e.preventDefault(); onDragState(true); }}
           onDragLeave={() => onDragState(false)}
           onDrop={handleDrop}
@@ -126,16 +162,23 @@ export default function UploadScreen({
           </div>
           <input id="file-input" type="file" multiple accept=".csv,.tsv,.xlsx,.xls"
             style={{ display: "none" }} onChange={handleFileInput} />
-        </div>
+        </motion.div>
 
         {/* File list */}
         {files.length > 0 && (
           <div style={{ marginTop: 20, display: "flex", flexDirection: "column", gap: 8 }}>
             {files.map((f, i) => (
-              <div key={i} style={{
-                background: colors.bg.card, borderRadius: radius.xl, padding: "10px 14px",
-                border: `1px solid ${colors.border.default}`, display: "flex", alignItems: "center", gap: 10,
-              }}>
+              <motion.div
+                key={i}
+                initial={{ opacity: 0, x: -10 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ delay: i * 0.05 }}
+                style={{
+                  background: colors.bg.card, borderRadius: radius.xl, padding: "10px 14px",
+                  border: `1px solid ${colors.border.default}`, display: "flex", alignItems: "center", gap: 10,
+                  ...glass.light,
+                }}
+              >
                 <div style={{ flex: 1 }}>
                   <input
                     value={f.eventName}
@@ -153,7 +196,7 @@ export default function UploadScreen({
                   style={{ background: "none", border: "none", cursor: "pointer", padding: 4 }}>
                   <X size={14} color={colors.status.error} />
                 </button>
-              </div>
+              </motion.div>
             ))}
 
             <label style={{
@@ -165,16 +208,21 @@ export default function UploadScreen({
                 style={{ display: "none" }} onChange={handleFileInput} />
             </label>
 
-            <button onClick={onAnalyze} style={{
-              marginTop: 12, padding: "12px 0", borderRadius: radius.xl,
-              background: gradients.brand,
-              color: colors.text.inverse, fontWeight: font.weight.semibold, fontSize: font.size.md,
-              border: "none", cursor: "pointer",
-              display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
-            }}>
+            <motion.button
+              whileHover={{ scale: 1.01, boxShadow: shadows.brand }}
+              whileTap={{ scale: 0.98 }}
+              onClick={onAnalyze}
+              style={{
+                marginTop: 12, padding: "12px 0", borderRadius: radius.xl,
+                background: gradients.brand,
+                color: colors.text.inverse, fontWeight: font.weight.semibold, fontSize: font.size.md,
+                border: "none", cursor: "pointer",
+                display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
+              }}
+            >
               <Cloud size={16} />
               Analizza e salva nel cloud ({files.length} file, {files.reduce((s, f) => s + f.rows.length, 0)} righe)
-            </button>
+            </motion.button>
           </div>
         )}
       </div>
