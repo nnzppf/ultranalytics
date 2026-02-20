@@ -368,11 +368,25 @@ function AuthenticatedApp({ user, logout }) {
       }
     }
 
+    // Determine if the selected edition is a future event (not yet happened)
+    // Use the 6 AM day-after grace period (same as comparisonEngine)
+    let isEditionFuture = false;
+    if (selectedEdition !== "all") {
+      const edRow = filtered.find(r => r.eventDate);
+      if (edRow?.eventDate) {
+        const dayAfter = new Date(edRow.eventDate);
+        dayAfter.setDate(dayAfter.getDate() + 1);
+        dayAfter.setHours(6, 0, 0, 0);
+        isEditionFuture = new Date() < dayAfter;
+      }
+    }
+
     return {
       total, entered, conv, noShowRate,
       brands,
       eventStats,
       trend,
+      isEditionFuture,
       hourlyReg,
       hourlyRegByEvent,
       hourlyPeak,
@@ -668,40 +682,50 @@ function AuthenticatedApp({ user, logout }) {
         </div>
       )}
 
-      {/* KPI Row */}
-      <StaggerList className="kpi-grid" style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 10, padding: "16px 20px" }}>
-        <StaggerItem><KPI icon={Users} label="Registrazioni" value={analytics.total} color={colors.brand.purple} trend={analytics.trend?.total} sub={analytics.trend ? `vs ${analytics.trend.prevEdition}` : undefined} /></StaggerItem>
-        <StaggerItem><KPI icon={Check} label="Presenze" value={analytics.entered} color={colors.status.success} trend={analytics.trend?.entered} /></StaggerItem>
-        <StaggerItem>
-          <motion.div
-            whileHover={{ scale: 1.03, boxShadow: shadows.md }}
-            transition={{ type: "spring", stiffness: 400, damping: 25 }}
-            style={{
-              background: colors.bg.card, borderRadius: radius["2xl"], padding: "14px 16px",
-              border: `1px solid ${colors.border.default}`, ...glass.card, boxShadow: shadows.sm, cursor: "default",
-            }}
-          >
-            <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ display: "flex", alignItems: "center", gap: 4, marginBottom: 4 }}>
-                  <TrendingUp size={12} color={colors.brand.cyan} style={{ flexShrink: 0 }} />
-                  <span style={{ fontSize: font.size.xs, color: colors.text.muted, textTransform: "uppercase", letterSpacing: "0.05em", whiteSpace: "nowrap" }}>Conv.</span>
-                </div>
-                <div style={{ fontSize: font.size["3xl"], fontWeight: font.weight.bold, color: colors.text.primary, whiteSpace: "nowrap" }}>{analytics.conv}%</div>
-              </div>
-              <div style={{ width: 1, background: colors.border.default, alignSelf: "stretch" }} />
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ display: "flex", alignItems: "center", gap: 4, marginBottom: 4 }}>
-                  <X size={12} color={colors.status.error} style={{ flexShrink: 0 }} />
-                  <span style={{ fontSize: font.size.xs, color: colors.text.muted, textTransform: "uppercase", letterSpacing: "0.05em", whiteSpace: "nowrap" }}>No-Show</span>
-                </div>
-                <div style={{ fontSize: font.size["3xl"], fontWeight: font.weight.bold, color: colors.text.primary, whiteSpace: "nowrap" }}>{analytics.noShowRate}%</div>
-              </div>
-            </div>
-          </motion.div>
-        </StaggerItem>
-        <StaggerItem><KPI icon={Calendar} label="Brand" value={analytics.brands.length} color={colors.status.warning} /></StaggerItem>
-      </StaggerList>
+      {/* KPI Row — hide Presenze/Conv/No-Show for future events */}
+      {(() => {
+        const showAttendance = !analytics.isEditionFuture;
+        const kpiCols = showAttendance ? 4 : 2;
+        return (
+          <StaggerList className="kpi-grid" style={{ display: "grid", gridTemplateColumns: `repeat(${kpiCols}, 1fr)`, gap: 10, padding: "16px 20px" }}>
+            <StaggerItem><KPI icon={Users} label="Registrazioni" value={analytics.total} color={colors.brand.purple} trend={analytics.trend?.total} sub={analytics.trend ? `vs ${analytics.trend.prevEdition}` : undefined} /></StaggerItem>
+            {showAttendance && (
+              <StaggerItem><KPI icon={Check} label="Presenze" value={analytics.entered} color={colors.status.success} trend={analytics.trend?.entered} /></StaggerItem>
+            )}
+            {showAttendance && (
+              <StaggerItem>
+                <motion.div
+                  whileHover={{ scale: 1.03, boxShadow: shadows.md }}
+                  transition={{ type: "spring", stiffness: 400, damping: 25 }}
+                  style={{
+                    background: colors.bg.card, borderRadius: radius["2xl"], padding: "14px 16px",
+                    border: `1px solid ${colors.border.default}`, ...glass.card, boxShadow: shadows.sm, cursor: "default",
+                  }}
+                >
+                  <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: 4, marginBottom: 4 }}>
+                        <TrendingUp size={12} color={colors.brand.cyan} style={{ flexShrink: 0 }} />
+                        <span style={{ fontSize: font.size.xs, color: colors.text.muted, textTransform: "uppercase", letterSpacing: "0.05em", whiteSpace: "nowrap" }}>Conv.</span>
+                      </div>
+                      <div style={{ fontSize: font.size["3xl"], fontWeight: font.weight.bold, color: colors.text.primary, whiteSpace: "nowrap" }}>{analytics.conv}%</div>
+                    </div>
+                    <div style={{ width: 1, background: colors.border.default, alignSelf: "stretch" }} />
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: 4, marginBottom: 4 }}>
+                        <X size={12} color={colors.status.error} style={{ flexShrink: 0 }} />
+                        <span style={{ fontSize: font.size.xs, color: colors.text.muted, textTransform: "uppercase", letterSpacing: "0.05em", whiteSpace: "nowrap" }}>No-Show</span>
+                      </div>
+                      <div style={{ fontSize: font.size["3xl"], fontWeight: font.weight.bold, color: colors.text.primary, whiteSpace: "nowrap" }}>{analytics.noShowRate}%</div>
+                    </div>
+                  </div>
+                </motion.div>
+              </StaggerItem>
+            )}
+            <StaggerItem><KPI icon={Calendar} label="Brand" value={analytics.brands.length} color={colors.status.warning} /></StaggerItem>
+          </StaggerList>
+        );
+      })()}
 
       {/* Tab Navigation — Desktop: buttons */}
       <div className="tab-bar tab-bar-buttons" style={{ display: "flex", gap: 4, padding: "0 20px 12px", overflowX: "auto" }}>
@@ -768,7 +792,7 @@ function AuthenticatedApp({ user, logout }) {
         )}
 
         {activeTab === "confronti" && (
-          <ComparisonTab data={data} filtered={filtered} selectedBrand={selectedBrand} selectedCategory={selectedCategory} />
+          <ComparisonTab data={data} filtered={filtered} selectedBrand={selectedBrand} selectedCategory={selectedCategory} selectedEdition={selectedEdition} />
         )}
 
         {activeTab === "utenti" && (

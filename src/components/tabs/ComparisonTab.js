@@ -11,11 +11,15 @@ import { getUserStats } from '../../utils/dataTransformers';
 import { GENRE_LABELS } from '../../config/eventConfig';
 import { colors, font, radius, gradients, alpha, transition as tr } from '../../config/designTokens';
 
-export default function ComparisonTab({ data, filtered, selectedBrand: topSelectedBrand, selectedCategory }) {
+export default function ComparisonTab({ data, filtered, selectedBrand: topSelectedBrand, selectedCategory, selectedEdition: topSelectedEdition }) {
   const [view, setView] = useState('tracker'); // genre | brand | location | tracker
   const [selectedGenre, setSelectedGenre] = useState(null);
   const [selectedBrand, setSelectedBrand] = useState(null);
-  const [selectedEdition, setSelectedEdition] = useState(null);
+  const [localSelectedEdition, setLocalSelectedEdition] = useState(null);
+
+  // If the top bar has a specific edition selected, use it; otherwise fall back to local state
+  const topEditionActive = topSelectedEdition && topSelectedEdition !== 'all';
+  const selectedEdition = topEditionActive ? topSelectedEdition : localSelectedEdition;
 
   // Use all non-senior data for comparisons (so we always have something to compare against)
   const baseData = useMemo(() => data.filter(d => d.category !== 'senior'), [data]);
@@ -113,12 +117,12 @@ export default function ComparisonTab({ data, filtered, selectedBrand: topSelect
   }, [highlightBrand, baseData]);
 
   const breadcrumb = [];
-  breadcrumb.push({ label: 'Confronti', action: () => { setSelectedGenre(null); setSelectedBrand(null); setSelectedEdition(null); } });
+  breadcrumb.push({ label: 'Confronti', action: () => { setSelectedGenre(null); setSelectedBrand(null); setLocalSelectedEdition(null); } });
   if (selectedGenre) {
-    breadcrumb.push({ label: GENRE_LABELS[selectedGenre]?.label || selectedGenre, action: () => { setSelectedBrand(null); setSelectedEdition(null); } });
+    breadcrumb.push({ label: GENRE_LABELS[selectedGenre]?.label || selectedGenre, action: () => { setSelectedBrand(null); setLocalSelectedEdition(null); } });
   }
   if (selectedBrand) {
-    breadcrumb.push({ label: selectedBrand, action: () => { setSelectedEdition(null); } });
+    breadcrumb.push({ label: selectedBrand, action: () => { setLocalSelectedEdition(null); } });
   }
   if (selectedEdition) {
     breadcrumb.push({ label: selectedEdition, action: null });
@@ -127,20 +131,20 @@ export default function ComparisonTab({ data, filtered, selectedBrand: topSelect
   const handleSelectGenre = (genre) => {
     setSelectedGenre(genre);
     setSelectedBrand(null);
-    setSelectedEdition(null);
+    setLocalSelectedEdition(null);
     setView('brand');
   };
 
   const handleSelectBrand = (brand) => {
     setSelectedBrand(brand);
-    setSelectedEdition(null);
+    setLocalSelectedEdition(null);
     setCrossBrandTarget(null);
     setCrossBrandEdition(null);
     setManualCount('');
     setDailyCounts({});
     const brandInfo = trackerBrands.find(b => b.brand === brand);
     if (brandInfo && brandInfo.editions.length >= 1) {
-      setSelectedEdition(brandInfo.editions[brandInfo.editions.length - 1]);
+      setLocalSelectedEdition(brandInfo.editions[brandInfo.editions.length - 1]);
       setView('tracker');
     }
   };
@@ -153,7 +157,7 @@ export default function ComparisonTab({ data, filtered, selectedBrand: topSelect
     if (view === 'tracker' && highlightBrand && !selectedBrand && !selectedEdition) {
       const brandInfo = trackerBrands.find(b => b.brand === highlightBrand);
       if (brandInfo && brandInfo.editions.length > 0) {
-        setSelectedEdition(brandInfo.editions[brandInfo.editions.length - 1]);
+        setLocalSelectedEdition(brandInfo.editions[brandInfo.editions.length - 1]);
       }
     }
   }, [view, highlightBrand, selectedBrand, selectedEdition, trackerBrands]);
@@ -188,9 +192,9 @@ export default function ComparisonTab({ data, filtered, selectedBrand: topSelect
             setView(t.key);
             setCrossBrandTarget(null);
             setCrossBrandEdition(null);
-            if (t.key === 'genre') { setSelectedGenre(null); setSelectedBrand(null); setSelectedEdition(null); }
-            if (t.key === 'brand') { setSelectedBrand(null); setSelectedEdition(null); }
-            if (t.key === 'tracker') { setSelectedBrand(null); setSelectedEdition(null); }
+            if (t.key === 'genre') { setSelectedGenre(null); setSelectedBrand(null); setLocalSelectedEdition(null); }
+            if (t.key === 'brand') { setSelectedBrand(null); setLocalSelectedEdition(null); }
+            if (t.key === 'tracker') { setSelectedBrand(null); setLocalSelectedEdition(null); }
           }} style={{
             padding: "6px 14px", borderRadius: radius.lg, fontSize: font.size.sm, border: "none", cursor: "pointer",
             background: view === t.key ? (t.highlight ? gradients.brand : colors.interactive.active) : colors.bg.card,
@@ -278,13 +282,13 @@ export default function ComparisonTab({ data, filtered, selectedBrand: topSelect
             }
             return (
               <div>
-                {editions.length > 0 && (
+                {editions.length > 0 && !topEditionActive && (
                   <>
-                    {/* Desktop: edition buttons */}
+                    {/* Desktop: edition buttons — hidden when top bar has a specific edition */}
                     <div className="tracker-edition-buttons" style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 8, alignItems: "center" }}>
                       <span style={{ fontSize: font.size.xs, color: colors.text.disabled, marginRight: 4 }}>Edizione:</span>
                       {editions.map(ed => (
-                        <button key={ed} onClick={() => { setSelectedEdition(ed); setCrossBrandTarget(null); setManualCount(''); setDailyCounts({}); }} style={{
+                        <button key={ed} onClick={() => { setLocalSelectedEdition(ed); setCrossBrandTarget(null); setManualCount(''); setDailyCounts({}); }} style={{
                           padding: "5px 12px", borderRadius: radius.md, fontSize: font.size.xs, border: "none", cursor: "pointer",
                           background: (selectedEdition || activeEdition) === ed ? colors.interactive.active : colors.interactive.inactive,
                           color: (selectedEdition || activeEdition) === ed ? colors.interactive.activeText : colors.interactive.inactiveText,
@@ -296,7 +300,7 @@ export default function ComparisonTab({ data, filtered, selectedBrand: topSelect
                     <div className="tracker-edition-dropdown" style={{ display: "none", marginBottom: 8 }}>
                       <Dropdown
                         value={selectedEdition || activeEdition}
-                        onChange={(ed) => { setSelectedEdition(ed); setCrossBrandTarget(null); setManualCount(''); setDailyCounts({}); }}
+                        onChange={(ed) => { setLocalSelectedEdition(ed); setCrossBrandTarget(null); setManualCount(''); setDailyCounts({}); }}
                         placeholder="Edizione"
                         options={editions.map(ed => ({ value: ed, label: ed }))}
                       />
