@@ -2,13 +2,21 @@ import { useState } from 'react';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine } from 'recharts';
 import { DeltaBadge } from '../shared/Badge';
 import ScaleToggle from '../shared/ScaleToggle';
-import { COLORS, TOOLTIP_STYLE } from '../../config/constants';
+import { TOOLTIP_STYLE } from '../../config/constants';
 import { colors, font, radius, gradients, presets, alpha } from '../../config/designTokens';
 
 // Cross-brand comparison view
 function CrossBrandView({ comparisonData }) {
   const { brandA, brandB, statsA, aggA, aggB, overlayData, allEditionLabels, allStats } = comparisonData;
   const [logScale, setLogScale] = useState(false);
+  const [hiddenLines, setHiddenLines] = useState(new Set());
+  const toggleLine = (label) => {
+    setHiddenLines(prev => {
+      const next = new Set(prev);
+      if (next.has(label)) next.delete(label); else next.add(label);
+      return next;
+    });
+  };
 
   const deltaReg = aggA.avgPerEdition - aggB.avgPerEdition;
   const deltaConv = parseFloat((aggA.avgConversion - aggB.avgConversion).toFixed(1));
@@ -152,6 +160,7 @@ function CrossBrandView({ comparisonData }) {
               <YAxis scale={logScale ? "log" : "auto"} domain={logScale ? ["auto", "auto"] : [0, "auto"]} allowDataOverflow={logScale} tick={{ fill: colors.text.muted, fontSize: 10 }} />
               <Tooltip {...TOOLTIP_STYLE} />
               {allEditionLabels.map((label, i) => {
+                if (hiddenLines.has(label)) return null;
                 const stat = allStats.find(s => s.displayLabel === label);
                 const isBrandA = stat?.brand === brandA;
                 return (
@@ -170,16 +179,32 @@ function CrossBrandView({ comparisonData }) {
               })}
             </AreaChart>
           </ResponsiveContainer>
-          {/* Legend */}
-          <div style={{ display: "flex", gap: 16, justifyContent: "center", marginTop: 8, fontSize: font.size.xs }}>
-            <span style={{ display: "flex", alignItems: "center", gap: 4 }}>
-              <span style={{ width: 16, height: 3, background: colors.brand.purple, display: "inline-block", borderRadius: 2 }} />
-              <span style={{ color: colors.text.muted }}>{brandA}</span>
-            </span>
-            <span style={{ display: "flex", alignItems: "center", gap: 4 }}>
-              <span style={{ width: 16, height: 3, background: colors.brand.pink, display: "inline-block", borderRadius: 2, borderBottom: `1px dashed ${colors.brand.pink}` }} />
-              <span style={{ color: colors.text.muted }}>{brandB}</span>
-            </span>
+          {/* Clickable legend */}
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap", justifyContent: "center", marginTop: 8 }}>
+            {allEditionLabels.map((label) => {
+              const stat = allStats.find(s => s.displayLabel === label);
+              const isBrandA = stat?.brand === brandA;
+              const lineColor = isBrandA ? colors.brand.purple : colors.brand.pink;
+              const isHidden = hiddenLines.has(label);
+              return (
+                <button key={label} onClick={() => toggleLine(label)} style={{
+                  display: "flex", alignItems: "center", gap: 4, padding: "2px 8px",
+                  borderRadius: radius.md, border: "none", cursor: "pointer",
+                  background: isHidden ? colors.bg.page : "transparent",
+                  opacity: isHidden ? 0.4 : 1,
+                  transition: "all 0.2s ease",
+                }}>
+                  <span style={{
+                    width: 14, height: 3, background: lineColor, display: "inline-block", borderRadius: 1,
+                  }} />
+                  <span style={{
+                    fontSize: font.size.xs,
+                    color: isHidden ? colors.text.disabled : colors.text.muted,
+                    textDecoration: isHidden ? "line-through" : "none",
+                  }}>{label}</span>
+                </button>
+              );
+            })}
           </div>
         </div>
       )}
@@ -196,6 +221,15 @@ function SingleBrandView({ comparisonData }) {
     avgFinal, progressPercent, overlayData, allEditionLabels,
   } = comparisonData;
   const [logScale, setLogScale] = useState(false);
+  // Track which lines are visible (all visible by default, plus projection)
+  const [hiddenLines, setHiddenLines] = useState(new Set());
+  const toggleLine = (label) => {
+    setHiddenLines(prev => {
+      const next = new Set(prev);
+      if (next.has(label)) next.delete(label); else next.add(label);
+      return next;
+    });
+  };
 
   const hasComparisons = comparisons.length > 0;
   const avgDelta = avgAtSamePoint > 0
@@ -344,21 +378,90 @@ function SingleBrandView({ comparisonData }) {
                   label={{ value: "OGGI", fill: colors.status.warning, fontSize: 10, position: "top" }}
                 />
               )}
-              {allEditionLabels.map((label, i) => (
+              {allEditionLabels.map((label, i) => {
+                if (hiddenLines.has(label)) return null;
+                const isCurrent = i === 0;
+                const pastOpacity = Math.max(0.25, 1 - (i * 0.15));
+                return (
+                  <Area
+                    key={label}
+                    type="monotone"
+                    dataKey={label}
+                    stroke={isCurrent ? colors.brand.purple : `rgba(148, 163, 184, ${pastOpacity})`}
+                    fill={isCurrent ? alpha.brand[15] : "transparent"}
+                    strokeWidth={isCurrent ? 3 : 1.5}
+                    strokeDasharray={isCurrent ? "" : "5 5"}
+                    dot={false}
+                    connectNulls
+                  />
+                );
+              })}
+              {/* Projection line */}
+              {!hiddenLines.has('_projection') && overlayData.some(p => p._projection != null) && (
                 <Area
-                  key={label}
                   type="monotone"
-                  dataKey={label}
-                  stroke={i === 0 ? colors.brand.purple : COLORS[i % COLORS.length]}
-                  fill={i === 0 ? alpha.brand[15] : "transparent"}
-                  strokeWidth={i === 0 ? 3 : 1.5}
-                  strokeDasharray={i === 0 ? "" : "5 5"}
+                  dataKey="_projection"
+                  stroke={colors.status.success}
+                  fill="transparent"
+                  strokeWidth={2}
+                  strokeDasharray="6 4"
                   dot={false}
                   connectNulls
+                  name="Proiezione"
                 />
-              ))}
+              )}
             </AreaChart>
           </ResponsiveContainer>
+          {/* Clickable legend */}
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap", justifyContent: "center", marginTop: 8 }}>
+            {allEditionLabels.map((label, i) => {
+              const isCurrent = i === 0;
+              const isHidden = hiddenLines.has(label);
+              const pastOpacity = Math.max(0.25, 1 - (i * 0.15));
+              const lineColor = isCurrent ? colors.brand.purple : `rgba(148, 163, 184, ${pastOpacity})`;
+              return (
+                <button key={label} onClick={() => toggleLine(label)} style={{
+                  display: "flex", alignItems: "center", gap: 4, padding: "2px 8px",
+                  borderRadius: radius.md, border: "none", cursor: "pointer",
+                  background: isHidden ? colors.bg.page : "transparent",
+                  opacity: isHidden ? 0.4 : 1,
+                  transition: "all 0.2s ease",
+                }}>
+                  <span style={{
+                    width: 14, height: isCurrent ? 3 : 2,
+                    background: lineColor, display: "inline-block", borderRadius: 1,
+                    borderBottom: isCurrent ? "none" : `1px dashed ${lineColor}`,
+                  }} />
+                  <span style={{
+                    fontSize: font.size.xs,
+                    color: isHidden ? colors.text.disabled : colors.text.muted,
+                    fontWeight: isCurrent ? font.weight.semibold : font.weight.normal,
+                    textDecoration: isHidden ? "line-through" : "none",
+                  }}>{label}</span>
+                </button>
+              );
+            })}
+            {/* Projection toggle */}
+            {overlayData.some(p => p._projection != null) && (
+              <button onClick={() => toggleLine('_projection')} style={{
+                display: "flex", alignItems: "center", gap: 4, padding: "2px 8px",
+                borderRadius: radius.md, border: "none", cursor: "pointer",
+                background: hiddenLines.has('_projection') ? colors.bg.page : "transparent",
+                opacity: hiddenLines.has('_projection') ? 0.4 : 1,
+                transition: "all 0.2s ease",
+              }}>
+                <span style={{
+                  width: 14, height: 2, display: "inline-block", borderRadius: 1,
+                  borderBottom: `2px dashed ${colors.status.success}`,
+                }} />
+                <span style={{
+                  fontSize: font.size.xs,
+                  color: hiddenLines.has('_projection') ? colors.text.disabled : colors.text.muted,
+                  textDecoration: hiddenLines.has('_projection') ? "line-through" : "none",
+                }}>Proiezione</span>
+              </button>
+            )}
+          </div>
         </div>
       )}
     </div>

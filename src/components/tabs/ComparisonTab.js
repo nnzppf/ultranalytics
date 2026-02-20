@@ -38,6 +38,7 @@ export default function ComparisonTab({ data, filtered, selectedBrand: topSelect
 
   // Cross-brand mode: user explicitly opted to compare against another brand
   const [crossBrandTarget, setCrossBrandTarget] = useState(null);
+  const [crossBrandEdition, setCrossBrandEdition] = useState(null); // specific edition of cross-brand target
   const isCrossBrandMode = !!crossBrandTarget;
 
   // Edition user lists (registered + retarget) — uses effectiveBrand
@@ -84,12 +85,12 @@ export default function ComparisonTab({ data, filtered, selectedBrand: topSelect
     if (!brand) return null;
     // Cross-brand comparison (explicitly selected)
     if (crossBrandTarget) {
-      return computeCrossBrandComparison(baseData, brand, crossBrandTarget);
+      return computeCrossBrandComparison(baseData, brand, crossBrandTarget, crossBrandEdition);
     }
     // Normal single-brand tracker (needs edition selected)
     if (!selectedEdition) return null;
     return computeWhereAreWeNow(baseData, brand, selectedEdition, overrides);
-  }, [baseData, selectedBrand, highlightBrand, view, selectedEdition, crossBrandTarget, overrides]);
+  }, [baseData, selectedBrand, highlightBrand, view, selectedEdition, crossBrandTarget, crossBrandEdition, overrides]);
 
   // Stats of the highlighted brand (for brand-vs-genre comparison)
   const highlightBrandStats = useMemo(() => {
@@ -133,6 +134,7 @@ export default function ComparisonTab({ data, filtered, selectedBrand: topSelect
     setSelectedBrand(brand);
     setSelectedEdition(null);
     setCrossBrandTarget(null);
+    setCrossBrandEdition(null);
     setManualCount('');
     setDailyCounts({});
     const brandInfo = trackerBrands.find(b => b.brand === brand);
@@ -184,6 +186,7 @@ export default function ComparisonTab({ data, filtered, selectedBrand: topSelect
           <button key={t.key} onClick={() => {
             setView(t.key);
             setCrossBrandTarget(null);
+            setCrossBrandEdition(null);
             if (t.key === 'genre') { setSelectedGenre(null); setSelectedBrand(null); setSelectedEdition(null); }
             if (t.key === 'brand') { setSelectedBrand(null); setSelectedEdition(null); }
             if (t.key === 'tracker') { setSelectedBrand(null); setSelectedEdition(null); }
@@ -282,19 +285,48 @@ export default function ComparisonTab({ data, filtered, selectedBrand: topSelect
           })()}
 
           {/* Cross-brand comparison section */}
-          {effectiveBrand && isCrossBrandMode && (
-            <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
-              <span style={{ fontSize: font.size.sm, color: colors.text.muted }}>
-                Confronto: <strong style={{ color: colors.brand.purple }}>{effectiveBrand}</strong> vs <strong style={{ color: colors.brand.pink }}>{crossBrandTarget}</strong>
-              </span>
-              <button onClick={() => setCrossBrandTarget(null)} style={{
-                padding: "3px 10px", borderRadius: radius.md, fontSize: font.size.xs, border: `1px solid ${colors.border.default}`,
-                background: "transparent", color: colors.text.muted, cursor: "pointer",
-              }}>
-                Torna alle edizioni
-              </button>
-            </div>
-          )}
+          {effectiveBrand && isCrossBrandMode && (() => {
+            const targetBrandInfo = trackerBrands.find(b => b.brand === crossBrandTarget);
+            const targetEditions = targetBrandInfo?.editions || [];
+            return (
+              <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 8 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                  <span style={{ fontSize: font.size.sm, color: colors.text.muted }}>
+                    Confronto: <strong style={{ color: colors.brand.purple }}>{effectiveBrand}</strong> vs <strong style={{ color: colors.brand.pink }}>{crossBrandTarget}</strong>
+                    {crossBrandEdition && <span style={{ color: colors.brand.pink }}> ({crossBrandEdition})</span>}
+                  </span>
+                  <button onClick={() => { setCrossBrandTarget(null); setCrossBrandEdition(null); }} style={{
+                    padding: "3px 10px", borderRadius: radius.md, fontSize: font.size.xs, border: `1px solid ${colors.border.default}`,
+                    background: "transparent", color: colors.text.muted, cursor: "pointer",
+                  }}>
+                    Torna alle edizioni
+                  </button>
+                </div>
+                {/* Edition filter for cross-brand target */}
+                {targetEditions.length > 1 && (
+                  <div style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center" }}>
+                    <span style={{ fontSize: font.size.xs, color: colors.text.disabled, marginRight: 4 }}>
+                      Edizione {crossBrandTarget}:
+                    </span>
+                    <button onClick={() => setCrossBrandEdition(null)} style={{
+                      padding: "4px 10px", borderRadius: radius.md, fontSize: font.size.xs, border: "none", cursor: "pointer",
+                      background: !crossBrandEdition ? colors.brand.pink : colors.interactive.inactive,
+                      color: !crossBrandEdition ? colors.text.inverse : colors.interactive.inactiveText,
+                      transition: tr.normal,
+                    }}>Tutte</button>
+                    {targetEditions.map(ed => (
+                      <button key={ed} onClick={() => setCrossBrandEdition(ed)} style={{
+                        padding: "4px 10px", borderRadius: radius.md, fontSize: font.size.xs, border: "none", cursor: "pointer",
+                        background: crossBrandEdition === ed ? colors.brand.pink : colors.interactive.inactive,
+                        color: crossBrandEdition === ed ? colors.text.inverse : colors.interactive.inactiveText,
+                        transition: tr.normal,
+                      }}>{ed}</button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            );
+          })()}
 
           {/* Manual registration override — only for upcoming events */}
           {effectiveBrand && selectedEdition && !isCrossBrandMode && trackerData && !trackerData.isEventPast && (
@@ -468,7 +500,7 @@ export default function ComparisonTab({ data, filtered, selectedBrand: topSelect
                 {allBrandStats
                   .filter(b => b.brand !== effectiveBrand)
                   .map(b => (
-                    <button key={b.brand} onClick={() => setCrossBrandTarget(b.brand)} style={{
+                    <button key={b.brand} onClick={() => { setCrossBrandTarget(b.brand); setCrossBrandEdition(null); }} style={{
                       padding: "6px 14px", borderRadius: radius.lg, fontSize: font.size.xs,
                       border: `1px solid ${colors.border.default}`,
                       cursor: "pointer", background: colors.bg.card,

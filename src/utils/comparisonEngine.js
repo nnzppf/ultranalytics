@@ -115,13 +115,25 @@ export function computeWhereAreWeNow(allData, targetBrand, targetEdition, overri
         currentRegistrations = overrides.days[currentDaysBefore];
         isOverridden = currentRegistrations !== dataRegistrations;
       }
-      // Fill gaps: ensure cumulative is monotonically non-decreasing
-      const allDays = Object.keys(targetCumulative).map(Number).sort((a, b) => b - a);
-      let prev = 0;
-      for (let i = allDays.length - 1; i >= 0; i--) {
-        const d = allDays[i];
-        if (targetCumulative[d] < prev) targetCumulative[d] = prev;
-        prev = targetCumulative[d];
+    }
+
+    // Fill gaps between last file data point and override point(s)
+    // Cumulative curves must be monotonically non-decreasing, so days
+    // without explicit data should carry forward the last known value.
+    const allDays = Object.keys(targetCumulative).map(Number).sort((a, b) => b - a);
+    if (allDays.length > 0) {
+      const maxDay = allDays[0];
+      const minDay = allDays[allDays.length - 1];
+      let carry = 0;
+      for (let d = maxDay; d >= minDay; d--) {
+        if (targetCumulative[d] != null) {
+          // Ensure monotonically non-decreasing
+          if (targetCumulative[d] < carry) targetCumulative[d] = carry;
+          carry = targetCumulative[d];
+        } else {
+          // Fill gap: carry forward last known value
+          targetCumulative[d] = carry;
+        }
       }
     }
   }
@@ -193,9 +205,21 @@ export function computeWhereAreWeNow(allData, targetBrand, targetEdition, overri
   const overlayData = [];
   for (let d = maxDaysAll; d >= 0; d--) {
     const point = { daysBefore: d, label: d === 0 ? 'Evento' : `-${d}` };
-    point[targetEdition] = targetCumulative[d] || null;
+    point[targetEdition] = targetCumulative[d] != null ? targetCumulative[d] : null;
     for (const comp of comparisons) {
-      point[comp.editionLabel] = comp.cumulative[d] || null;
+      point[comp.editionLabel] = comp.cumulative[d] != null ? comp.cumulative[d] : null;
+    }
+    // Add projection line: from currentDaysBefore to event day (day 0)
+    if (!isEventPast && avgProjectedFinal != null && d <= currentDaysBefore) {
+      if (d === currentDaysBefore) {
+        point._projection = currentRegistrations;
+      } else if (d === 0) {
+        point._projection = avgProjectedFinal;
+      } else {
+        // Linear interpolation between current point and projected final
+        const progress = (currentDaysBefore - d) / currentDaysBefore;
+        point._projection = Math.round(currentRegistrations + (avgProjectedFinal - currentRegistrations) * progress);
+      }
     }
     overlayData.push(point);
   }
@@ -230,14 +254,17 @@ export function computeWhereAreWeNow(allData, targetBrand, targetEdition, overri
  * Shows all editions of both brands on the same cumulative chart,
  * with summary stats for each brand.
  */
-export function computeCrossBrandComparison(allData, brandA, brandB) {
+export function computeCrossBrandComparison(allData, brandA, brandB, specificEditionB = null) {
   const dataA = allData.filter(d => d.brand === brandA);
   const dataB = allData.filter(d => d.brand === brandB);
 
   if (!dataA.length || !dataB.length) return null;
 
   const editionsA = [...new Set(dataA.map(d => d.editionLabel))].filter(Boolean);
-  const editionsB = [...new Set(dataB.map(d => d.editionLabel))].filter(Boolean);
+  const allEditionsB = [...new Set(dataB.map(d => d.editionLabel))].filter(Boolean);
+  // If a specific edition is selected, filter to just that one
+  const editionsB = specificEditionB ? allEditionsB.filter(e => e === specificEditionB) : allEditionsB;
+  if (editionsB.length === 0) return null;
 
   // Build edition stats for each brand
   function buildEditionStats(rows, editions, brandName) {
