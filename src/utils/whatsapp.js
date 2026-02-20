@@ -51,6 +51,8 @@ export function applyTemplate(template, replacements) {
 /**
  * Retarget message templates — for inviting past attendees to upcoming editions.
  */
+const OPT_OUT = `Invia STOP per non ricevere più messaggi promozionali.`;
+
 export const RETARGET_TEMPLATES = [
   {
     id: 'invito_standard',
@@ -66,7 +68,8 @@ Registrati qui: {link}
 
 Ti aspettiamo!
 
-— Studios Club & Co`,
+— Studios Club & Co
+${OPT_OUT}`,
   },
   {
     id: 'invito_esclusivo',
@@ -82,7 +85,8 @@ Registrati qui: {link}
 
 Scrivici per confermare la tua presenza!
 
-— Studios Club & Co`,
+— Studios Club & Co
+${OPT_OUT}`,
   },
   {
     id: 'invito_breve',
@@ -94,7 +98,8 @@ Registrati qui: {link}
 
 Ti aspettiamo!
 
-— Studios Club & Co`,
+— Studios Club & Co
+${OPT_OUT}`,
   },
 ];
 

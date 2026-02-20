@@ -7,6 +7,8 @@ import { colors, alpha, shadows } from '../../config/designTokens';
 import { BRAND_REGISTRY, GENRE_LABELS, CATEGORY_LABELS } from '../../config/eventConfig';
 
 // {nome} placeholder gets replaced with user's first name
+const OPT_OUT = `Invia STOP per non ricevere più messaggi promozionali.`;
+
 const MESSAGE_TEMPLATES = [
   {
     id: 'auguri_promo',
@@ -20,7 +22,8 @@ Per festeggiare insieme abbiamo una promozione esclusiva per te: prenota un tavo
 
 Scrivici per prenotare, ti aspettiamo! 🎉
 
-— Studios Club & Co`,
+— Studios Club & Co
+${OPT_OUT}`,
   },
   {
     id: 'auguri_semplice',
@@ -32,7 +35,8 @@ Tanti auguri di buon compleanno da parte di tutto lo staff! 🥳🎉
 
 Ti aspettiamo presto per festeggiare insieme!
 
-— Studios Club & Co`,
+— Studios Club & Co
+${OPT_OUT}`,
   },
   {
     id: 'auguri_tavolo',
@@ -46,7 +50,8 @@ Per il tuo giorno speciale ti riserviamo un trattamento VIP: prenota un tavolo p
 
 Scrivici per prenotare il tuo tavolo birthday! 🎉
 
-— Studios Club & Co`,
+— Studios Club & Co
+${OPT_OUT}`,
   },
   {
     id: 'auguri_lista',
@@ -60,7 +65,8 @@ Per festeggiare ti offriamo l'ingresso omaggio + un drink di benvenuto al prossi
 
 Scrivici il tuo nome per la lista birthday!
 
-— Studios Club & Co`,
+— Studios Club & Co
+${OPT_OUT}`,
   },
 ];
 

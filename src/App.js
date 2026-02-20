@@ -29,6 +29,36 @@ function eventNameFromFile(filename) {
   return filename.replace(/\.(csv|xlsx|xls|tsv)$/i, "").replace(/registrazioni[_\s]*/i, "").replace(/_/g, " ").trim();
 }
 
+/**
+ * Apply event config (renames, edition renames, exclusions, overrides) to data records.
+ */
+function applyEventConfig(records, config) {
+  return records.map(d => {
+    let brand = d.brand;
+    let editionLabel = d.editionLabel;
+    // Apply brand renames
+    if (config.renames?.[brand]) {
+      brand = config.renames[brand];
+    }
+    // Apply edition renames (check both original and renamed brand)
+    if (config.editionRenames?.[d.brand]?.[editionLabel]) {
+      editionLabel = config.editionRenames[d.brand][editionLabel];
+    } else if (config.editionRenames?.[brand]?.[editionLabel]) {
+      editionLabel = config.editionRenames[brand][editionLabel];
+    }
+    // Apply custom config (category, genres, venue)
+    const brandConfig = config.brands?.[d.brand] || config.brands?.[brand];
+    return {
+      ...d,
+      brand,
+      editionLabel,
+      category: brandConfig?.category || d.category,
+      genres: brandConfig?.genres?.length ? brandConfig.genres : d.genres,
+      location: brandConfig?.venue || d.location,
+    };
+  }).filter(d => !config.excludedBrands?.includes(d.brand));
+}
+
 export default function ClubAnalytics() {
   const { isAuthenticated, loading: authLoading, user, logout } = useAuth();
 
@@ -89,14 +119,19 @@ function AuthenticatedApp({ user, logout }) {
   useEffect(() => {
     async function checkCloud() {
       try {
-        // Load event config in parallel
-        loadEventConfig().then(cfg => { if (cfg) setEventConfig(cfg); }).catch(() => {});
+        // Load event config and data in parallel
+        const [cfg, hasData] = await Promise.all([
+          loadEventConfig().catch(() => null),
+          hasStoredData(),
+        ]);
+        if (cfg) setEventConfig(cfg);
 
-        const hasData = await hasStoredData();
         if (hasData) {
           const { records, utenti, datasets } = await loadAllData();
           if (records.length > 0 || utenti.length > 0) {
-            setData(records);
+            // Apply event config to loaded data (renames, exclusions, etc.)
+            const finalRecords = cfg ? applyEventConfig(records, cfg) : records;
+            setData(finalRecords);
             setUtentiData(utenti);
             setSavedDatasets(datasets);
             setCloudStatus("saved");
@@ -233,31 +268,7 @@ function AuthenticatedApp({ user, logout }) {
     const success = await saveEventConfig(config);
     if (success) {
       setEventConfig(config);
-      // Apply renames, edition renames, and exclusions to current data in-memory
-      setData(prev => prev.map(d => {
-        let brand = d.brand;
-        let editionLabel = d.editionLabel;
-        // Apply brand renames
-        if (config.renames?.[brand]) {
-          brand = config.renames[brand];
-        }
-        // Apply edition renames
-        if (config.editionRenames?.[d.brand]?.[editionLabel]) {
-          editionLabel = config.editionRenames[d.brand][editionLabel];
-        } else if (config.editionRenames?.[brand]?.[editionLabel]) {
-          editionLabel = config.editionRenames[brand][editionLabel];
-        }
-        // Apply custom config (category, genres, venue)
-        const brandConfig = config.brands?.[d.brand] || config.brands?.[brand];
-        return {
-          ...d,
-          brand,
-          editionLabel,
-          category: brandConfig?.category || d.category,
-          genres: brandConfig?.genres?.length ? brandConfig.genres : d.genres,
-          location: brandConfig?.venue || d.location,
-        };
-      }).filter(d => !config.excludedBrands?.includes(d.brand)));
+      setData(prev => applyEventConfig(prev, config));
     }
   }, []);
 
