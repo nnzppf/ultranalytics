@@ -850,7 +850,20 @@ function SingleBrandView({ comparisonData }) {
                 );
               })}
               <span style={{ width: 1, height: 16, background: colors.border.default, margin: "0 2px" }} />
-              <button onClick={() => setShowAvgCurves(v => !v)} style={{
+              <button onClick={() => {
+                setShowAvgCurves(v => {
+                  const next = !v;
+                  if (next) {
+                    // When enabling averages, hide individual past editions (keep current + projection)
+                    const pastLabels = sortedEditionLabels.slice(1);
+                    setHiddenLines(new Set(pastLabels));
+                  } else {
+                    // When disabling averages, restore all lines
+                    setHiddenLines(new Set());
+                  }
+                  return next;
+                });
+              }} style={{
                 padding: "3px 10px", borderRadius: radius.md, fontSize: font.size.xs, fontWeight: font.weight.medium,
                 border: `1px solid ${showAvgCurves ? '#f59e0b' : colors.border.default}`,
                 background: showAvgCurves ? 'rgba(245,158,11,0.15)' : "transparent",

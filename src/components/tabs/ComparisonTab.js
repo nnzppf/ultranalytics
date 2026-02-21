@@ -147,6 +147,13 @@ export default function ComparisonTab({ data, filtered, selectedBrand: topSelect
   };
 
   const handleSelectBrand = (brand) => {
+    // If a brand is already selected and we pick a different one, open cross-brand comparison
+    if (effectiveBrand && brand !== effectiveBrand) {
+      setCrossBrandTarget(brand);
+      setCrossBrandEdition(null);
+      setView('tracker');
+      return;
+    }
     setSelectedBrand(brand);
     setLocalSelectedEdition(null);
     setCrossBrandTarget(null);
