@@ -17,6 +17,8 @@ function CrossBrandView({ comparisonData }) {
   const [logScale, setLogScale] = useState(false);
   const [compressed, setCompressed] = useState(true);
   const [hiddenLines, setHiddenLines] = useState(new Set());
+  const [excludedYears, setExcludedYears] = useState(new Set());
+  const [showAvgCurves, setShowAvgCurves] = useState(false);
   const toggleLine = (label) => {
     setHiddenLines(prev => {
       const next = new Set(prev);
@@ -25,24 +27,82 @@ function CrossBrandView({ comparisonData }) {
     });
   };
 
-  // Compressed overlay for cross-brand chart
+  // Available years from all editions
+  const availableYears = useMemo(() => {
+    const years = new Set();
+    for (const s of allStats) {
+      if (s.eventDate) years.add(s.eventDate.getFullYear());
+    }
+    return [...years].sort();
+  }, [allStats]);
+
+  // Yearly average curves per brand
+  const yearAvgCurves = useMemo(() => {
+    const result = {}; // { "BrandA 2024": {daysBefore: cumVal, ...}, ... }
+    for (const brand of [brandA, brandB]) {
+      const stats = brand === brandA ? statsA : statsB;
+      const byYear = {};
+      for (const s of stats) {
+        if (!s.eventDate) continue;
+        const year = s.eventDate.getFullYear();
+        if (excludedYears.has(year)) continue;
+        if (!byYear[year]) byYear[year] = [];
+        byYear[year].push(s.cumulative);
+      }
+      for (const [year, curves] of Object.entries(byYear)) {
+        if (curves.length < 1) continue;
+        const allDays = new Set();
+        for (const c of curves) for (const d of Object.keys(c)) allDays.add(Number(d));
+        const avgCurve = {};
+        for (const d of allDays) {
+          const vals = curves.map(c => c[d]).filter(v => v != null);
+          if (vals.length > 0) avgCurve[d] = Math.round(vals.reduce((s, v) => s + v, 0) / vals.length);
+        }
+        result[`${brand} media ${year}`] = { curve: avgCurve, brand, year: Number(year) };
+      }
+    }
+    return result;
+  }, [statsA, statsB, brandA, brandB, excludedYears]);
+
+  const yearAvgKeys = useMemo(() => Object.keys(yearAvgCurves).sort(), [yearAvgCurves]);
+
+  // Filter editions by excluded years
+  const filteredEditionLabels = useMemo(() => {
+    if (excludedYears.size === 0) return allEditionLabels;
+    return allEditionLabels.filter(label => {
+      const stat = allStats.find(s => s.displayLabel === label);
+      return !(stat?.eventDate && excludedYears.has(stat.eventDate.getFullYear()));
+    });
+  }, [allEditionLabels, allStats, excludedYears]);
+
+  // Compressed overlay for cross-brand chart + yearly avg curves injection
   const chartData = useMemo(() => {
-    if (!compressed || !overlayData || overlayData.length === 0) return overlayData;
+    if (!overlayData || overlayData.length === 0) return overlayData;
+    // Add yearly avg data points
+    let enriched = overlayData.map(pt => {
+      const enrichedPt = { ...pt };
+      for (const [key, { curve }] of Object.entries(yearAvgCurves)) {
+        const val = curve[pt.daysBefore];
+        enrichedPt[key] = val != null ? val : null;
+      }
+      return enrichedPt;
+    });
+    if (!compressed) return enriched;
     const keep = new Set([0]);
-    for (let i = 0; i < overlayData.length; i++) {
-      const pt = overlayData[i];
-      for (const k of allEditionLabels) {
+    for (let i = 0; i < enriched.length; i++) {
+      const pt = enriched[i];
+      for (const k of [...filteredEditionLabels, ...yearAvgKeys]) {
         if (pt[k] != null) {
           let prevVal = null;
           for (let j = i - 1; j >= 0; j--) {
-            if (overlayData[j][k] != null) { prevVal = overlayData[j][k]; break; }
+            if (enriched[j][k] != null) { prevVal = enriched[j][k]; break; }
           }
           if (prevVal === null || pt[k] !== prevVal) keep.add(pt.daysBefore);
         }
       }
     }
-    return overlayData.filter(pt => keep.has(pt.daysBefore));
-  }, [overlayData, compressed, allEditionLabels]);
+    return enriched.filter(pt => keep.has(pt.daysBefore));
+  }, [overlayData, compressed, filteredEditionLabels, yearAvgCurves, yearAvgKeys]);
 
   const deltaReg = aggA.avgPerEdition - aggB.avgPerEdition;
   const deltaConv = parseFloat((aggA.avgConversion - aggB.avgConversion).toFixed(1));
@@ -189,13 +249,75 @@ function CrossBrandView({ comparisonData }) {
         statsA.forEach((s) => { editionColorMap[s.displayLabel] = colors.chart[colorIdx % colors.chart.length]; colorIdx++; });
         statsB.forEach((s) => { editionColorMap[s.displayLabel] = colors.chart[colorIdx % colors.chart.length]; colorIdx++; });
 
+        // Map edition → year for filtering
+        const editionToYear = {};
+        for (const s of allStats) {
+          if (s.eventDate) editionToYear[s.displayLabel] = s.eventDate.getFullYear();
+        }
+
+        // Avg curve colors: brand color with year-based variation
+        const avgColorMap = {};
+        for (const [key, { brand }] of Object.entries(yearAvgCurves)) {
+          avgColorMap[key] = brand === brandA ? '#f59e0b' : '#3b82f6';
+        }
+
         return (
           <div>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10, flexWrap: "wrap", gap: 8 }}>
               <div style={presets.sectionLabel}>
                 Curve cumulative registrazioni
               </div>
-              <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+              <div style={{ display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap" }}>
+                {availableYears.length > 1 && (
+                  <div style={{ display: "flex", gap: 4 }}>
+                    {availableYears.map(year => {
+                      const isExcluded = excludedYears.has(year);
+                      return (
+                        <button key={year} onClick={() => {
+                          setExcludedYears(prev => {
+                            const next = new Set(prev);
+                            if (next.has(year)) next.delete(year); else next.add(year);
+                            return next;
+                          });
+                        }} style={{
+                          padding: "2px 8px", borderRadius: radius.md, fontSize: font.size.xs,
+                          border: `1px solid ${isExcluded ? colors.border.default : colors.brand.purple}`,
+                          background: isExcluded ? "transparent" : alpha.brand[15],
+                          color: isExcluded ? colors.text.disabled : colors.brand.purple,
+                          cursor: "pointer", fontWeight: font.weight.medium, transition: "all 0.15s ease",
+                          textDecoration: isExcluded ? "line-through" : "none",
+                        }}>{year}</button>
+                      );
+                    })}
+                  </div>
+                )}
+                {availableYears.length > 1 && (
+                  <button onClick={() => {
+                    setShowAvgCurves(v => {
+                      const next = !v;
+                      if (next) {
+                        // Auto-hide individual past editions
+                        const pastLabels = allEditionLabels.filter(label => {
+                          const stat = allStats.find(s => s.displayLabel === label);
+                          const isBrandA = stat?.brand === brandA;
+                          const group = isBrandA ? statsA : statsB;
+                          return group[group.length - 1]?.displayLabel !== label;
+                        });
+                        setHiddenLines(new Set(pastLabels));
+                      } else {
+                        setHiddenLines(new Set());
+                      }
+                      return next;
+                    });
+                  }} style={{
+                    display: "flex", alignItems: "center", gap: 4,
+                    padding: "3px 10px", borderRadius: radius.md, fontSize: font.size.xs,
+                    border: `1px solid ${showAvgCurves ? '#f59e0b' : colors.border.default}`,
+                    background: showAvgCurves ? 'rgba(245,158,11,0.15)' : "transparent",
+                    color: showAvgCurves ? '#f59e0b' : colors.text.muted,
+                    cursor: "pointer", fontWeight: font.weight.medium,
+                  }}>Medie per anno</button>
+                )}
                 <button onClick={() => setCompressed(v => !v)} style={{
                   display: "flex", alignItems: "center", gap: 4,
                   padding: "3px 10px", borderRadius: radius.md, fontSize: font.size.xs,
@@ -215,8 +337,9 @@ function CrossBrandView({ comparisonData }) {
                 <XAxis dataKey="label" tick={{ fill: colors.text.disabled, fontSize: 10 }} axisLine={{ stroke: colors.border.subtle }} tickLine={false} />
                 <YAxis scale={logScale ? "log" : "auto"} domain={logScale ? ["auto", "auto"] : [0, "auto"]} allowDataOverflow={logScale} tick={{ fill: colors.text.disabled, fontSize: 10 }} axisLine={false} tickLine={false} />
                 <Tooltip {...TOOLTIP_STYLE} />
-                {allEditionLabels.map((label) => {
+                {filteredEditionLabels.map((label) => {
                   if (hiddenLines.has(label)) return null;
+                  if (editionToYear[label] && excludedYears.has(editionToYear[label])) return null;
                   const stat = allStats.find(s => s.displayLabel === label);
                   const isBrandA = stat?.brand === brandA;
                   const group = isBrandA ? statsA : statsB;
@@ -236,6 +359,23 @@ function CrossBrandView({ comparisonData }) {
                     />
                   );
                 })}
+                {/* Yearly average curves */}
+                {showAvgCurves && yearAvgKeys.map(key => {
+                  const avgColor = avgColorMap[key];
+                  return (
+                    <Area
+                      key={key}
+                      type="monotone"
+                      dataKey={key}
+                      stroke={avgColor}
+                      fill="transparent"
+                      strokeWidth={2.5}
+                      dot={false}
+                      connectNulls
+                      name={key}
+                    />
+                  );
+                })}
               </AreaChart>
             </ResponsiveContainer>
             {/* Legend grouped by brand */}
@@ -247,6 +387,7 @@ function CrossBrandView({ comparisonData }) {
                     {brand}
                   </span>
                   {stats.map((st) => {
+                    if (editionToYear[st.displayLabel] && excludedYears.has(editionToYear[st.displayLabel])) return null;
                     const isHidden = hiddenLines.has(st.displayLabel);
                     const edColor = editionColorMap[st.displayLabel];
                     const isLatest = stats[stats.length - 1]?.displayLabel === st.displayLabel;
@@ -269,9 +410,28 @@ function CrossBrandView({ comparisonData }) {
                       </button>
                     );
                   })}
+                  {/* Avg curve legend entries for this brand */}
+                  {showAvgCurves && yearAvgKeys.filter(k => yearAvgCurves[k].brand === brand).map(key => (
+                    <span key={key} style={{ display: "flex", alignItems: "center", gap: 6, padding: "1px 4px" }}>
+                      <span style={{ width: 16, height: 3, flexShrink: 0, background: avgColorMap[key], display: "inline-block", borderRadius: 1 }} />
+                      <span style={{ fontSize: 10, color: avgColorMap[key], fontWeight: font.weight.semibold }}>{key.replace(brand + ' ', '')}</span>
+                    </span>
+                  ))}
                 </div>
               ))}
             </div>
+            {/* Reset button */}
+            {(hiddenLines.size > 0 || excludedYears.size > 0) && (
+              <div style={{ display: "flex", justifyContent: "center", marginTop: 8 }}>
+                <button onClick={() => { setHiddenLines(new Set()); setExcludedYears(new Set()); setShowAvgCurves(false); }} style={{
+                  display: "flex", alignItems: "center", gap: 4, padding: "2px 10px",
+                  borderRadius: radius.md, border: `1px solid ${colors.border.default}`,
+                  cursor: "pointer", background: "transparent", transition: "all 0.15s ease",
+                }}>
+                  <span style={{ fontSize: font.size.xs, color: colors.text.muted }}>Reset</span>
+                </button>
+              </div>
+            )}
           </div>
         );
       })()}
