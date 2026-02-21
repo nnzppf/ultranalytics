@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, AreaChart, Area } from 'recharts';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, AreaChart, Area, LineChart, Line } from 'recharts';
 import { TrendingUp } from 'lucide-react';
 import Section from '../shared/Section';
 import ResizeHandle from '../shared/ResizeHandle';
@@ -54,6 +54,21 @@ export default function OverviewTab({ analytics, filtered, selectedBrand, graphH
     }));
   }, [eventStats]);
 
+  // Trend data: total registrations per edition, chronological
+  const editionTrendData = useMemo(() => {
+    if (!eventStats || !eventStats.length) return [];
+    return eventStats
+      .filter(ev => ev.eventDate)
+      .sort((a, b) => a.eventDate - b.eventDate)
+      .map(ev => ({
+        label: ev.editionLabel || ev.brand,
+        registrazioni: ev.registrations,
+        presenze: ev.entries,
+        conv: ev.registrations > 0 ? parseFloat(((ev.entries / ev.registrations) * 100).toFixed(1)) : 0,
+        date: ev.eventDate,
+      }));
+  }, [eventStats]);
+
   // Recalculate hourly data when granularity changes
   const groupKey = selectedBrand !== "all" ? 'editionLabel' : 'brand';
 
@@ -89,19 +104,19 @@ export default function OverviewTab({ analytics, filtered, selectedBrand, graphH
           title="Andamento registrazioni per anno"
           extra={
             <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
-              {['curve', 'barre'].map(v => (
-                <button key={v} onClick={() => setYearlyView(v)} style={{
+              {[{ key: 'curve', label: 'Curve' }, { key: 'barre', label: 'Barre' }, { key: 'trend', label: 'Trend' }].map(v => (
+                <button key={v.key} onClick={() => setYearlyView(v.key)} style={{
                   padding: "3px 10px", borderRadius: radius.md, fontSize: font.size.xs, border: "none", cursor: "pointer",
-                  background: yearlyView === v ? colors.interactive.active : colors.interactive.inactive,
-                  color: yearlyView === v ? colors.interactive.activeText : colors.interactive.inactiveText,
+                  background: yearlyView === v.key ? colors.interactive.active : colors.interactive.inactive,
+                  color: yearlyView === v.key ? colors.interactive.activeText : colors.interactive.inactiveText,
                   transition: tr.normal, fontWeight: font.weight.medium,
-                }}>{v === 'curve' ? 'Curve' : 'Barre'}</button>
+                }}>{v.label}</button>
               ))}
               {yearlyView === 'curve' && <ScaleToggle isLog={logScaleYearly} onToggle={setLogScaleYearly} />}
             </div>
           }
         >
-          {yearlyView === 'curve' ? (
+          {yearlyView === 'curve' && (
             <>
               <div style={{ fontSize: font.size.xs, color: colors.text.muted, marginBottom: 8 }}>
                 Media registrazioni cumulative per edizione, raggruppate per anno
@@ -160,7 +175,8 @@ export default function OverviewTab({ analytics, filtered, selectedBrand, graphH
                 })}
               </div>
             </>
-          ) : (
+          )}
+          {yearlyView === 'barre' && (
             <>
               <div style={{ fontSize: font.size.xs, color: colors.text.muted, marginBottom: 8 }}>
                 Media registrazioni e presenze per edizione · tra parentesi il numero di edizioni
@@ -186,6 +202,26 @@ export default function OverviewTab({ analytics, filtered, selectedBrand, graphH
                   </span>
                 ))}
               </div>
+            </>
+          )}
+          {yearlyView === 'trend' && (
+            <>
+              <div style={{ fontSize: font.size.xs, color: colors.text.muted, marginBottom: 8 }}>
+                Registrazioni totali per edizione in ordine cronologico
+              </div>
+              <ResponsiveContainer width="100%" height={graphHeights.yearlyAvg || 260}>
+                <LineChart data={editionTrendData}>
+                  <CartesianGrid strokeDasharray="3 3" stroke={colors.border.default} />
+                  <XAxis dataKey="label" tick={{ fill: colors.text.muted, fontSize: 9 }} angle={-30} textAnchor="end" height={60} interval={0} />
+                  <YAxis tick={{ fill: colors.text.muted, fontSize: 10 }} />
+                  <Tooltip {...TOOLTIP_STYLE} formatter={(value, name) => {
+                    if (name === 'conv') return [`${value}%`, 'Conversione'];
+                    return [value, name === 'registrazioni' ? 'Registrazioni' : 'Presenze'];
+                  }} />
+                  <Line type="monotone" dataKey="registrazioni" stroke={colors.brand.purple} strokeWidth={2.5} dot={{ r: 4, fill: colors.brand.purple }} name="registrazioni" />
+                  <Line type="monotone" dataKey="presenze" stroke={colors.status.success} strokeWidth={2} dot={{ r: 3, fill: colors.status.success }} name="presenze" />
+                </LineChart>
+              </ResponsiveContainer>
             </>
           )}
           <ResizeHandle chartKey="yearlyAvg" graphHeights={graphHeights} setGraphHeights={setGraphHeights} />
