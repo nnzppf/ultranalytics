@@ -624,10 +624,10 @@ function SingleBrandView({ comparisonData }) {
   }, [comparisons, excludedYears, hiddenLines]);
 
   // Recompute averages and projections from filtered comparisons
-  // When showAvgCurves is ON and filteredComparisons is empty, use yearly avg curves
+  // When showAvgCurves is ON, always use yearly avg curves for KPIs and projection
   const filtered = useMemo(() => {
-    // --- Fallback: use yearly avg curves when "Medie per anno" hides all editions ---
-    if (showAvgCurves && filteredComparisons.length === 0 && yearAvgKeys.length > 0 && !isEventPast) {
+    // --- Use yearly avg curves when "Medie per anno" is active ---
+    if (showAvgCurves && yearAvgKeys.length > 0) {
       // Compute grand avg curve across all yearly avg curves
       const allDays = new Set();
       for (const year of yearAvgKeys) {
@@ -641,9 +641,9 @@ function SingleBrandView({ comparisonData }) {
 
       // avgAtSamePoint: interpolate grand avg at currentDaysBefore
       const db = currentDaysBefore;
-      let fAvgAtSamePoint = grandAvg[db] || 0;
+      let fAvgAtSamePoint = grandAvg[db] != null ? grandAvg[db] : 0;
       // Try interpolation if exact day not available
-      if (!fAvgAtSamePoint && db > 0) {
+      if (!fAvgAtSamePoint) {
         const days = Object.keys(grandAvg).map(Number).sort((a, b) => a - b);
         const lower = days.filter(d => d <= db).pop();
         const upper = days.filter(d => d >= db).shift();
@@ -652,6 +652,8 @@ function SingleBrandView({ comparisonData }) {
           fAvgAtSamePoint = Math.round(grandAvg[lower] + ratio * (grandAvg[upper] - grandAvg[lower]));
         } else if (lower != null) {
           fAvgAtSamePoint = grandAvg[lower];
+        } else if (upper != null) {
+          fAvgAtSamePoint = grandAvg[upper];
         }
       }
 
