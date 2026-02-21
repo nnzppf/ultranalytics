@@ -396,7 +396,7 @@ export function getYearlyAvgCurves(data, maxDays = 30) {
 
   // 3. Group editions by year
   const byYear = {};
-  for (const [label, { year, cumulative }] of Object.entries(editionCurves)) {
+  for (const [, { year, cumulative }] of Object.entries(editionCurves)) {
     if (!byYear[year]) byYear[year] = [];
     byYear[year].push(cumulative);
   }
