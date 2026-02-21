@@ -13,6 +13,7 @@ export default function OverviewTab({ analytics, filtered, selectedBrand, graphH
   const [timeGranularity, setTimeGranularity] = useState('hourly');
   const [stackedView, setStackedView] = useState(false);
   const [logScale, setLogScale] = useState(false);
+  const [logScaleYearly, setLogScaleYearly] = useState(false);
   const [hiddenYears, setHiddenYears] = useState(new Set());
 
   const { dowData, daysBeforeData, multiEvent } = analytics;
@@ -62,15 +63,22 @@ export default function OverviewTab({ analytics, filtered, selectedBrand, graphH
     <div className="bento-grid" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, alignItems: "start" }}>
       {/* Andamento registrazioni per anno — full width */}
       {yearlyAvg.years.length > 0 && (
-        <FadeIn style={{ gridColumn: "1 / -1" }}><Section title="Andamento registrazioni per anno">
+        <FadeIn style={{ gridColumn: "1 / -1" }}><Section
+          title="Andamento registrazioni per anno"
+          extra={<ScaleToggle isLog={logScaleYearly} onToggle={setLogScaleYearly} />}
+        >
           <div style={{ fontSize: font.size.xs, color: colors.text.muted, marginBottom: 8 }}>
             Media registrazioni cumulative per edizione, raggruppate per anno
           </div>
           <ResponsiveContainer width="100%" height={graphHeights.yearlyAvg || 260}>
-            <AreaChart data={yearlyAvg.data}>
+            <AreaChart data={logScaleYearly ? yearlyAvg.data.map(d => {
+              const pt = { ...d };
+              for (const y of yearlyAvg.years) { if (pt[y] === 0) pt[y] = null; }
+              return pt;
+            }) : yearlyAvg.data}>
               <CartesianGrid strokeDasharray="3 3" stroke={colors.border.default} />
               <XAxis dataKey="day" tick={{ fill: colors.text.muted, fontSize: 10 }} />
-              <YAxis tick={{ fill: colors.text.muted, fontSize: 10 }} />
+              <YAxis scale={logScaleYearly ? "log" : "auto"} domain={logScaleYearly ? [1, "auto"] : [0, "auto"]} allowDataOverflow={logScaleYearly} tick={{ fill: colors.text.muted, fontSize: 10 }} />
               <Tooltip {...TOOLTIP_STYLE} />
               {yearlyAvg.years.map((year, i) => {
                 if (hiddenYears.has(year)) return null;
