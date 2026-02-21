@@ -859,6 +859,17 @@ function SingleBrandView({ comparisonData }) {
                 }}>Proiezione</span>
               </button>
             )}
+            {/* Reset button — only show when some lines are manually hidden */}
+            {hiddenLines.size > 0 && (
+              <button onClick={() => setHiddenLines(new Set())} style={{
+                display: "flex", alignItems: "center", gap: 4, padding: "2px 8px",
+                borderRadius: radius.md, border: `1px solid ${colors.border.default}`,
+                cursor: "pointer", background: "transparent",
+                transition: "all 0.15s ease",
+              }}>
+                <span style={{ fontSize: font.size.xs, color: colors.text.muted }}>Reset</span>
+              </button>
+            )}
           </div>
         </div>
         );
