@@ -320,6 +320,7 @@ export default function ComparisonTab({ data, filtered, selectedBrand: topSelect
                   </span>
                   {allBrandStats
                     .filter(b => b.brand !== effectiveBrand)
+                    .sort((a, b) => a.brand.localeCompare(b.brand))
                     .map(b => (
                       <button key={b.brand} onClick={() => { setCrossBrandTarget(b.brand); setCrossBrandEdition(null); }} style={{
                         padding: "4px 10px", borderRadius: radius.md, fontSize: font.size.xs,
@@ -345,7 +346,7 @@ export default function ComparisonTab({ data, filtered, selectedBrand: topSelect
                     value={null}
                     onChange={(brand) => { setCrossBrandTarget(brand); setCrossBrandEdition(null); }}
                     placeholder="Seleziona brand..."
-                    options={allBrandStats.filter(b => b.brand !== effectiveBrand).map(b => ({ value: b.brand, label: b.brand }))}
+                    options={allBrandStats.filter(b => b.brand !== effectiveBrand).sort((a, b) => a.brand.localeCompare(b.brand)).map(b => ({ value: b.brand, label: b.brand }))}
                   />
                 </div>
               </div>

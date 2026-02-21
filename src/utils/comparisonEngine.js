@@ -179,15 +179,20 @@ export function computeWhereAreWeNow(allData, targetBrand, targetEdition, overri
     const totalAttended = edRows.filter(r => r.attended).length;
     const atSamePoint = cumulative[currentDaysBefore] || 0;
 
-    // Time-adjusted comparison: interpolate between previous day and current day
-    // to estimate what past editions had at this exact time of day.
-    // cumulative[currentDaysBefore+1] = end of previous day (= start of current day)
-    // cumulative[currentDaysBefore] = end of current day
-    // At dayFraction through the day, estimated = prevDay + (currentDay - prevDay) * dayFraction
-    const prevDayValue = cumulative[currentDaysBefore + 1] || 0;
-    const atSamePointAdjusted = isEventPast
-      ? atSamePoint
-      : Math.round(prevDayValue + (atSamePoint - prevDayValue) * dayFraction);
+    // Precise time-adjusted comparison: count actual registrations that arrived
+    // by the same hour:minute relative to the edition's own event date.
+    let atSamePointAdjusted;
+    if (isEventPast) {
+      atSamePointAdjusted = atSamePoint;
+    } else if (edEventDate) {
+      const edEventMidnight = new Date(edEventDate.getFullYear(), edEventDate.getMonth(), edEventDate.getDate());
+      const cutoff = new Date(edEventMidnight);
+      cutoff.setDate(cutoff.getDate() - currentDaysBefore);
+      cutoff.setHours(now.getHours(), now.getMinutes(), 59, 999);
+      atSamePointAdjusted = edRows.filter(r => r.purchaseDate && r.purchaseDate <= cutoff).length;
+    } else {
+      atSamePointAdjusted = atSamePoint;
+    }
 
     const delta = currentRegistrations - atSamePointAdjusted;
     const deltaPercent = atSamePointAdjusted > 0
@@ -197,9 +202,9 @@ export function computeWhereAreWeNow(allData, targetBrand, targetEdition, overri
       ? Math.round((currentRegistrations / atSamePointAdjusted) * totalFinal)
       : null;
 
-    // What % of final registrations this edition had at the same point
+    // What % of final registrations this edition had at the same point (time-adjusted)
     const completionPercent = totalFinal > 0
-      ? parseFloat(((atSamePoint / totalFinal) * 100).toFixed(1))
+      ? parseFloat(((atSamePointAdjusted / totalFinal) * 100).toFixed(1))
       : 0;
 
     comparisons.push({
