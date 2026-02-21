@@ -664,10 +664,10 @@ function BrandRow({
                             editionNames: { ...prev.editionNames, [original]: e.target.value },
                           }))}
                           style={{
-                            width: 120, padding: "4px 8px", borderRadius: radius.md,
+                            minWidth: 200, padding: "6px 10px", borderRadius: radius.md,
                             background: colors.bg.input,
                             border: `1px solid ${display !== original ? colors.brand.purple : colors.border.default}`,
-                            color: colors.text.primary, fontSize: font.size.xs, outline: "none",
+                            color: colors.text.primary, fontSize: font.size.sm, outline: "none",
                             fontFamily: "inherit",
                           }}
                         />

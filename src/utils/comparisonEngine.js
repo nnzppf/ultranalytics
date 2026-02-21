@@ -539,12 +539,23 @@ export function getBrandsForTracker(allData) {
   const brandEditions = {};
   for (const d of allData) {
     if (!d.brand) continue;
-    if (!brandEditions[d.brand]) brandEditions[d.brand] = new Set();
-    brandEditions[d.brand].add(d.editionLabel);
+    if (!brandEditions[d.brand]) brandEditions[d.brand] = {};
+    if (!brandEditions[d.brand][d.editionLabel]) {
+      brandEditions[d.brand][d.editionLabel] = d.eventDate || null;
+    }
+    // Keep the most reliable eventDate (non-null wins)
+    if (d.eventDate && !brandEditions[d.brand][d.editionLabel]) {
+      brandEditions[d.brand][d.editionLabel] = d.eventDate;
+    }
   }
   return Object.entries(brandEditions)
-    .filter(([_, eds]) => eds.size >= 1)
-    .map(([brand, eds]) => ({ brand, editions: [...eds] }));
+    .filter(([_, eds]) => Object.keys(eds).length >= 1)
+    .map(([brand, eds]) => ({
+      brand,
+      editions: Object.entries(eds)
+        .sort((a, b) => (a[1] || 0) - (b[1] || 0))
+        .map(([label]) => label),
+    }));
 }
 
 /**

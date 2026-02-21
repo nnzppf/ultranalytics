@@ -334,7 +334,7 @@ function SingleBrandView({ comparisonData }) {
   }, [overlayData, compressed, allEditionLabels, currentDaysBefore]);
 
   const hasComparisons = comparisons.length > 0;
-  const { sorted: sortedComparisons, sortKey: cSortKey, sortDir: cSortDir, toggleSort: cToggleSort } = useSortable(comparisons, 'atSamePoint', 'desc');
+  const { sorted: sortedComparisons, sortKey: cSortKey, sortDir: cSortDir, toggleSort: cToggleSort } = useSortable(comparisons, 'eventDate', 'asc');
   const avgDelta = avgAtSamePoint > 0
     ? parseFloat((((currentRegistrations - avgAtSamePoint) / avgAtSamePoint) * 100).toFixed(1))
     : null;
