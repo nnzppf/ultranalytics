@@ -356,3 +356,65 @@ export function getEventStats(data) {
       : 0,
   })).sort((a, b) => b.registrations - a.registrations);
 }
+
+/**
+ * Yearly average cumulative registration curves.
+ * Groups editions by year, builds cumulative curves per edition,
+ * then averages them per year. Returns Recharts-ready data.
+ *
+ * @returns {{ data: Array<{day: number, [year]: number}>, years: string[] }}
+ */
+export function getYearlyAvgCurves(data, maxDays = 30) {
+  // 1. Group records by edition
+  const byEdition = {};
+  for (const d of data) {
+    if (!d.editionLabel || d.daysBefore == null || !d.eventDate) continue;
+    if (!byEdition[d.editionLabel]) {
+      byEdition[d.editionLabel] = { year: d.eventDate.getFullYear(), rows: [] };
+    }
+    byEdition[d.editionLabel].rows.push(d);
+  }
+
+  // 2. Build cumulative curve for each edition: { daysBefore → cumulative count }
+  const editionCurves = {};
+  for (const [label, { year, rows }] of Object.entries(byEdition)) {
+    // Count registrations per daysBefore
+    const daily = {};
+    for (const r of rows) {
+      const db = Math.min(r.daysBefore, maxDays);
+      daily[db] = (daily[db] || 0) + 1;
+    }
+    // Build cumulative from maxDays down to 0
+    const cumulative = {};
+    let sum = 0;
+    for (let d = maxDays; d >= 0; d--) {
+      sum += (daily[d] || 0);
+      cumulative[d] = sum;
+    }
+    editionCurves[label] = { year, cumulative };
+  }
+
+  // 3. Group editions by year
+  const byYear = {};
+  for (const [label, { year, cumulative }] of Object.entries(editionCurves)) {
+    if (!byYear[year]) byYear[year] = [];
+    byYear[year].push(cumulative);
+  }
+
+  const years = Object.keys(byYear).sort();
+  if (years.length === 0) return { data: [], years: [] };
+
+  // 4. Average cumulative curves per year → Recharts data points
+  const chartData = [];
+  for (let d = maxDays; d >= 0; d--) {
+    const point = { day: d === 0 ? 0 : -d, dayNum: d };
+    for (const year of years) {
+      const curves = byYear[year];
+      const vals = curves.map(c => c[d]).filter(v => v != null);
+      point[year] = vals.length > 0 ? Math.round(vals.reduce((s, v) => s + v, 0) / vals.length) : null;
+    }
+    chartData.push(point);
+  }
+
+  return { data: chartData, years };
+}

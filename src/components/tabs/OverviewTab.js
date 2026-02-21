@@ -6,15 +6,30 @@ import ResizeHandle from '../shared/ResizeHandle';
 import ScaleToggle from '../shared/ScaleToggle';
 import { COLORS, TOOLTIP_STYLE } from '../../config/constants';
 import { colors, font, radius, alpha, transition as tr } from '../../config/designTokens';
-import { getHourlyData, getHourlyDataByGroup } from '../../utils/dataTransformers';
+import { getHourlyData, getHourlyDataByGroup, getYearlyAvgCurves } from '../../utils/dataTransformers';
 import { FadeIn } from '../shared/Motion';
 
 export default function OverviewTab({ analytics, filtered, selectedBrand, graphHeights, setGraphHeights }) {
   const [timeGranularity, setTimeGranularity] = useState('hourly');
   const [stackedView, setStackedView] = useState(false);
   const [logScale, setLogScale] = useState(false);
+  const [hiddenYears, setHiddenYears] = useState(new Set());
 
   const { dowData, daysBeforeData, multiEvent } = analytics;
+
+  // Yearly average cumulative curves
+  const yearlyAvg = useMemo(() => {
+    if (!filtered || !filtered.length) return { data: [], years: [] };
+    return getYearlyAvgCurves(filtered);
+  }, [filtered]);
+
+  const toggleYear = (year) => {
+    setHiddenYears(prev => {
+      const next = new Set(prev);
+      if (next.has(year)) next.delete(year); else next.add(year);
+      return next;
+    });
+  };
 
   // Recalculate hourly data when granularity changes
   const groupKey = selectedBrand !== "all" ? 'editionLabel' : 'brand';
@@ -45,6 +60,65 @@ export default function OverviewTab({ analytics, filtered, selectedBrand, graphH
 
   return (
     <div className="bento-grid" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, alignItems: "start" }}>
+      {/* Andamento registrazioni per anno — full width */}
+      {yearlyAvg.years.length > 0 && (
+        <FadeIn style={{ gridColumn: "1 / -1" }}><Section title="Andamento registrazioni per anno">
+          <div style={{ fontSize: font.size.xs, color: colors.text.muted, marginBottom: 8 }}>
+            Media registrazioni cumulative per edizione, raggruppate per anno
+          </div>
+          <ResponsiveContainer width="100%" height={graphHeights.yearlyAvg || 260}>
+            <AreaChart data={yearlyAvg.data}>
+              <CartesianGrid strokeDasharray="3 3" stroke={colors.border.default} />
+              <XAxis dataKey="day" tick={{ fill: colors.text.muted, fontSize: 10 }} />
+              <YAxis tick={{ fill: colors.text.muted, fontSize: 10 }} />
+              <Tooltip {...TOOLTIP_STYLE} />
+              {yearlyAvg.years.map((year, i) => {
+                if (hiddenYears.has(year)) return null;
+                const isCurrent = year === yearlyAvg.years[yearlyAvg.years.length - 1];
+                return (
+                  <Area
+                    key={year}
+                    type="monotone"
+                    dataKey={year}
+                    stroke={COLORS[i % COLORS.length]}
+                    fill={isCurrent ? `${COLORS[i % COLORS.length]}22` : "transparent"}
+                    strokeWidth={isCurrent ? 3 : 2}
+                    dot={false}
+                    connectNulls
+                    name={year}
+                  />
+                );
+              })}
+            </AreaChart>
+          </ResponsiveContainer>
+          {/* Clickable year legend */}
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap", justifyContent: "center", marginTop: 8 }}>
+            {yearlyAvg.years.map((year, i) => {
+              const isHidden = hiddenYears.has(year);
+              return (
+                <button key={year} onClick={() => toggleYear(year)} style={{
+                  display: "flex", alignItems: "center", gap: 4, padding: "2px 8px",
+                  borderRadius: radius.md, border: "none", cursor: "pointer",
+                  background: "transparent", opacity: isHidden ? 0.3 : 1, transition: "all 0.2s ease",
+                }}>
+                  <span style={{
+                    width: 12, height: 3, display: "inline-block", borderRadius: 2,
+                    background: COLORS[i % COLORS.length],
+                  }} />
+                  <span style={{
+                    fontSize: font.size.xs,
+                    color: isHidden ? colors.text.disabled : colors.text.muted,
+                    fontWeight: font.weight.medium,
+                    textDecoration: isHidden ? "line-through" : "none",
+                  }}>{year}</span>
+                </button>
+              );
+            })}
+          </div>
+          <ResizeHandle chartKey="yearlyAvg" graphHeights={graphHeights} setGraphHeights={setGraphHeights} />
+        </Section></FadeIn>
+      )}
+
       {/* Registrazioni per ora — full width */}
       <FadeIn style={{ gridColumn: "1 / -1" }}><Section
         title="Registrazioni per ora del giorno"
