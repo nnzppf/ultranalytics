@@ -299,6 +299,8 @@ function SingleBrandView({ comparisonData }) {
   const [hiddenLines, setHiddenLines] = useState(new Set());
   // Year filter: excluded years for avg/projection recalculation
   const [excludedYears, setExcludedYears] = useState(new Set());
+  // Toggle yearly average curves
+  const [showAvgCurves, setShowAvgCurves] = useState(false);
 
   // Available years from comparisons
   const availableYears = useMemo(() => {
@@ -309,6 +311,15 @@ function SingleBrandView({ comparisonData }) {
     return [...years].sort();
   }, [comparisons]);
 
+  // Map edition label → year
+  const editionToYear = useMemo(() => {
+    const map = {};
+    for (const c of comparisons) {
+      if (c.eventDate) map[c.editionLabel] = c.eventDate.getFullYear();
+    }
+    return map;
+  }, [comparisons]);
+
   const toggleYear = (year) => {
     setExcludedYears(prev => {
       const next = new Set(prev);
@@ -316,6 +327,37 @@ function SingleBrandView({ comparisonData }) {
       return next;
     });
   };
+
+  // Yearly average cumulative curves (only from included years)
+  const yearAvgCurves = useMemo(() => {
+    const byYear = {};
+    for (const c of comparisons) {
+      if (!c.eventDate) continue;
+      const year = c.eventDate.getFullYear();
+      if (excludedYears.has(year)) continue;
+      if (!byYear[year]) byYear[year] = [];
+      byYear[year].push(c);
+    }
+    const result = {};
+    for (const [year, comps] of Object.entries(byYear)) {
+      if (comps.length < 1) continue;
+      const allDays = new Set();
+      for (const c of comps) {
+        for (const d of Object.keys(c.cumulative)) allDays.add(Number(d));
+      }
+      const avgCurve = {};
+      for (const d of allDays) {
+        const vals = comps.map(c => c.cumulative[d]).filter(v => v != null);
+        if (vals.length > 0) {
+          avgCurve[d] = Math.round(vals.reduce((s, v) => s + v, 0) / vals.length);
+        }
+      }
+      result[year] = avgCurve;
+    }
+    return result;
+  }, [comparisons, excludedYears]);
+
+  const yearAvgKeys = useMemo(() => Object.keys(yearAvgCurves).map(Number).sort(), [yearAvgCurves]);
 
   // Filtered comparisons based on excluded years
   const filteredComparisons = useMemo(() => {
@@ -400,31 +442,45 @@ function SingleBrandView({ comparisonData }) {
     });
   };
 
+  // Enrich overlay data with yearly average curves
+  const enrichedOverlayData = useMemo(() => {
+    if (!overlayData || overlayData.length === 0) return overlayData;
+    return overlayData.map(pt => {
+      const enriched = { ...pt };
+      for (const year of yearAvgKeys) {
+        const key = `_avg${year}`;
+        const val = yearAvgCurves[year]?.[pt.daysBefore];
+        enriched[key] = val != null ? val : null;
+      }
+      return enriched;
+    });
+  }, [overlayData, yearAvgCurves, yearAvgKeys]);
+
   // Compressed overlay: keep only days where at least one edition changes value,
   // plus always keep day 0 (event), currentDaysBefore (today), and first/last data points
   const chartData = useMemo(() => {
-    if (!compressed || !overlayData || overlayData.length === 0) return overlayData;
-    const edKeys = allEditionLabels;
+    const data = enrichedOverlayData;
+    if (!compressed || !data || data.length === 0) return data;
+    const avgKeys = yearAvgKeys.map(y => `_avg${y}`);
+    const allKeys = [...allEditionLabels, ...avgKeys];
     const keep = new Set([0, currentDaysBefore]);
-    for (let i = 0; i < overlayData.length; i++) {
-      const pt = overlayData[i];
-      for (const k of edKeys) {
+    for (let i = 0; i < data.length; i++) {
+      const pt = data[i];
+      for (const k of allKeys) {
         if (pt[k] != null) {
-          // Keep this point if it's the first non-null or value differs from previous non-null
           let prevVal = null;
           for (let j = i - 1; j >= 0; j--) {
-            if (overlayData[j][k] != null) { prevVal = overlayData[j][k]; break; }
+            if (data[j][k] != null) { prevVal = data[j][k]; break; }
           }
           if (prevVal === null || pt[k] !== prevVal) {
             keep.add(pt.daysBefore);
           }
         }
       }
-      // Always keep projection points
       if (pt._projRegression != null || pt._projEnsemble != null) keep.add(pt.daysBefore);
     }
-    return overlayData.filter(pt => keep.has(pt.daysBefore));
-  }, [overlayData, compressed, allEditionLabels, currentDaysBefore]);
+    return data.filter(pt => keep.has(pt.daysBefore));
+  }, [enrichedOverlayData, compressed, allEditionLabels, currentDaysBefore, yearAvgKeys]);
 
   const hasComparisons = comparisons.length > 0;
   const hasFilteredComparisons = filteredComparisons.length > 0;
@@ -527,29 +583,6 @@ function SingleBrandView({ comparisonData }) {
         )}
       </div>
 
-      {/* Year filter chips — show when multiple years available */}
-      {availableYears.length > 1 && hasComparisons && (
-        <div style={{ display: "flex", gap: 6, alignItems: "center", marginBottom: 12, flexWrap: "wrap" }}>
-          <span style={{ fontSize: font.size.xs, color: colors.text.disabled }}>Filtra anni:</span>
-          {availableYears.map(year => {
-            const isExcluded = excludedYears.has(year);
-            return (
-              <button key={year} onClick={() => toggleYear(year)} style={{
-                padding: "3px 10px", borderRadius: radius.md, fontSize: font.size.xs, fontWeight: font.weight.semibold,
-                border: `1px solid ${isExcluded ? colors.border.default : colors.brand.purple}`,
-                background: isExcluded ? "transparent" : alpha.brand[15],
-                color: isExcluded ? colors.text.disabled : colors.brand.purple,
-                cursor: "pointer", transition: "all 0.15s ease",
-                textDecoration: isExcluded ? "line-through" : "none",
-                opacity: isExcluded ? 0.5 : 1,
-              }}>
-                {year}
-              </button>
-            );
-          })}
-        </div>
-      )}
-
       {/* Progress bar — only when there are comparisons */}
       {hasFilteredComparisons && (
         <div style={{ marginBottom: 16 }}>
@@ -625,9 +658,15 @@ function SingleBrandView({ comparisonData }) {
         const edColorMap = {};
         allEditionLabels.forEach((label, i) => { edColorMap[label] = colors.chart[i % colors.chart.length]; });
 
+        // Colors for yearly average curves — consistent warm/cool palette
+        const yearAvgColorPalette = ['#f59e0b', '#3b82f6', '#10b981', '#ef4444', '#8b5cf6'];
+        const yearAvgColorMap = {};
+        yearAvgKeys.forEach((year, i) => { yearAvgColorMap[year] = yearAvgColorPalette[i % yearAvgColorPalette.length]; });
+
         return (
         <div>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8, flexWrap: "wrap", gap: 8 }}>
+          {/* Header row: title + controls */}
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4, flexWrap: "wrap", gap: 8 }}>
             <div style={presets.sectionLabel}>
               Curve cumulative registrazioni
             </div>
@@ -645,6 +684,37 @@ function SingleBrandView({ comparisonData }) {
               <ScaleToggle isLog={logScale} onToggle={setLogScale} />
             </div>
           </div>
+          {/* Year filter chips + Medie toggle */}
+          {availableYears.length > 1 && (
+            <div style={{ display: "flex", gap: 6, alignItems: "center", marginBottom: 8, flexWrap: "wrap" }}>
+              {availableYears.map(year => {
+                const isExcluded = excludedYears.has(year);
+                return (
+                  <button key={year} onClick={() => toggleYear(year)} style={{
+                    padding: "3px 10px", borderRadius: radius.md, fontSize: font.size.xs, fontWeight: font.weight.semibold,
+                    border: `1px solid ${isExcluded ? colors.border.default : colors.brand.purple}`,
+                    background: isExcluded ? "transparent" : alpha.brand[15],
+                    color: isExcluded ? colors.text.disabled : colors.brand.purple,
+                    cursor: "pointer", transition: "all 0.15s ease",
+                    textDecoration: isExcluded ? "line-through" : "none",
+                    opacity: isExcluded ? 0.5 : 1,
+                  }}>
+                    {year}
+                  </button>
+                );
+              })}
+              <span style={{ width: 1, height: 16, background: colors.border.default, margin: "0 2px" }} />
+              <button onClick={() => setShowAvgCurves(v => !v)} style={{
+                padding: "3px 10px", borderRadius: radius.md, fontSize: font.size.xs, fontWeight: font.weight.medium,
+                border: `1px solid ${showAvgCurves ? '#f59e0b' : colors.border.default}`,
+                background: showAvgCurves ? 'rgba(245,158,11,0.15)' : "transparent",
+                color: showAvgCurves ? '#f59e0b' : colors.text.muted,
+                cursor: "pointer", transition: "all 0.15s ease",
+              }}>
+                Medie per anno
+              </button>
+            </div>
+          )}
           <ResponsiveContainer width="100%" height={250}>
             <AreaChart data={chartData} margin={{ top: 5, right: 10, left: 0, bottom: 5 }}>
               <CartesianGrid strokeDasharray="2 8" stroke={colors.border.subtle} />
@@ -658,9 +728,12 @@ function SingleBrandView({ comparisonData }) {
                   label={{ value: "OGGI", fill: colors.status.warning, fontSize: 10, position: "top" }}
                 />
               )}
+              {/* Individual edition lines — hide if year is excluded */}
               {allEditionLabels.map((label, i) => {
                 if (hiddenLines.has(label)) return null;
                 const isCurrent = i === 0;
+                // Hide past editions whose year is excluded (never hide current edition)
+                if (!isCurrent && editionToYear[label] && excludedYears.has(editionToYear[label])) return null;
                 const edColor = edColorMap[label];
                 return (
                   <Area
@@ -673,6 +746,25 @@ function SingleBrandView({ comparisonData }) {
                     strokeDasharray={isCurrent ? "" : "5 3"}
                     dot={false}
                     connectNulls
+                  />
+                );
+              })}
+              {/* Yearly average curves */}
+              {showAvgCurves && yearAvgKeys.map(year => {
+                const key = `_avg${year}`;
+                if (hiddenLines.has(key)) return null;
+                const avgColor = yearAvgColorMap[year];
+                return (
+                  <Area
+                    key={key}
+                    type="monotone"
+                    dataKey={key}
+                    stroke={avgColor}
+                    fill="transparent"
+                    strokeWidth={2.5}
+                    dot={false}
+                    connectNulls
+                    name={`Media ${year}`}
                   />
                 );
               })}
@@ -696,6 +788,8 @@ function SingleBrandView({ comparisonData }) {
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap", justifyContent: "center", marginTop: 8 }}>
             {allEditionLabels.map((label, i) => {
               const isCurrent = i === 0;
+              // Hide legend items for excluded years (keep current edition)
+              if (!isCurrent && editionToYear[label] && excludedYears.has(editionToYear[label])) return null;
               const isHidden = hiddenLines.has(label);
               const edColor = edColorMap[label];
               return (
@@ -716,6 +810,32 @@ function SingleBrandView({ comparisonData }) {
                     fontWeight: isCurrent ? font.weight.semibold : font.weight.normal,
                     textDecoration: isHidden ? "line-through" : "none",
                   }}>{label}</span>
+                </button>
+              );
+            })}
+            {/* Yearly average legend entries */}
+            {showAvgCurves && yearAvgKeys.map(year => {
+              const key = `_avg${year}`;
+              const isHidden = hiddenLines.has(key);
+              const avgColor = yearAvgColorMap[year];
+              return (
+                <button key={key} onClick={() => toggleLine(key)} style={{
+                  display: "flex", alignItems: "center", gap: 4, padding: "2px 8px",
+                  borderRadius: radius.md, border: "none", cursor: "pointer",
+                  background: "transparent",
+                  opacity: isHidden ? 0.3 : 1,
+                  transition: "all 0.2s ease",
+                }}>
+                  <span style={{
+                    width: 16, height: 3,
+                    background: avgColor, display: "inline-block", borderRadius: 1,
+                  }} />
+                  <span style={{
+                    fontSize: font.size.xs,
+                    color: isHidden ? colors.text.disabled : avgColor,
+                    fontWeight: font.weight.bold,
+                    textDecoration: isHidden ? "line-through" : "none",
+                  }}>Media {year}</span>
                 </button>
               );
             })}
