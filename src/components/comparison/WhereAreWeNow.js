@@ -1,6 +1,6 @@
-import { useState, useMemo, useCallback } from 'react';
+import { useState, useMemo, useCallback, useRef } from 'react';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine } from 'recharts';
-import { FileText, X, Copy, Check, Loader } from 'lucide-react';
+import { FileText, X, Copy, Check, Loader, Share2 } from 'lucide-react';
 import { DeltaBadge } from '../shared/Badge';
 import ScaleToggle from '../shared/ScaleToggle';
 import { useSortable, Th } from '../shared/SortableTable';
@@ -326,13 +326,47 @@ function SingleBrandView({ comparisonData }) {
 
   const handleCopyReport = useCallback(() => {
     if (!reportText) return;
-    // Strip markdown for plain text copy
     const plain = reportText.replace(/\*\*(.+?)\*\*/g, '$1').replace(/^##\s*/gm, '').replace(/^- /gm, '  - ');
     navigator.clipboard.writeText(plain).then(() => {
       setReportCopied(true);
       setTimeout(() => setReportCopied(false), 2000);
     });
   }, [reportText]);
+
+  const reportCardRef = useRef(null);
+  const [shareLoading, setShareLoading] = useState(false);
+
+  const handleShareReport = useCallback(async () => {
+    if (!reportCardRef.current || shareLoading) return;
+    setShareLoading(true);
+    try {
+      const { default: html2canvas } = await import('html2canvas');
+      const bgColor = getComputedStyle(document.documentElement).getPropertyValue('--bg-solid').trim() || '#1e293b';
+      const canvas = await html2canvas(reportCardRef.current, { backgroundColor: bgColor, scale: 2, useCORS: true });
+      const fileName = `report-${brand}-${edition}-${new Date().toISOString().slice(0, 10)}.png`;
+      if (navigator.share && navigator.canShare) {
+        try {
+          const blob = await new Promise(r => canvas.toBlob(r, 'image/png'));
+          const file = new File([blob], fileName, { type: 'image/png' });
+          if (navigator.canShare({ files: [file] })) {
+            await navigator.share({ files: [file], title: `Report ${brand} ${edition}` });
+            setShareLoading(false);
+            return;
+          }
+        } catch (e) {
+          if (e.name === 'AbortError') { setShareLoading(false); return; }
+        }
+      }
+      const link = document.createElement('a');
+      link.download = fileName;
+      link.href = canvas.toDataURL();
+      link.click();
+    } catch (err) {
+      console.error('Share report error:', err);
+    } finally {
+      setShareLoading(false);
+    }
+  }, [brand, edition, shareLoading]);
   // Toggle yearly average curves
   const [showAvgCurves, setShowAvgCurves] = useState(false);
 
@@ -973,9 +1007,80 @@ function SingleBrandView({ comparisonData }) {
                 </div>
               )}
               {reportText && (
-                <div style={{ fontSize: font.size.sm, lineHeight: font.lineHeight.relaxed, color: colors.text.secondary }}
-                  dangerouslySetInnerHTML={{ __html: formatReportMarkdown(reportText) }}
-                />
+                <>
+                  {/* Visual report card for screenshot/share */}
+                  <div ref={reportCardRef} style={{ padding: 20, background: "var(--bg-solid, #1e293b)" }}>
+                    {/* Card header */}
+                    <div style={{ marginBottom: 16 }}>
+                      <div style={{ fontSize: 11, color: colors.text.disabled, textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: 2 }}>
+                        Report Live Tracker
+                      </div>
+                      <div style={{ fontSize: 20, fontWeight: 800, color: colors.text.primary }}>
+                        {brand} <span style={{ color: colors.brand.purple }}>{edition}</span>
+                      </div>
+                      <div style={{ fontSize: 12, color: colors.text.muted, marginTop: 2 }}>
+                        {eventDate ? eventDate.toLocaleDateString('it', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }) : ''}
+                        {' — '}{isEventPast ? 'Concluso' : `${currentDaysBefore} giorni all'evento`}
+                      </div>
+                    </div>
+
+                    {/* KPI grid */}
+                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8, marginBottom: 16 }}>
+                      <div style={{ background: colors.bg.card, borderRadius: 12, padding: 10, textAlign: "center" }}>
+                        <div style={{ fontSize: 10, color: colors.text.muted }}>Registrazioni</div>
+                        <div style={{ fontSize: 22, fontWeight: 900, color: colors.brand.purple }}>{currentRegistrations}</div>
+                      </div>
+                      <div style={{ background: colors.bg.card, borderRadius: 12, padding: 10, textAlign: "center" }}>
+                        <div style={{ fontSize: 10, color: colors.text.muted }}>Media storica</div>
+                        <div style={{ fontSize: 22, fontWeight: 900, color: colors.text.primary }}>{effectiveAvgAtSamePoint}</div>
+                      </div>
+                      <div style={{ background: colors.bg.card, borderRadius: 12, padding: 10, textAlign: "center" }}>
+                        <div style={{ fontSize: 10, color: colors.text.muted }}>{activeProjection != null ? 'Proiezione' : 'Delta'}</div>
+                        <div style={{ fontSize: 22, fontWeight: 900, color: activeProjection != null ? colors.status.success : (avgDelta > 0 ? colors.status.success : colors.status.error) }}>
+                          {activeProjection != null ? `~${activeProjection}` : avgDelta != null ? `${avgDelta > 0 ? '+' : ''}${avgDelta}%` : '-'}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Mini chart */}
+                    <div style={{ marginBottom: 16, background: colors.bg.card, borderRadius: 12, padding: "12px 8px 4px" }}>
+                      <div style={{ fontSize: 10, color: colors.text.muted, marginBottom: 4, paddingLeft: 8 }}>Curve cumulative</div>
+                      <div style={{ width: "100%", height: 160 }}>
+                        <ResponsiveContainer width="100%" height={160}>
+                          <AreaChart data={chartData} margin={{ top: 5, right: 10, left: 0, bottom: 5 }}>
+                            <CartesianGrid strokeDasharray="2 8" stroke={colors.border.subtle} />
+                            <XAxis dataKey="label" tick={{ fill: colors.text.disabled, fontSize: 9 }} axisLine={false} tickLine={false} />
+                            <YAxis tick={{ fill: colors.text.disabled, fontSize: 9 }} axisLine={false} tickLine={false} />
+                            {allEditionLabels.map((label, i) => {
+                              const isCurrent = i === 0;
+                              if (!isCurrent && editionToYear[label] && excludedYears.has(editionToYear[label])) return null;
+                              return (
+                                <Area key={label} type="monotone" dataKey={label}
+                                  stroke={colors.chart[i % colors.chart.length]}
+                                  fill={isCurrent ? `${colors.chart[0]}18` : "transparent"}
+                                  strokeWidth={isCurrent ? 2.5 : 1} strokeDasharray={isCurrent ? "" : "4 3"}
+                                  dot={false} connectNulls />
+                              );
+                            })}
+                          </AreaChart>
+                        </ResponsiveContainer>
+                      </div>
+                    </div>
+
+                    {/* AI insights */}
+                    <div style={{ fontSize: 12, lineHeight: 1.6, color: colors.text.secondary }}
+                      dangerouslySetInnerHTML={{ __html: formatReportMarkdown(reportText) }}
+                    />
+
+                    {/* Footer */}
+                    <div style={{ marginTop: 16, paddingTop: 8, borderTop: `1px solid ${colors.border.subtle}`, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                      <span style={{ fontSize: 10, color: colors.text.disabled }}>
+                        Ultranalytics — {new Date().toLocaleDateString('it', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                      </span>
+                      <span style={{ fontSize: 10, color: colors.text.disabled }}>Powered by Gemini AI</span>
+                    </div>
+                  </div>
+                </>
               )}
             </div>
             {/* Modal footer */}
@@ -984,6 +1089,16 @@ function SingleBrandView({ comparisonData }) {
                 padding: "12px 20px", borderTop: `1px solid ${colors.border.default}`,
                 display: "flex", justifyContent: "flex-end", gap: 8, flexShrink: 0,
               }}>
+                <button onClick={handleShareReport} disabled={shareLoading} style={{
+                  display: "flex", alignItems: "center", gap: 6, padding: "8px 16px",
+                  borderRadius: radius.xl, fontSize: font.size.sm, fontWeight: font.weight.medium,
+                  border: "none", cursor: shareLoading ? "wait" : "pointer",
+                  background: gradients.brandAlt, color: colors.text.inverse,
+                  transition: "all 0.15s ease", opacity: shareLoading ? 0.7 : 1,
+                }}>
+                  {shareLoading ? <Loader size={14} style={{ animation: "spin 1s linear infinite" }} /> : <Share2 size={14} />}
+                  Condividi
+                </button>
                 <button onClick={handleCopyReport} style={{
                   display: "flex", alignItems: "center", gap: 6, padding: "8px 16px",
                   borderRadius: radius.xl, fontSize: font.size.sm, fontWeight: font.weight.medium,
