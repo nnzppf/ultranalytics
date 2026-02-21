@@ -1,6 +1,6 @@
 import { useState, useMemo, useCallback, useRef } from 'react';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine } from 'recharts';
-import { FileText, X, Copy, Check, Loader, Share2 } from 'lucide-react';
+import { FileText, X, Copy, Check, Loader, Share2, ChevronDown, ChevronUp } from 'lucide-react';
 import { DeltaBadge } from '../shared/Badge';
 import ScaleToggle from '../shared/ScaleToggle';
 import { useSortable, Th } from '../shared/SortableTable';
@@ -307,6 +307,7 @@ function SingleBrandView({ comparisonData }) {
   const [reportLoading, setReportLoading] = useState(false);
   const [showReport, setShowReport] = useState(false);
   const [reportCopied, setReportCopied] = useState(false);
+  const [editionsExpanded, setEditionsExpanded] = useState(false);
 
   const handleGenerateReport = useCallback(async () => {
     if (reportLoading) return;
@@ -404,6 +405,19 @@ function SingleBrandView({ comparisonData }) {
     return map;
   }, [comparisons]);
 
+  // Edition labels sorted chronologically (current first, then past by sortDate)
+  const sortedEditionLabels = useMemo(() => {
+    if (!allEditionLabels || allEditionLabels.length <= 1) return allEditionLabels;
+    const current = allEditionLabels[0];
+    const dateMap = {};
+    for (const c of comparisons) {
+      const d = c.sortDate || c.eventDate;
+      if (d) dateMap[c.editionLabel] = d instanceof Date ? d.getTime() : new Date(d).getTime();
+    }
+    const rest = allEditionLabels.slice(1).sort((a, b) => (dateMap[a] || 0) - (dateMap[b] || 0));
+    return [current, ...rest];
+  }, [allEditionLabels, comparisons]);
+
   const toggleYear = (year) => {
     setExcludedYears(prev => {
       const next = new Set(prev);
@@ -443,11 +457,15 @@ function SingleBrandView({ comparisonData }) {
 
   const yearAvgKeys = useMemo(() => Object.keys(yearAvgCurves).map(Number).sort(), [yearAvgCurves]);
 
-  // Filtered comparisons based on excluded years
+  // Filtered comparisons based on excluded years AND hidden lines
   const filteredComparisons = useMemo(() => {
-    if (excludedYears.size === 0) return comparisons;
-    return comparisons.filter(c => !c.eventDate || !excludedYears.has(c.eventDate.getFullYear()));
-  }, [comparisons, excludedYears]);
+    if (excludedYears.size === 0 && hiddenLines.size === 0) return comparisons;
+    return comparisons.filter(c => {
+      if (c.eventDate && excludedYears.has(c.eventDate.getFullYear())) return false;
+      if (hiddenLines.has(c.editionLabel)) return false;
+      return true;
+    });
+  }, [comparisons, excludedYears, hiddenLines]);
 
   // Recompute averages and projections from filtered comparisons
   const filtered = useMemo(() => {
@@ -508,8 +526,8 @@ function SingleBrandView({ comparisonData }) {
     return { avgAtSamePoint: fAvgAtSamePoint, avgFinal: fAvgFinal, progressPercent: fProgressPercent, regressionProjection: fRegProj, ensembleProjection: fEnsProj };
   }, [filteredComparisons, currentRegistrations, isEventPast, comparisonData.targetCumulative]);
 
-  // Use filtered values when year filter is active, original values otherwise
-  const isYearFiltered = excludedYears.size > 0;
+  // Use filtered values when year filter or hidden lines are active
+  const isYearFiltered = excludedYears.size > 0 || hiddenLines.size > 0;
   const effectiveAvgAtSamePoint = isYearFiltered ? filtered.avgAtSamePoint : avgAtSamePoint;
   const effectiveAvgFinal = isYearFiltered ? filtered.avgFinal : avgFinal;
   const effectiveProgressPercent = isYearFiltered ? filtered.progressPercent : progressPercent;
@@ -656,8 +674,8 @@ function SingleBrandView({ comparisonData }) {
             <div style={{ fontSize: font.size.xs, color: colors.text.muted, marginBottom: 4 }}>
               {isEventPast ? "vs media finale" : "Rispetto alla media"}
             </div>
-            <div style={{ fontSize: font.size["4xl"], fontWeight: font.weight.black }}>
-              <DeltaBadge value={avgDelta} />
+            <div style={{ fontWeight: font.weight.black }}>
+              <DeltaBadge value={avgDelta} size={font.size["4xl"]} />
             </div>
           </div>
         )}
@@ -735,18 +753,53 @@ function SingleBrandView({ comparisonData }) {
               </tbody>
             </table>
           </div>
-          {/* Mobile: cards */}
-          <DataCards
-            items={sortedComparisons}
-            fields={[
-              { key: 'editionLabel', label: 'Edizione', primary: true },
-              { key: 'deltaPercent', label: 'Delta', badge: true, render: c => <DeltaBadge value={c.deltaPercent} /> },
-              { key: 'atSamePointAdj', label: `A -${currentDaysBefore}gg`, render: c => !isEventPast && c.atSamePointAdjusted != null ? c.atSamePointAdjusted : c.atSamePoint },
-              { key: 'totalFinal', label: 'Finale' },
-              { key: 'finalConversion', label: 'Conv.', render: c => `${c.finalConversion}%` },
-              { key: 'completionPercent', label: `Completamento`, render: c => `${c.completionPercent}%` },
-            ]}
-          />
+          {/* Mobile: compact 2-per-row grid */}
+          <div className="mobile-cards">
+            {(editionsExpanded ? sortedComparisons : sortedComparisons.slice(0, 4)).map((c, i) => (
+              <div key={i} style={{
+                display: "inline-flex", flexDirection: "column",
+                width: "calc(50% - 4px)", verticalAlign: "top",
+                marginRight: i % 2 === 0 ? 8 : 0, marginBottom: 8,
+                background: colors.bg.card, borderRadius: radius.lg,
+                padding: "10px 12px",
+                border: `1px solid ${colors.border.default}`,
+                boxSizing: "border-box",
+              }}>
+                <div style={{ fontSize: 11, fontWeight: font.weight.semibold, color: colors.text.primary, marginBottom: 6, lineHeight: 1.3, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                  {c.editionLabel}
+                </div>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4 }}>
+                  <span style={{ fontSize: 10, color: colors.text.disabled }}>A -{currentDaysBefore}gg</span>
+                  <span style={{ fontSize: font.size.xs, fontWeight: font.weight.semibold, color: colors.text.primary }}>
+                    {!isEventPast && c.atSamePointAdjusted != null ? c.atSamePointAdjusted : c.atSamePoint}
+                  </span>
+                </div>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4 }}>
+                  <span style={{ fontSize: 10, color: colors.text.disabled }}>Delta</span>
+                  <DeltaBadge value={c.deltaPercent} />
+                </div>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4 }}>
+                  <span style={{ fontSize: 10, color: colors.text.disabled }}>Finale</span>
+                  <span style={{ fontSize: font.size.xs, color: colors.text.muted }}>{c.totalFinal}</span>
+                </div>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                  <span style={{ fontSize: 10, color: colors.text.disabled }}>Conv.</span>
+                  <span style={{ fontSize: font.size.xs, color: colors.text.muted }}>{c.finalConversion}%</span>
+                </div>
+              </div>
+            ))}
+            {sortedComparisons.length > 4 && (
+              <button onClick={() => setEditionsExpanded(v => !v)} style={{
+                width: "100%", padding: "8px 0", marginTop: 4,
+                display: "flex", alignItems: "center", justifyContent: "center", gap: 4,
+                background: "transparent", border: `1px solid ${colors.border.default}`,
+                borderRadius: radius.md, cursor: "pointer",
+                fontSize: font.size.xs, color: colors.text.muted, fontWeight: font.weight.medium,
+              }}>
+                {editionsExpanded ? <>Chiudi <ChevronUp size={14} /></> : <>Mostra tutte ({sortedComparisons.length}) <ChevronDown size={14} /></>}
+              </button>
+            )}
+          </div>
         </div>
       )}
 
@@ -827,9 +880,9 @@ function SingleBrandView({ comparisonData }) {
                 />
               )}
               {/* Individual edition lines — hide if year is excluded */}
-              {allEditionLabels.map((label, i) => {
+              {sortedEditionLabels.map((label, i) => {
                 if (hiddenLines.has(label)) return null;
-                const isCurrent = i === 0;
+                const isCurrent = label === sortedEditionLabels[0];
                 // Hide past editions whose year is excluded (never hide current edition)
                 if (!isCurrent && editionToYear[label] && excludedYears.has(editionToYear[label])) return null;
                 const edColor = edColorMap[label];
@@ -884,8 +937,8 @@ function SingleBrandView({ comparisonData }) {
           </ResponsiveContainer>
           {/* Clickable legend */}
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap", justifyContent: "center", marginTop: 8 }}>
-            {allEditionLabels.map((label, i) => {
-              const isCurrent = i === 0;
+            {sortedEditionLabels.map((label) => {
+              const isCurrent = label === sortedEditionLabels[0];
               // Hide legend items for excluded years (keep current edition)
               if (!isCurrent && editionToYear[label] && excludedYears.has(editionToYear[label])) return null;
               const isHidden = hiddenLines.has(label);

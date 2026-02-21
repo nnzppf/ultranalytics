@@ -174,6 +174,23 @@ export function computeWhereAreWeNow(allData, targetBrand, targetEdition, overri
     if (!edRows.length) continue;
 
     const edEventDate = edRows[0].eventDate;
+
+    // sortDate: for chronological ordering only (not used in calculations)
+    // Falls back to most common scanDate (= actual event day) when eventDate is missing
+    let sortDate = edEventDate;
+    if (!sortDate) {
+      const dayCounts = {};
+      for (const r of edRows) {
+        if (!r.scanDate) continue;
+        const sd = r.scanDate instanceof Date ? r.scanDate : new Date(r.scanDate);
+        if (isNaN(sd)) continue;
+        const dayKey = `${sd.getFullYear()}-${sd.getMonth()}-${sd.getDate()}`;
+        dayCounts[dayKey] = (dayCounts[dayKey] || { count: 0, date: sd });
+        dayCounts[dayKey].count++;
+      }
+      const best = Object.values(dayCounts).sort((a, b) => b.count - a.count)[0];
+      if (best) sortDate = best.date;
+    }
     const cumulative = buildCumulativeCurve(edRows);
     const totalFinal = edRows.length;
     const totalAttended = edRows.filter(r => r.attended).length;
@@ -210,6 +227,7 @@ export function computeWhereAreWeNow(allData, targetBrand, targetEdition, overri
     comparisons.push({
       editionLabel: edLabel,
       eventDate: edEventDate,
+      sortDate,
       totalFinal,
       totalAttended,
       finalConversion: totalFinal > 0 ? parseFloat(((totalAttended / totalFinal) * 100).toFixed(1)) : 0,

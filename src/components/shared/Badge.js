@@ -41,14 +41,14 @@ export function CategoryBadge({ category, color }) {
   );
 }
 
-export function DeltaBadge({ value, suffix = "%" }) {
+export function DeltaBadge({ value, suffix = "%", size }) {
   if (value === null || value === undefined) return <span style={{ color: colors.text.disabled }}>-</span>;
   const isPositive = value > 0;
   const isZero = value === 0;
   return (
     <span style={{
       color: isZero ? colors.text.muted : isPositive ? colors.status.success : colors.status.error,
-      fontWeight: font.weight.semibold, fontSize: font.size.base,
+      fontWeight: font.weight.semibold, fontSize: size || font.size.base,
     }}>
       {isPositive ? "+" : ""}{value}{suffix}
     </span>
