@@ -1,12 +1,15 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useCallback } from 'react';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine } from 'recharts';
+import { FileText, X, Copy, Check, Loader } from 'lucide-react';
 import { DeltaBadge } from '../shared/Badge';
 import ScaleToggle from '../shared/ScaleToggle';
 import { useSortable, Th } from '../shared/SortableTable';
 import DataCards from '../shared/DataCards';
 import { TOOLTIP_STYLE } from '../../config/constants';
 import { linReg } from '../../utils/comparisonEngine';
-import { colors, font, radius, gradients, presets, alpha } from '../../config/designTokens';
+import { buildTrackerSummary } from '../../utils/dataSummarizer';
+import { generateTrackerReport, isGeminiConfigured } from '../../services/geminiService';
+import { colors, font, radius, gradients, presets, alpha, shadows } from '../../config/designTokens';
 
 // Cross-brand comparison view
 function CrossBrandView({ comparisonData }) {
@@ -299,6 +302,37 @@ function SingleBrandView({ comparisonData }) {
   const [hiddenLines, setHiddenLines] = useState(new Set());
   // Year filter: excluded years for avg/projection recalculation
   const [excludedYears, setExcludedYears] = useState(new Set());
+  // AI Report state
+  const [reportText, setReportText] = useState('');
+  const [reportLoading, setReportLoading] = useState(false);
+  const [showReport, setShowReport] = useState(false);
+  const [reportCopied, setReportCopied] = useState(false);
+
+  const handleGenerateReport = useCallback(async () => {
+    if (reportLoading) return;
+    setReportLoading(true);
+    setShowReport(true);
+    setReportText('');
+    try {
+      const summary = buildTrackerSummary(comparisonData);
+      const text = await generateTrackerReport(summary);
+      setReportText(text);
+    } catch (err) {
+      setReportText(`Errore nella generazione del report: ${err.message}`);
+    } finally {
+      setReportLoading(false);
+    }
+  }, [comparisonData, reportLoading]);
+
+  const handleCopyReport = useCallback(() => {
+    if (!reportText) return;
+    // Strip markdown for plain text copy
+    const plain = reportText.replace(/\*\*(.+?)\*\*/g, '$1').replace(/^##\s*/gm, '').replace(/^- /gm, '  - ');
+    navigator.clipboard.writeText(plain).then(() => {
+      setReportCopied(true);
+      setTimeout(() => setReportCopied(false), 2000);
+    });
+  }, [reportText]);
   // Toggle yearly average curves
   const [showAvgCurves, setShowAvgCurves] = useState(false);
 
@@ -506,13 +540,27 @@ function SingleBrandView({ comparisonData }) {
           <div style={{ fontSize: font.size.md, fontWeight: font.weight.semibold, color: colors.text.primary }}>
             {eventDate ? eventDate.toLocaleDateString('it', { weekday: 'short', day: 'numeric', month: 'short' }) : '-'}
           </div>
-          <div style={{
-            display: "inline-block", marginTop: 4, padding: "2px 10px",
-            borderRadius: radius.lg, fontSize: font.size.sm, fontWeight: font.weight.bold,
-            background: isEventPast ? colors.bg.elevated : currentDaysBefore <= 1 ? colors.status.error : currentDaysBefore <= 3 ? colors.status.warning : colors.bg.elevated,
-            color: colors.text.inverse,
-          }}>
-            {isEventPast ? "Concluso" : currentDaysBefore === 0 ? "OGGI" : `-${currentDaysBefore} giorni`}
+          <div style={{ display: "flex", gap: 6, alignItems: "center", marginTop: 4, justifyContent: "flex-end" }}>
+            <div style={{
+              display: "inline-block", padding: "2px 10px",
+              borderRadius: radius.lg, fontSize: font.size.sm, fontWeight: font.weight.bold,
+              background: isEventPast ? colors.bg.elevated : currentDaysBefore <= 1 ? colors.status.error : currentDaysBefore <= 3 ? colors.status.warning : colors.bg.elevated,
+              color: colors.text.inverse,
+            }}>
+              {isEventPast ? "Concluso" : currentDaysBefore === 0 ? "OGGI" : `-${currentDaysBefore} giorni`}
+            </div>
+            {isGeminiConfigured() && (
+              <button onClick={handleGenerateReport} disabled={reportLoading} style={{
+                display: "flex", alignItems: "center", gap: 4, padding: "3px 10px",
+                borderRadius: radius.lg, fontSize: font.size.xs, fontWeight: font.weight.medium,
+                border: "none", cursor: reportLoading ? "wait" : "pointer",
+                background: gradients.brandAlt, color: colors.text.inverse,
+                transition: "all 0.15s ease", opacity: reportLoading ? 0.7 : 1,
+              }}>
+                {reportLoading ? <Loader size={12} style={{ animation: 'spin 1s linear infinite' }} /> : <FileText size={12} />}
+                Report AI
+              </button>
+            )}
           </div>
         </div>
       </div>
@@ -874,8 +922,117 @@ function SingleBrandView({ comparisonData }) {
         </div>
         );
       })()}
+
+      {/* AI Report Modal */}
+      {showReport && (
+        <div style={{
+          position: "fixed", top: 0, left: 0, right: 0, bottom: 0, zIndex: 9000,
+          background: "rgba(0,0,0,0.7)", backdropFilter: "blur(4px)",
+          display: "flex", alignItems: "center", justifyContent: "center",
+          padding: 16,
+        }} onClick={(e) => { if (e.target === e.currentTarget) setShowReport(false); }}>
+          <div style={{
+            background: colors.bg.page, borderRadius: radius["4xl"],
+            width: "100%", maxWidth: 600, maxHeight: "85vh",
+            display: "flex", flexDirection: "column",
+            boxShadow: shadows.xl, overflow: "hidden",
+          }}>
+            {/* Modal header */}
+            <div style={{
+              background: gradients.brandAlt, padding: "14px 20px",
+              display: "flex", justifyContent: "space-between", alignItems: "center",
+              flexShrink: 0,
+            }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                <FileText size={18} color={colors.text.inverse} />
+                <div>
+                  <div style={{ fontSize: font.size.md, fontWeight: font.weight.bold, color: colors.text.inverse }}>
+                    Report — {brand} {edition}
+                  </div>
+                  <div style={{ fontSize: font.size.xs, color: alpha.white[70] }}>
+                    Powered by Gemini
+                  </div>
+                </div>
+              </div>
+              <button onClick={() => setShowReport(false)} style={{
+                background: alpha.white[15], border: "none", borderRadius: radius.lg,
+                padding: 6, cursor: "pointer", display: "flex",
+              }}>
+                <X size={16} color={colors.text.inverse} />
+              </button>
+            </div>
+            {/* Modal body */}
+            <div style={{ flex: 1, overflowY: "auto", padding: 20 }}>
+              {reportLoading && (
+                <div style={{
+                  display: "flex", alignItems: "center", justifyContent: "center", gap: 10,
+                  padding: 40, color: colors.text.muted, fontSize: font.size.sm,
+                }}>
+                  <Loader size={18} style={{ animation: "spin 1s linear infinite" }} />
+                  Sto generando il report...
+                </div>
+              )}
+              {reportText && (
+                <div style={{ fontSize: font.size.sm, lineHeight: font.lineHeight.relaxed, color: colors.text.secondary }}
+                  dangerouslySetInnerHTML={{ __html: formatReportMarkdown(reportText) }}
+                />
+              )}
+            </div>
+            {/* Modal footer */}
+            {reportText && !reportLoading && (
+              <div style={{
+                padding: "12px 20px", borderTop: `1px solid ${colors.border.default}`,
+                display: "flex", justifyContent: "flex-end", gap: 8, flexShrink: 0,
+              }}>
+                <button onClick={handleCopyReport} style={{
+                  display: "flex", alignItems: "center", gap: 6, padding: "8px 16px",
+                  borderRadius: radius.xl, fontSize: font.size.sm, fontWeight: font.weight.medium,
+                  border: `1px solid ${colors.border.default}`, cursor: "pointer",
+                  background: reportCopied ? alpha.brand[15] : "transparent",
+                  color: reportCopied ? colors.brand.purple : colors.text.primary,
+                  transition: "all 0.15s ease",
+                }}>
+                  {reportCopied ? <Check size={14} /> : <Copy size={14} />}
+                  {reportCopied ? "Copiato!" : "Copia testo"}
+                </button>
+                <button onClick={() => setShowReport(false)} style={{
+                  padding: "8px 16px", borderRadius: radius.xl, fontSize: font.size.sm,
+                  fontWeight: font.weight.medium, border: "none", cursor: "pointer",
+                  background: colors.bg.elevated, color: colors.text.primary,
+                }}>
+                  Chiudi
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      <style>{`@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }`}</style>
     </div>
   );
+}
+
+// Format markdown text for report display
+function formatReportMarkdown(text) {
+  if (!text) return '';
+  return text
+    .split('\n')
+    .map((line) => {
+      let formatted = line.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+      if (formatted.startsWith('- ') || formatted.startsWith('* ')) {
+        formatted = `<span style="color:${colors.brand.purple};margin-right:6px">•</span>${formatted.slice(2)}`;
+        return `<div style="padding-left:12px;margin:2px 0">${formatted}</div>`;
+      }
+      if (formatted.startsWith('## ')) {
+        return `<div style="font-weight:700;color:${colors.text.primary};font-size:14px;margin-top:16px;margin-bottom:6px;padding-bottom:4px;border-bottom:1px solid ${colors.border.subtle}">${formatted.slice(3)}</div>`;
+      }
+      if (formatted.startsWith('# ')) {
+        return `<div style="font-weight:800;color:${colors.text.primary};font-size:16px;margin-top:12px;margin-bottom:6px">${formatted.slice(2)}</div>`;
+      }
+      return formatted ? `<div style="margin:2px 0">${formatted}</div>` : '<div style="height:6px"></div>';
+    })
+    .join('');
 }
 
 // Main component - routes to correct view

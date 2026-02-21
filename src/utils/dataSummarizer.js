@@ -518,3 +518,110 @@ export function buildDataSummary(data, analytics, userStats) {
 
   return lines.join('\n');
 }
+
+/**
+ * Builds a text summary of the Live Tracker state for AI report generation.
+ * Receives comparisonData from computeWhereAreWeNow().
+ */
+export function buildTrackerSummary(comparisonData) {
+  if (!comparisonData) return 'Nessun dato tracker disponibile.';
+
+  const {
+    brand, edition, eventDate, currentDaysBefore, isEventPast,
+    currentRegistrations, dataRegistrations, isOverridden,
+    currentAttended, currentConversion,
+    comparisons, avgAtSamePoint,
+    regressionProjection, ensembleProjection,
+    avgFinal, progressPercent, targetCumulative,
+    snapshotHour,
+  } = comparisonData;
+
+  const lines = [];
+
+  // Current edition overview
+  lines.push('## EDIZIONE CORRENTE');
+  lines.push(`Brand: ${brand}`);
+  lines.push(`Edizione: ${edition}`);
+  lines.push(`Data evento: ${eventDate ? eventDate.toLocaleDateString('it', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }) : 'n/a'}`);
+  lines.push(`Stato: ${isEventPast ? 'Evento concluso' : `Mancano ${currentDaysBefore} giorni`}`);
+  lines.push(`Snapshot ore: ${snapshotHour || 'n/a'}`);
+  lines.push(`Registrazioni attuali: ${currentRegistrations}${isOverridden ? ` (dato live, da file: ${dataRegistrations})` : ''}`);
+  if (isEventPast) {
+    lines.push(`Presenze: ${currentAttended}`);
+    lines.push(`Conversione: ${currentConversion}%`);
+  }
+  lines.push('');
+
+  // Cumulative curve shape (key milestones)
+  if (targetCumulative && Object.keys(targetCumulative).length > 0) {
+    lines.push('## CURVA CUMULATIVA REGISTRAZIONI (edizione corrente)');
+    const milestones = [30, 21, 14, 7, 5, 3, 2, 1, 0];
+    for (const d of milestones) {
+      if (targetCumulative[d] != null) {
+        lines.push(`- A -${d} giorni: ${targetCumulative[d]} registrazioni`);
+      }
+    }
+    lines.push('');
+  }
+
+  // Comparison with past editions
+  if (comparisons.length > 0) {
+    lines.push('## CONFRONTO CON EDIZIONI PRECEDENTI');
+    lines.push(`Numero edizioni confrontate: ${comparisons.length}`);
+    lines.push('');
+    for (const c of comparisons) {
+      const date = c.eventDate ? c.eventDate.toLocaleDateString('it') : 'n/a';
+      const year = c.eventDate ? c.eventDate.getFullYear() : 'n/a';
+      lines.push(`### ${c.editionLabel} (${date}, anno ${year})`);
+      lines.push(`- Allo stesso punto (${isEventPast ? 'finale' : `-${currentDaysBefore}gg ${snapshotHour || ''}`}): ${c.atSamePointAdjusted ?? c.atSamePoint} registrazioni`);
+      lines.push(`- Delta vs attuale: ${c.deltaPercent != null ? `${c.deltaPercent > 0 ? '+' : ''}${c.deltaPercent}%` : 'n/a'}`);
+      lines.push(`- Registrazioni finali: ${c.totalFinal}`);
+      lines.push(`- Presenze: ${c.totalAttended}, Conversione: ${c.finalConversion}%`);
+      lines.push(`- Completamento a -${currentDaysBefore}gg: ${c.completionPercent}% del totale finale`);
+      // Cumulative milestones for this edition
+      if (c.cumulative) {
+        const mils = [14, 7, 3, 1, 0].filter(d => c.cumulative[d] != null);
+        if (mils.length > 0) {
+          lines.push(`- Curva: ${mils.map(d => `-${d}gg: ${c.cumulative[d]}`).join(', ')}`);
+        }
+      }
+    }
+    lines.push('');
+  }
+
+  // Averages and projections
+  lines.push('## MEDIE E PROIEZIONI');
+  lines.push(`Media allo stesso punto: ${avgAtSamePoint}`);
+  lines.push(`Media finale edizioni precedenti: ${avgFinal}`);
+  lines.push(`Progresso vs media finale: ${progressPercent}%`);
+  if (regressionProjection != null) {
+    lines.push(`Proiezione (regressione lineare): ${regressionProjection}`);
+  }
+  if (ensembleProjection != null) {
+    lines.push(`Proiezione (modello bilanciato): ${ensembleProjection}`);
+  }
+  lines.push('');
+
+  // Year breakdown
+  if (comparisons.length > 0) {
+    const byYear = {};
+    for (const c of comparisons) {
+      if (!c.eventDate) continue;
+      const year = c.eventDate.getFullYear();
+      if (!byYear[year]) byYear[year] = [];
+      byYear[year].push(c);
+    }
+    if (Object.keys(byYear).length > 1) {
+      lines.push('## ANALISI PER ANNO');
+      for (const [year, comps] of Object.entries(byYear).sort()) {
+        const avgFinalYear = Math.round(comps.reduce((s, c) => s + c.totalFinal, 0) / comps.length);
+        const avgSamePoint = Math.round(comps.reduce((s, c) => s + (c.atSamePointAdjusted ?? c.atSamePoint), 0) / comps.length);
+        const avgConv = (comps.reduce((s, c) => s + c.finalConversion, 0) / comps.length).toFixed(1);
+        lines.push(`- ${year}: ${comps.length} edizioni, media finale ${avgFinalYear}, media allo stesso punto ${avgSamePoint}, conversione media ${avgConv}%`);
+      }
+      lines.push('');
+    }
+  }
+
+  return lines.join('\n');
+}

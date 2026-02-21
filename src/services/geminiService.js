@@ -56,6 +56,53 @@ Domanda dell'utente: ${question}`;
   });
 }
 
+const REPORT_PROMPT = `Sei un analista esperto di eventi e club notturni. Genera un REPORT STRATEGICO conciso per il gestore del club basandoti esclusivamente sui dati forniti.
+
+Struttura del report:
+
+## Situazione attuale
+Stato dell'edizione corrente: registrazioni, giorni mancanti, confronto immediato con la media.
+
+## Confronto con edizioni precedenti
+Delta vs media storica, quali edizioni andavano meglio/peggio allo stesso punto, trend tra anni diversi se disponibili.
+
+## Proiezione e obiettivo
+Proiezione finale commentata, probabilità di superare la media storica, quanto manca all'obiettivo.
+
+## Punti di forza
+Cosa sta funzionando bene rispetto al passato (max 3 punti).
+
+## Aree di attenzione
+Rischi o criticità da monitorare (max 3 punti).
+
+## Azioni consigliate
+3-5 suggerimenti operativi concreti e specifici per i prossimi giorni.
+
+REGOLE:
+- Usa SOLO numeri e percentuali dai dati forniti, non inventare nulla
+- Sii conciso e diretto, massimo 400 parole
+- Rispondi in italiano
+- Usa bullet points per leggibilità
+- Se l'evento è già concluso, adatta il report come riepilogo post-evento`;
+
+export async function generateTrackerReport(trackerSummary) {
+  const m = getModel();
+
+  const prompt = `${REPORT_PROMPT}
+
+--- DATI LIVE TRACKER ---
+${trackerSummary}
+--- FINE DATI ---
+
+Genera il report strategico.`;
+
+  return withRetry(async () => {
+    const result = await m.generateContent(prompt);
+    const response = result.response;
+    return response.text();
+  });
+}
+
 export function isGeminiConfigured() {
   return !!process.env.REACT_APP_GEMINI_API_KEY;
 }
