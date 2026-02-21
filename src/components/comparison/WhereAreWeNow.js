@@ -255,10 +255,19 @@ function CrossBrandView({ comparisonData }) {
           if (s.eventDate) editionToYear[s.displayLabel] = s.eventDate.getFullYear();
         }
 
-        // Avg curve colors: brand color with year-based variation
+        // Avg curve colors: distinct shade per year within each brand's color family
+        const avgPaletteA = ['#fbbf24', '#f59e0b', '#d97706', '#b45309']; // yellow → amber → dark amber
+        const avgPaletteB = ['#38bdf8', '#3b82f6', '#6366f1', '#4338ca']; // sky → blue → indigo → deep indigo
         const avgColorMap = {};
+        let idxA = 0, idxB = 0;
         for (const [key, { brand }] of Object.entries(yearAvgCurves)) {
-          avgColorMap[key] = brand === brandA ? '#f59e0b' : '#3b82f6';
+          if (brand === brandA) {
+            avgColorMap[key] = avgPaletteA[idxA % avgPaletteA.length];
+            idxA++;
+          } else {
+            avgColorMap[key] = avgPaletteB[idxB % avgPaletteB.length];
+            idxB++;
+          }
         }
 
         return (
