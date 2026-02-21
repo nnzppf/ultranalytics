@@ -41,6 +41,17 @@ export default function ComparisonTab({ data, filtered, selectedBrand: topSelect
   const locationStats = useMemo(() => compareLocations(baseData), [baseData]);
   const trackerBrands = useMemo(() => getBrandsForTracker(baseData), [baseData]);
 
+  // Map edition → year tag (e.g. "'24") for display
+  const editionYearMap = useMemo(() => {
+    const map = {};
+    for (const d of baseData) {
+      if (d.editionLabel && d.eventDate && !map[d.editionLabel]) {
+        map[d.editionLabel] = "'" + String(d.eventDate.getFullYear()).slice(-2);
+      }
+    }
+    return map;
+  }, [baseData]);
+
   // Cross-brand mode: user explicitly opted to compare against another brand
   const [crossBrandTarget, setCrossBrandTarget] = useState(null);
   const [crossBrandEdition, setCrossBrandEdition] = useState(null); // specific edition of cross-brand target
@@ -293,7 +304,7 @@ export default function ComparisonTab({ data, filtered, selectedBrand: topSelect
                           background: (selectedEdition || activeEdition) === ed ? colors.interactive.active : colors.interactive.inactive,
                           color: (selectedEdition || activeEdition) === ed ? colors.interactive.activeText : colors.interactive.inactiveText,
                           transition: tr.normal,
-                        }}>{ed}</button>
+                        }}>{ed}{editionYearMap[ed] && <span style={{ fontSize: 9, opacity: 0.5, marginLeft: 3 }}>{editionYearMap[ed]}</span>}</button>
                       ))}
                     </div>
                     {/* Mobile: edition dropdown */}
@@ -302,7 +313,7 @@ export default function ComparisonTab({ data, filtered, selectedBrand: topSelect
                         value={selectedEdition || activeEdition}
                         onChange={(ed) => { setLocalSelectedEdition(ed); setCrossBrandTarget(null); setManualCount(''); setDailyCounts({}); }}
                         placeholder="Edizione"
-                        options={editions.map(ed => ({ value: ed, label: ed }))}
+                        options={editions.map(ed => ({ value: ed, label: editionYearMap[ed] ? `${ed} ${editionYearMap[ed]}` : ed }))}
                       />
                     </div>
                   </>
@@ -389,7 +400,7 @@ export default function ComparisonTab({ data, filtered, selectedBrand: topSelect
                         background: crossBrandEdition === ed ? colors.brand.pink : colors.interactive.inactive,
                         color: crossBrandEdition === ed ? colors.text.inverse : colors.interactive.inactiveText,
                         transition: tr.normal,
-                      }}>{ed}</button>
+                      }}>{ed}{editionYearMap[ed] && <span style={{ fontSize: 9, opacity: 0.5, marginLeft: 3 }}>{editionYearMap[ed]}</span>}</button>
                     ))}
                   </div>
                 )}

@@ -5,6 +5,7 @@ import ScaleToggle from '../shared/ScaleToggle';
 import { useSortable, Th } from '../shared/SortableTable';
 import DataCards from '../shared/DataCards';
 import { TOOLTIP_STYLE } from '../../config/constants';
+import { linReg } from '../../utils/comparisonEngine';
 import { colors, font, radius, gradients, presets, alpha } from '../../config/designTokens';
 
 // Cross-brand comparison view
@@ -296,8 +297,100 @@ function SingleBrandView({ comparisonData }) {
   const [projModel, setProjModel] = useState('regression');
   // Track which lines are visible (all visible by default, plus projection)
   const [hiddenLines, setHiddenLines] = useState(new Set());
+  // Year filter: excluded years for avg/projection recalculation
+  const [excludedYears, setExcludedYears] = useState(new Set());
 
-  const activeProjection = projModel === 'ensemble' ? ensembleProjection : regressionProjection;
+  // Available years from comparisons
+  const availableYears = useMemo(() => {
+    const years = new Set();
+    for (const c of comparisons) {
+      if (c.eventDate) years.add(c.eventDate.getFullYear());
+    }
+    return [...years].sort();
+  }, [comparisons]);
+
+  const toggleYear = (year) => {
+    setExcludedYears(prev => {
+      const next = new Set(prev);
+      if (next.has(year)) next.delete(year); else next.add(year);
+      return next;
+    });
+  };
+
+  // Filtered comparisons based on excluded years
+  const filteredComparisons = useMemo(() => {
+    if (excludedYears.size === 0) return comparisons;
+    return comparisons.filter(c => !c.eventDate || !excludedYears.has(c.eventDate.getFullYear()));
+  }, [comparisons, excludedYears]);
+
+  // Recompute averages and projections from filtered comparisons
+  const filtered = useMemo(() => {
+    const validComps = filteredComparisons.filter(c => c.atSamePoint > 0);
+    const fAvgAtSamePoint = validComps.length
+      ? Math.round(validComps.reduce((s, c) => s + (c.atSamePointAdjusted ?? c.atSamePoint), 0) / validComps.length)
+      : 0;
+    const fAvgFinal = filteredComparisons.length
+      ? Math.round(filteredComparisons.reduce((s, c) => s + c.totalFinal, 0) / filteredComparisons.length)
+      : 0;
+    const fProgressPercent = fAvgFinal > 0 ? Math.round((currentRegistrations / fAvgFinal) * 100) : 0;
+
+    // Regression projection
+    let fRegProj = null;
+    if (!isEventPast && validComps.length >= 2) {
+      const pts = validComps.map(c => ({ x: c.atSamePointAdjusted ?? c.atSamePoint, y: c.totalFinal }));
+      const reg = linReg(pts);
+      if (reg && reg.a > 0) {
+        fRegProj = Math.round(reg.a * currentRegistrations + reg.b);
+        if (fRegProj < currentRegistrations) fRegProj = null;
+      }
+    }
+
+    // Ensemble projection
+    let fEnsProj = null;
+    if (!isEventPast && validComps.length >= 2) {
+      const DECAY = 2;
+      const dayPredictions = [];
+      const maxDayComp = Math.max(...filteredComparisons.map(c => Math.max(...Object.keys(c.cumulative).map(Number), 0)), 0);
+      for (let d = maxDayComp; d >= 1; d--) {
+        const pts = [];
+        for (const c of filteredComparisons) {
+          const val = c.cumulative[d];
+          if (val != null && val > 0) pts.push({ x: val, y: c.totalFinal });
+        }
+        if (pts.length < 2) continue;
+        const reg = linReg(pts);
+        if (!reg || reg.a <= 0) continue;
+        const currVal = comparisonData.targetCumulative?.[d];
+        if (currVal == null || currVal <= 0) continue;
+        const pred = Math.round(reg.a * currVal + reg.b);
+        if (pred > currVal) dayPredictions.push({ day: d, pred });
+      }
+      if (fRegProj != null) dayPredictions.push({ day: 0, pred: fRegProj });
+      if (dayPredictions.length > 0) {
+        const maxDay = Math.max(...dayPredictions.map(p => p.day));
+        let wSum = 0, wTotal = 0;
+        for (const p of dayPredictions) {
+          const w = Math.pow(DECAY, maxDay - p.day);
+          wSum += p.pred * w;
+          wTotal += w;
+        }
+        fEnsProj = Math.round(wSum / wTotal);
+        if (fEnsProj < currentRegistrations) fEnsProj = null;
+      }
+    }
+
+    return { avgAtSamePoint: fAvgAtSamePoint, avgFinal: fAvgFinal, progressPercent: fProgressPercent, regressionProjection: fRegProj, ensembleProjection: fEnsProj };
+  }, [filteredComparisons, currentRegistrations, isEventPast, comparisonData.targetCumulative]);
+
+  // Use filtered values when year filter is active, original values otherwise
+  const isYearFiltered = excludedYears.size > 0;
+  const effectiveAvgAtSamePoint = isYearFiltered ? filtered.avgAtSamePoint : avgAtSamePoint;
+  const effectiveAvgFinal = isYearFiltered ? filtered.avgFinal : avgFinal;
+  const effectiveProgressPercent = isYearFiltered ? filtered.progressPercent : progressPercent;
+  const effectiveRegProj = isYearFiltered ? filtered.regressionProjection : regressionProjection;
+  const effectiveEnsProj = isYearFiltered ? filtered.ensembleProjection : ensembleProjection;
+
+  const activeProjection = projModel === 'ensemble' ? effectiveEnsProj : effectiveRegProj;
   const projDataKey = projModel === 'ensemble' ? '_projEnsemble' : '_projRegression';
   const toggleLine = (label) => {
     setHiddenLines(prev => {
@@ -334,9 +427,10 @@ function SingleBrandView({ comparisonData }) {
   }, [overlayData, compressed, allEditionLabels, currentDaysBefore]);
 
   const hasComparisons = comparisons.length > 0;
+  const hasFilteredComparisons = filteredComparisons.length > 0;
   const { sorted: sortedComparisons, sortKey: cSortKey, sortDir: cSortDir, toggleSort: cToggleSort } = useSortable(comparisons, 'eventDate', 'asc');
-  const avgDelta = avgAtSamePoint > 0
-    ? parseFloat((((currentRegistrations - avgAtSamePoint) / avgAtSamePoint) * 100).toFixed(1))
+  const avgDelta = effectiveAvgAtSamePoint > 0
+    ? parseFloat((((currentRegistrations - effectiveAvgAtSamePoint) / effectiveAvgAtSamePoint) * 100).toFixed(1))
     : null;
 
   return (
@@ -400,7 +494,7 @@ function SingleBrandView({ comparisonData }) {
             <div style={{ fontSize: font.size.xs, color: colors.text.muted, marginBottom: 4 }}>
               {isEventPast ? "Media finale altre edizioni" : "Media allo stesso punto"}
             </div>
-            <div style={{ fontSize: font.size["4xl"], fontWeight: font.weight.black, color: colors.text.primary }}>{avgAtSamePoint}</div>
+            <div style={{ fontSize: font.size["4xl"], fontWeight: font.weight.black, color: colors.text.primary }}>{effectiveAvgAtSamePoint}</div>
           </div>
         )}
         {hasComparisons && (
@@ -433,17 +527,40 @@ function SingleBrandView({ comparisonData }) {
         )}
       </div>
 
+      {/* Year filter chips — show when multiple years available */}
+      {availableYears.length > 1 && hasComparisons && (
+        <div style={{ display: "flex", gap: 6, alignItems: "center", marginBottom: 12, flexWrap: "wrap" }}>
+          <span style={{ fontSize: font.size.xs, color: colors.text.disabled }}>Filtra anni:</span>
+          {availableYears.map(year => {
+            const isExcluded = excludedYears.has(year);
+            return (
+              <button key={year} onClick={() => toggleYear(year)} style={{
+                padding: "3px 10px", borderRadius: radius.md, fontSize: font.size.xs, fontWeight: font.weight.semibold,
+                border: `1px solid ${isExcluded ? colors.border.default : colors.brand.purple}`,
+                background: isExcluded ? "transparent" : alpha.brand[15],
+                color: isExcluded ? colors.text.disabled : colors.brand.purple,
+                cursor: "pointer", transition: "all 0.15s ease",
+                textDecoration: isExcluded ? "line-through" : "none",
+                opacity: isExcluded ? 0.5 : 1,
+              }}>
+                {year}
+              </button>
+            );
+          })}
+        </div>
+      )}
+
       {/* Progress bar — only when there are comparisons */}
-      {hasComparisons && (
+      {hasFilteredComparisons && (
         <div style={{ marginBottom: 16 }}>
           <div style={{ display: "flex", justifyContent: "space-between", fontSize: font.size.xs, color: colors.text.muted, marginBottom: 4 }}>
-            <span>Progresso vs media finale ({avgFinal})</span>
-            <span>{Math.min(progressPercent, 100)}%</span>
+            <span>Progresso vs media finale ({effectiveAvgFinal})</span>
+            <span>{Math.min(effectiveProgressPercent, 100)}%</span>
           </div>
           <div style={{ background: colors.bg.page, borderRadius: radius.md, height: 8, overflow: "hidden" }}>
             <div style={{
-              width: `${Math.min(progressPercent, 100)}%`, height: "100%", borderRadius: radius.md,
-              background: progressPercent >= 100 ? colors.status.success : gradients.progress,
+              width: `${Math.min(effectiveProgressPercent, 100)}%`, height: "100%", borderRadius: radius.md,
+              background: effectiveProgressPercent >= 100 ? colors.status.success : gradients.progress,
               transition: "width 0.5s ease",
             }} />
           </div>

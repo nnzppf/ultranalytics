@@ -427,6 +427,17 @@ function AuthenticatedApp({ user, logout }) {
     });
   }, [data, selectedBrand]);
 
+  // Map edition → year (short, e.g. "'24") for year tags
+  const editionYearMap = useMemo(() => {
+    const map = {};
+    for (const r of data) {
+      if (r.editionLabel && r.eventDate && !map[r.editionLabel]) {
+        map[r.editionLabel] = "'" + String(r.eventDate.getFullYear()).slice(-2);
+      }
+    }
+    return map;
+  }, [data]);
+
   // Tab definitions
   const tabs = [
     { key: "overview", label: "Panoramica" },
@@ -663,8 +674,8 @@ function AuthenticatedApp({ user, logout }) {
               <button
                 key={ed}
                 onClick={() => setSelectedEdition(ed)}
-                style={{ ...filterBtn(selectedEdition === ed), whiteSpace: "nowrap" }}
-              >{ed}</button>
+                style={{ ...filterBtn(selectedEdition === ed), whiteSpace: "nowrap", display: "inline-flex", alignItems: "center", gap: 4 }}
+              >{ed}{editionYearMap[ed] && <span style={{ fontSize: 9, opacity: 0.5 }}>{editionYearMap[ed]}</span>}</button>
             ))}
           </div>
           {/* Mobile: compact dropdown */}
@@ -675,7 +686,7 @@ function AuthenticatedApp({ user, logout }) {
               placeholder="Edizione"
               options={[
                 { value: "all", label: `Tutte le edizioni (${availableEditions.length})` },
-                ...availableEditions.map(ed => ({ value: ed, label: ed })),
+                ...availableEditions.map(ed => ({ value: ed, label: editionYearMap[ed] ? `${ed} ${editionYearMap[ed]}` : ed })),
               ]}
             />
           </div>

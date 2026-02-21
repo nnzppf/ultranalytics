@@ -6,7 +6,7 @@
  * Simple linear regression: y = a*x + b
  * Returns { a, b, r2 } or null if insufficient data.
  */
-function linReg(points) {
+export function linReg(points) {
   const n = points.length;
   if (n < 2) return null;
   const xs = points.map(p => p.x), ys = points.map(p => p.y);
