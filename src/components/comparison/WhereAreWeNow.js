@@ -405,18 +405,12 @@ function SingleBrandView({ comparisonData }) {
     return map;
   }, [comparisons]);
 
-  // Edition labels sorted chronologically (current first, then past by sortDate)
+  // Edition labels sorted same as comparison table (current first, then table order)
   const sortedEditionLabels = useMemo(() => {
     if (!allEditionLabels || allEditionLabels.length <= 1) return allEditionLabels;
     const current = allEditionLabels[0];
-    const dateMap = {};
-    for (const c of comparisons) {
-      const d = c.sortDate || c.eventDate;
-      if (d) dateMap[c.editionLabel] = d instanceof Date ? d.getTime() : new Date(d).getTime();
-    }
-    const rest = allEditionLabels.slice(1).sort((a, b) => (dateMap[a] || 0) - (dateMap[b] || 0));
-    return [current, ...rest];
-  }, [allEditionLabels, comparisons]);
+    return [current, ...sortedComparisons.map(c => c.editionLabel)];
+  }, [allEditionLabels, sortedComparisons]);
 
   const toggleYear = (year) => {
     setExcludedYears(prev => {
