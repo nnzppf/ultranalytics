@@ -624,7 +624,57 @@ function SingleBrandView({ comparisonData }) {
   }, [comparisons, excludedYears, hiddenLines]);
 
   // Recompute averages and projections from filtered comparisons
+  // When showAvgCurves is ON and filteredComparisons is empty, use yearly avg curves
   const filtered = useMemo(() => {
+    // --- Fallback: use yearly avg curves when "Medie per anno" hides all editions ---
+    if (showAvgCurves && filteredComparisons.length === 0 && yearAvgKeys.length > 0 && !isEventPast) {
+      // Compute grand avg curve across all yearly avg curves
+      const allDays = new Set();
+      for (const year of yearAvgKeys) {
+        for (const d of Object.keys(yearAvgCurves[year])) allDays.add(Number(d));
+      }
+      const grandAvg = {};
+      for (const d of allDays) {
+        const vals = yearAvgKeys.map(y => yearAvgCurves[y][d]).filter(v => v != null);
+        if (vals.length > 0) grandAvg[d] = Math.round(vals.reduce((s, v) => s + v, 0) / vals.length);
+      }
+
+      // avgAtSamePoint: interpolate grand avg at currentDaysBefore
+      const db = currentDaysBefore;
+      let fAvgAtSamePoint = grandAvg[db] || 0;
+      // Try interpolation if exact day not available
+      if (!fAvgAtSamePoint && db > 0) {
+        const days = Object.keys(grandAvg).map(Number).sort((a, b) => a - b);
+        const lower = days.filter(d => d <= db).pop();
+        const upper = days.filter(d => d >= db).shift();
+        if (lower != null && upper != null && lower !== upper) {
+          const ratio = (db - lower) / (upper - lower);
+          fAvgAtSamePoint = Math.round(grandAvg[lower] + ratio * (grandAvg[upper] - grandAvg[lower]));
+        } else if (lower != null) {
+          fAvgAtSamePoint = grandAvg[lower];
+        }
+      }
+
+      // avgFinal: value at day 0
+      const fAvgFinal = grandAvg[0] || 0;
+      const fProgressPercent = fAvgFinal > 0 ? Math.round((currentRegistrations / fAvgFinal) * 100) : 0;
+
+      // Projection: scale final by current/avgAtSamePoint ratio
+      let fRegProj = null;
+      let fEnsProj = null;
+      if (fAvgAtSamePoint > 0 && fAvgFinal > 0) {
+        const ratio = currentRegistrations / fAvgAtSamePoint;
+        const projected = Math.round(fAvgFinal * ratio);
+        if (projected >= currentRegistrations) {
+          fRegProj = projected;
+          fEnsProj = projected;
+        }
+      }
+
+      return { avgAtSamePoint: fAvgAtSamePoint, avgFinal: fAvgFinal, progressPercent: fProgressPercent, regressionProjection: fRegProj, ensembleProjection: fEnsProj };
+    }
+
+    // --- Normal path: use filteredComparisons ---
     const validComps = filteredComparisons.filter(c => c.atSamePoint > 0);
     const fAvgAtSamePoint = validComps.length
       ? Math.round(validComps.reduce((s, c) => s + (c.atSamePointAdjusted ?? c.atSamePoint), 0) / validComps.length)
@@ -680,7 +730,7 @@ function SingleBrandView({ comparisonData }) {
     }
 
     return { avgAtSamePoint: fAvgAtSamePoint, avgFinal: fAvgFinal, progressPercent: fProgressPercent, regressionProjection: fRegProj, ensembleProjection: fEnsProj };
-  }, [filteredComparisons, currentRegistrations, isEventPast, comparisonData.targetCumulative]);
+  }, [filteredComparisons, currentRegistrations, isEventPast, comparisonData.targetCumulative, showAvgCurves, yearAvgCurves, yearAvgKeys, currentDaysBefore]);
 
   // Use filtered values when year filter or hidden lines are active
   const isYearFiltered = excludedYears.size > 0 || hiddenLines.size > 0;
