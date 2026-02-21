@@ -749,16 +749,13 @@ function SingleBrandView({ comparisonData }) {
             </table>
           </div>
           {/* Mobile: compact 2-per-row grid */}
-          <div className="mobile-cards">
+          <div className="mobile-cards" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
             {(editionsExpanded ? sortedComparisons : sortedComparisons.slice(0, 4)).map((c, i) => (
               <div key={i} style={{
-                display: "inline-flex", flexDirection: "column",
-                width: "calc(50% - 4px)", verticalAlign: "top",
-                marginRight: i % 2 === 0 ? 8 : 0, marginBottom: 8,
+                display: "flex", flexDirection: "column",
                 background: colors.bg.card, borderRadius: radius.lg,
                 padding: "10px 12px",
                 border: `1px solid ${colors.border.default}`,
-                boxSizing: "border-box",
               }}>
                 <div style={{ fontSize: 11, fontWeight: font.weight.semibold, color: colors.text.primary, marginBottom: 6, lineHeight: 1.3, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
                   {c.editionLabel}
@@ -785,7 +782,8 @@ function SingleBrandView({ comparisonData }) {
             ))}
             {sortedComparisons.length > 4 && (
               <button onClick={() => setEditionsExpanded(v => !v)} style={{
-                width: "100%", padding: "8px 0", marginTop: 4,
+                gridColumn: "1 / -1",
+                width: "100%", padding: "8px 0",
                 display: "flex", alignItems: "center", justifyContent: "center", gap: 4,
                 background: "transparent", border: `1px solid ${colors.border.default}`,
                 borderRadius: radius.md, cursor: "pointer",
