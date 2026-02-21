@@ -247,7 +247,7 @@ export default function ComparisonTab({ data, filtered, selectedBrand: topSelect
               </div>
               {/* Desktop: buttons */}
               <div className="tracker-brand-buttons" style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                {trackerBrands.map(b => (
+                {[...trackerBrands].sort((a, b) => a.brand.localeCompare(b.brand)).map(b => (
                   <button key={b.brand} onClick={() => handleSelectBrand(b.brand)} style={{
                     padding: "8px 16px", borderRadius: radius.lg, fontSize: font.size.sm,
                     border: `1px solid ${colors.border.default}`,
@@ -264,7 +264,7 @@ export default function ComparisonTab({ data, filtered, selectedBrand: topSelect
                   value={null}
                   onChange={(brand) => handleSelectBrand(brand)}
                   placeholder="Seleziona brand..."
-                  options={trackerBrands.map(b => ({ value: b.brand, label: b.brand, count: b.editions.length }))}
+                  options={[...trackerBrands].sort((a, b) => a.brand.localeCompare(b.brand)).map(b => ({ value: b.brand, label: b.brand, count: b.editions.length }))}
                 />
               </div>
             </div>
