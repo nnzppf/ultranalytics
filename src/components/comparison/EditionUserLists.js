@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react';
-import { ChevronDown, MessageCircle, Phone, Search, X, Edit3, Send } from 'lucide-react';
+import { ChevronDown, MessageCircle, Phone, Search, X, Edit3, Send, Layers } from 'lucide-react';
 import { SegmentBadge } from '../shared/Badge';
 import { formatWhatsAppUrl, openWhatsAppTab, applyTemplate, RETARGET_TEMPLATES } from '../../utils/whatsapp';
 import { colors, font, radius, shadows, presets, transition as tr, alpha } from '../../config/designTokens';
@@ -332,11 +332,60 @@ function CollapsibleSection({ title, count, withPhoneCount, children, defaultOpe
   );
 }
 
+// ---- Collapsible Edition Group (for "Per edizione" mode) ----
+function EditionGroup({ edLabel, users, brand, eventDate, eventLink, userStats, onOpenRetargetModal }) {
+  const [open, setOpen] = useState(false);
+  const withPhone = users.filter(u => u.phone).length;
+
+  return (
+    <div style={{ borderBottom: `1px solid ${colors.border.default}` }}>
+      <button
+        onClick={() => setOpen(v => !v)}
+        style={{
+          width: "100%", padding: "10px 14px", background: colors.bg.page,
+          border: "none", cursor: "pointer",
+          display: "flex", alignItems: "center", justifyContent: "space-between",
+        }}
+      >
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <ChevronDown size={14} color={colors.text.disabled} style={{
+            transform: open ? "rotate(180deg)" : "rotate(-90deg)",
+            transition: "transform 0.2s",
+          }} />
+          <span style={{ fontSize: font.size.sm, fontWeight: font.weight.bold, color: colors.text.primary }}>
+            {edLabel}
+          </span>
+          {withPhone < users.length && (
+            <span style={{ fontSize: font.size.xs, color: colors.text.disabled }}>
+              ({withPhone} con tel.)
+            </span>
+          )}
+        </div>
+        <span style={{
+          fontSize: font.size.xs, fontWeight: font.weight.bold, color: colors.text.inverse,
+          background: colors.status.warning, borderRadius: radius.xl, padding: "1px 8px",
+        }}>
+          {users.length}
+        </span>
+      </button>
+      {open && users.map((user, i) => (
+        <UserRow
+          key={i} user={user} isRetarget={true}
+          brand={brand} eventDate={eventDate} eventLink={eventLink}
+          userStats={userStats}
+          onOpenRetargetModal={onOpenRetargetModal}
+        />
+      ))}
+    </div>
+  );
+}
+
 // ---- Main Component ----
 export default function EditionUserLists({ registered, retarget, brand, edition, eventDate, eventLink, userStats }) {
   const [regSearch, setRegSearch] = useState('');
   const [retSearch, setRetSearch] = useState('');
   const [retargetModalUser, setRetargetModalUser] = useState(null);
+  const [groupByEdition, setGroupByEdition] = useState(false);
 
   const filteredReg = useMemo(() => {
     if (!regSearch) return registered;
@@ -349,6 +398,25 @@ export default function EditionUserLists({ registered, retarget, brand, edition,
     const q = retSearch.toLowerCase();
     return retarget.filter(u => u.fullName?.toLowerCase().includes(q));
   }, [retarget, retSearch]);
+
+  // Group retarget users by their most recent past edition
+  const retargetByEdition = useMemo(() => {
+    if (!groupByEdition) return null;
+    const groups = {};
+    for (const user of filteredRet) {
+      // Group by most recent edition (based on lastEventDate)
+      // Each user has pastEditions array — pick the most recent one
+      const edKey = user.pastEditions?.length === 1
+        ? user.pastEditions[0]
+        : (user.pastEditions || []).length > 0
+          ? user.pastEditions[user.pastEditions.length - 1]
+          : 'Sconosciuta';
+      if (!groups[edKey]) groups[edKey] = [];
+      groups[edKey].push(user);
+    }
+    // Sort editions by count descending
+    return Object.entries(groups).sort((a, b) => b[1].length - a[1].length);
+  }, [filteredRet, groupByEdition]);
 
   const regWithPhone = registered.filter(u => u.phone).length;
   const retWithPhone = retarget.filter(u => u.phone).length;
@@ -409,9 +477,41 @@ export default function EditionUserLists({ registered, retarget, brand, edition,
           defaultOpen={false}
           accentColor={colors.status.warning}
         >
-          {retarget.length > 10 && searchInput(retSearch, setRetSearch)}
-          <div style={{ maxHeight: 400, overflowY: "auto" }}>
-            {filteredRet.map((user, i) => (
+          {/* Toolbar: search + group toggle */}
+          <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 12px", borderBottom: `1px solid ${colors.border.default}` }}>
+            {retarget.length > 10 && (
+              <div style={{ position: "relative", flex: 1 }}>
+                <Search size={14} color={colors.text.disabled} style={{ position: "absolute", left: 10, top: 8 }} />
+                <input
+                  placeholder="Cerca nome..."
+                  value={retSearch}
+                  onChange={e => setRetSearch(e.target.value)}
+                  style={{
+                    width: "100%", padding: "6px 12px 6px 30px", borderRadius: radius.lg,
+                    background: colors.bg.input, border: `1px solid ${colors.border.default}`,
+                    color: colors.text.primary, fontSize: font.size.sm, outline: "none",
+                  }}
+                />
+              </div>
+            )}
+            <button
+              onClick={() => setGroupByEdition(v => !v)}
+              style={{
+                display: "flex", alignItems: "center", gap: 5, padding: "6px 12px",
+                borderRadius: radius.lg, fontSize: font.size.xs, fontWeight: font.weight.semibold,
+                border: "none", cursor: "pointer", whiteSpace: "nowrap", flexShrink: 0,
+                background: groupByEdition ? colors.interactive.active : colors.interactive.inactive,
+                color: groupByEdition ? colors.interactive.activeText : colors.interactive.inactiveText,
+                transition: tr.normal,
+              }}
+            >
+              <Layers size={12} /> Per edizione
+            </button>
+          </div>
+
+          <div style={{ maxHeight: 500, overflowY: "auto" }}>
+            {/* Flat list (default) */}
+            {!groupByEdition && filteredRet.map((user, i) => (
               <UserRow
                 key={i} user={user} isRetarget={true}
                 brand={brand} eventDate={eventDate} eventLink={eventLink}
@@ -419,6 +519,21 @@ export default function EditionUserLists({ registered, retarget, brand, edition,
                 onOpenRetargetModal={setRetargetModalUser}
               />
             ))}
+
+            {/* Grouped by edition — collapsible sub-sections */}
+            {groupByEdition && retargetByEdition && retargetByEdition.map(([edLabel, users]) => (
+              <EditionGroup
+                key={edLabel}
+                edLabel={edLabel}
+                users={users}
+                brand={brand}
+                eventDate={eventDate}
+                eventLink={eventLink}
+                userStats={userStats}
+                onOpenRetargetModal={setRetargetModalUser}
+              />
+            ))}
+
             {filteredRet.length === 0 && (
               <div style={{ padding: 16, textAlign: "center", fontSize: font.size.sm, color: colors.text.disabled }}>
                 Nessun risultato
