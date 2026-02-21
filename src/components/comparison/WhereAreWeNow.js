@@ -336,6 +336,22 @@ function SingleBrandView({ comparisonData }) {
   const reportCardRef = useRef(null);
   const [shareLoading, setShareLoading] = useState(false);
 
+  // Simplified chart data for report card: only current edition + overall average
+  const reportChartData = useMemo(() => {
+    if (!overlayData || overlayData.length === 0 || allEditionLabels.length === 0) return [];
+    const currentLabel = allEditionLabels[0];
+    const pastLabels = allEditionLabels.slice(1);
+    return overlayData.map(pt => {
+      const vals = pastLabels.map(l => pt[l]).filter(v => v != null);
+      return {
+        daysBefore: pt.daysBefore,
+        label: pt.label,
+        current: pt[currentLabel] != null ? pt[currentLabel] : null,
+        media: vals.length > 0 ? Math.round(vals.reduce((s, v) => s + v, 0) / vals.length) : null,
+      };
+    });
+  }, [overlayData, allEditionLabels]);
+
   const handleShareReport = useCallback(async () => {
     if (!reportCardRef.current || shareLoading) return;
     setShareLoading(true);
@@ -1042,26 +1058,35 @@ function SingleBrandView({ comparisonData }) {
                       </div>
                     </div>
 
-                    {/* Mini chart */}
+                    {/* Mini chart — current edition vs average */}
                     <div style={{ marginBottom: 16, background: colors.bg.card, borderRadius: 12, padding: "12px 8px 4px" }}>
-                      <div style={{ fontSize: 10, color: colors.text.muted, marginBottom: 4, paddingLeft: 8 }}>Curve cumulative</div>
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", paddingLeft: 8, paddingRight: 8, marginBottom: 4 }}>
+                        <span style={{ fontSize: 10, color: colors.text.muted }}>Curva cumulativa</span>
+                        <div style={{ display: "flex", gap: 12, fontSize: 9 }}>
+                          <span style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                            <span style={{ width: 14, height: 3, borderRadius: 2, background: colors.chart[0], display: "inline-block" }} />
+                            <span style={{ color: colors.text.muted }}>{edition}</span>
+                          </span>
+                          <span style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                            <span style={{ width: 14, height: 2, borderRadius: 2, background: colors.text.disabled, display: "inline-block", borderTop: `1px dashed ${colors.text.disabled}` }} />
+                            <span style={{ color: colors.text.muted }}>Media storica</span>
+                          </span>
+                        </div>
+                      </div>
                       <div style={{ width: "100%", height: 160 }}>
                         <ResponsiveContainer width="100%" height={160}>
-                          <AreaChart data={chartData} margin={{ top: 5, right: 10, left: 0, bottom: 5 }}>
+                          <AreaChart data={reportChartData} margin={{ top: 5, right: 10, left: 0, bottom: 5 }}>
                             <CartesianGrid strokeDasharray="2 8" stroke={colors.border.subtle} />
                             <XAxis dataKey="label" tick={{ fill: colors.text.disabled, fontSize: 9 }} axisLine={false} tickLine={false} />
                             <YAxis tick={{ fill: colors.text.disabled, fontSize: 9 }} axisLine={false} tickLine={false} />
-                            {allEditionLabels.map((label, i) => {
-                              const isCurrent = i === 0;
-                              if (!isCurrent && editionToYear[label] && excludedYears.has(editionToYear[label])) return null;
-                              return (
-                                <Area key={label} type="monotone" dataKey={label}
-                                  stroke={colors.chart[i % colors.chart.length]}
-                                  fill={isCurrent ? `${colors.chart[0]}18` : "transparent"}
-                                  strokeWidth={isCurrent ? 2.5 : 1} strokeDasharray={isCurrent ? "" : "4 3"}
-                                  dot={false} connectNulls />
-                              );
-                            })}
+                            <Area type="monotone" dataKey="media"
+                              stroke={colors.text.disabled} fill={`${colors.text.disabled}10`}
+                              strokeWidth={1.5} strokeDasharray="6 3"
+                              dot={false} connectNulls />
+                            <Area type="monotone" dataKey="current"
+                              stroke={colors.chart[0]} fill={`${colors.chart[0]}20`}
+                              strokeWidth={2.5}
+                              dot={false} connectNulls />
                           </AreaChart>
                         </ResponsiveContainer>
                       </div>

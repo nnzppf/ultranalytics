@@ -159,10 +159,7 @@ table {
 
 /* ===== RESPONSIVE MOBILE STYLES ===== */
 
-/* Edition bar: desktop buttons visible, mobile dropdown hidden by default */
-.edition-dropdown {
-  display: none !important;
-}
+/* Edition bar uses dropdown always — no toggle needed */
 
 /* Tracker: desktop buttons visible, mobile dropdowns hidden by default */
 .tracker-brand-dropdown,
@@ -267,13 +264,7 @@ table {
     padding: 8px 12px !important;
   }
 
-  /* Edition bar: switch to dropdown on mobile */
-  .edition-buttons {
-    display: none !important;
-  }
-  .edition-dropdown {
-    display: block !important;
-  }
+  /* Edition bar: already dropdown, just tighter padding */
 
   /* Tracker: switch to dropdowns on mobile */
   .tracker-brand-buttons,

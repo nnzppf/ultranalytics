@@ -663,23 +663,8 @@ function AuthenticatedApp({ user, logout }) {
           background: `${colors.bg.card}80`, borderBottom: `1px solid ${colors.border.default}`,
           alignItems: "center",
         }}>
-          {/* Desktop: buttons row */}
-          <div className="edition-buttons" style={{ display: "flex", gap: 4, alignItems: "center" }}>
-            <span style={{ fontSize: font.size.xs, color: colors.text.disabled, marginRight: 4, whiteSpace: "nowrap" }}>Edizione:</span>
-            <button
-              onClick={() => setSelectedEdition("all")}
-              style={{ ...filterBtn(selectedEdition === "all"), whiteSpace: "nowrap" }}
-            >Tutte ({availableEditions.length})</button>
-            {availableEditions.map(ed => (
-              <button
-                key={ed}
-                onClick={() => setSelectedEdition(ed)}
-                style={{ ...filterBtn(selectedEdition === ed), whiteSpace: "nowrap", display: "inline-flex", alignItems: "center", gap: 4 }}
-              >{ed}{editionYearMap[ed] && <span style={{ fontSize: 9, opacity: 0.5 }}>{editionYearMap[ed]}</span>}</button>
-            ))}
-          </div>
-          {/* Mobile: compact dropdown */}
-          <div className="edition-dropdown" style={{ display: "none" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <span style={{ fontSize: font.size.xs, color: colors.text.disabled, whiteSpace: "nowrap" }}>Edizione:</span>
             <Dropdown
               value={selectedEdition}
               onChange={setSelectedEdition}
