@@ -15,8 +15,9 @@ export default function OverviewTab({ analytics, filtered, selectedBrand, graphH
   const [logScale, setLogScale] = useState(false);
   const [logScaleYearly, setLogScaleYearly] = useState(false);
   const [hiddenYears, setHiddenYears] = useState(new Set());
+  const [yearlyView, setYearlyView] = useState('curve'); // 'curve' | 'barre'
 
-  const { dowData, daysBeforeData, multiEvent } = analytics;
+  const { dowData, daysBeforeData, multiEvent, eventStats } = analytics;
 
   // Yearly average cumulative curves
   const yearlyAvg = useMemo(() => {
@@ -31,6 +32,27 @@ export default function OverviewTab({ analytics, filtered, selectedBrand, graphH
       return next;
     });
   };
+
+  // Yearly bar data: avg registrations + avg conversion per year
+  const yearlyBarData = useMemo(() => {
+    if (!eventStats || !eventStats.length) return [];
+    const byYear = {};
+    for (const ev of eventStats) {
+      if (!ev.eventDate) continue;
+      const year = ev.eventDate.getFullYear();
+      if (!byYear[year]) byYear[year] = { year, totalReg: 0, totalEnt: 0, editions: 0 };
+      byYear[year].totalReg += ev.registrations;
+      byYear[year].totalEnt += ev.entries;
+      byYear[year].editions++;
+    }
+    return Object.values(byYear).sort((a, b) => a.year - b.year).map(y => ({
+      year: String(y.year),
+      mediaReg: Math.round(y.totalReg / y.editions),
+      mediaPresenze: Math.round(y.totalEnt / y.editions),
+      conv: y.totalReg > 0 ? parseFloat(((y.totalEnt / y.totalReg) * 100).toFixed(1)) : 0,
+      edizioni: y.editions,
+    }));
+  }, [eventStats]);
 
   // Recalculate hourly data when granularity changes
   const groupKey = selectedBrand !== "all" ? 'editionLabel' : 'brand';
@@ -65,64 +87,107 @@ export default function OverviewTab({ analytics, filtered, selectedBrand, graphH
       {yearlyAvg.years.length > 0 && (
         <FadeIn style={{ gridColumn: "1 / -1" }}><Section
           title="Andamento registrazioni per anno"
-          extra={<ScaleToggle isLog={logScaleYearly} onToggle={setLogScaleYearly} />}
+          extra={
+            <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+              {['curve', 'barre'].map(v => (
+                <button key={v} onClick={() => setYearlyView(v)} style={{
+                  padding: "3px 10px", borderRadius: radius.md, fontSize: font.size.xs, border: "none", cursor: "pointer",
+                  background: yearlyView === v ? colors.interactive.active : colors.interactive.inactive,
+                  color: yearlyView === v ? colors.interactive.activeText : colors.interactive.inactiveText,
+                  transition: tr.normal, fontWeight: font.weight.medium,
+                }}>{v === 'curve' ? 'Curve' : 'Barre'}</button>
+              ))}
+              {yearlyView === 'curve' && <ScaleToggle isLog={logScaleYearly} onToggle={setLogScaleYearly} />}
+            </div>
+          }
         >
-          <div style={{ fontSize: font.size.xs, color: colors.text.muted, marginBottom: 8 }}>
-            Media registrazioni cumulative per edizione, raggruppate per anno
-          </div>
-          <ResponsiveContainer width="100%" height={graphHeights.yearlyAvg || 260}>
-            <AreaChart data={logScaleYearly ? yearlyAvg.data.map(d => {
-              const pt = { ...d };
-              for (const y of yearlyAvg.years) { if (pt[y] === 0) pt[y] = null; }
-              return pt;
-            }) : yearlyAvg.data}>
-              <CartesianGrid strokeDasharray="3 3" stroke={colors.border.default} />
-              <XAxis dataKey="day" tick={{ fill: colors.text.muted, fontSize: 10 }} />
-              <YAxis scale={logScaleYearly ? "log" : "auto"} domain={logScaleYearly ? [1, "auto"] : [0, "auto"]} allowDataOverflow={logScaleYearly} tick={{ fill: colors.text.muted, fontSize: 10 }} />
-              <Tooltip {...TOOLTIP_STYLE} />
-              {yearlyAvg.years.map((year, i) => {
-                if (hiddenYears.has(year)) return null;
-                const isCurrent = year === yearlyAvg.years[yearlyAvg.years.length - 1];
-                return (
-                  <Area
-                    key={year}
-                    type="monotone"
-                    dataKey={year}
-                    stroke={COLORS[i % COLORS.length]}
-                    fill={isCurrent ? `${COLORS[i % COLORS.length]}22` : "transparent"}
-                    strokeWidth={isCurrent ? 3 : 2}
-                    dot={false}
-                    connectNulls
-                    name={year}
-                  />
-                );
-              })}
-            </AreaChart>
-          </ResponsiveContainer>
-          {/* Clickable year legend */}
-          <div style={{ display: "flex", gap: 8, flexWrap: "wrap", justifyContent: "center", marginTop: 8 }}>
-            {yearlyAvg.years.map((year, i) => {
-              const isHidden = hiddenYears.has(year);
-              return (
-                <button key={year} onClick={() => toggleYear(year)} style={{
-                  display: "flex", alignItems: "center", gap: 4, padding: "2px 8px",
-                  borderRadius: radius.md, border: "none", cursor: "pointer",
-                  background: "transparent", opacity: isHidden ? 0.3 : 1, transition: "all 0.2s ease",
-                }}>
-                  <span style={{
-                    width: 12, height: 3, display: "inline-block", borderRadius: 2,
-                    background: COLORS[i % COLORS.length],
+          {yearlyView === 'curve' ? (
+            <>
+              <div style={{ fontSize: font.size.xs, color: colors.text.muted, marginBottom: 8 }}>
+                Media registrazioni cumulative per edizione, raggruppate per anno
+              </div>
+              <ResponsiveContainer width="100%" height={graphHeights.yearlyAvg || 260}>
+                <AreaChart data={logScaleYearly ? yearlyAvg.data.map(d => {
+                  const pt = { ...d };
+                  for (const y of yearlyAvg.years) { if (pt[y] === 0) pt[y] = null; }
+                  return pt;
+                }) : yearlyAvg.data}>
+                  <CartesianGrid strokeDasharray="3 3" stroke={colors.border.default} />
+                  <XAxis dataKey="day" tick={{ fill: colors.text.muted, fontSize: 10 }} />
+                  <YAxis scale={logScaleYearly ? "log" : "auto"} domain={logScaleYearly ? [1, "auto"] : [0, "auto"]} allowDataOverflow={logScaleYearly} tick={{ fill: colors.text.muted, fontSize: 10 }} />
+                  <Tooltip {...TOOLTIP_STYLE} />
+                  {yearlyAvg.years.map((year, i) => {
+                    if (hiddenYears.has(year)) return null;
+                    const isCurrent = year === yearlyAvg.years[yearlyAvg.years.length - 1];
+                    return (
+                      <Area
+                        key={year}
+                        type="monotone"
+                        dataKey={year}
+                        stroke={COLORS[i % COLORS.length]}
+                        fill={isCurrent ? `${COLORS[i % COLORS.length]}22` : "transparent"}
+                        strokeWidth={isCurrent ? 3 : 2}
+                        dot={false}
+                        connectNulls
+                        name={year}
+                      />
+                    );
+                  })}
+                </AreaChart>
+              </ResponsiveContainer>
+              {/* Clickable year legend */}
+              <div style={{ display: "flex", gap: 8, flexWrap: "wrap", justifyContent: "center", marginTop: 8 }}>
+                {yearlyAvg.years.map((year, i) => {
+                  const isHidden = hiddenYears.has(year);
+                  return (
+                    <button key={year} onClick={() => toggleYear(year)} style={{
+                      display: "flex", alignItems: "center", gap: 4, padding: "2px 8px",
+                      borderRadius: radius.md, border: "none", cursor: "pointer",
+                      background: "transparent", opacity: isHidden ? 0.3 : 1, transition: "all 0.2s ease",
+                    }}>
+                      <span style={{
+                        width: 12, height: 3, display: "inline-block", borderRadius: 2,
+                        background: COLORS[i % COLORS.length],
+                      }} />
+                      <span style={{
+                        fontSize: font.size.xs,
+                        color: isHidden ? colors.text.disabled : colors.text.muted,
+                        fontWeight: font.weight.medium,
+                        textDecoration: isHidden ? "line-through" : "none",
+                      }}>{year}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            </>
+          ) : (
+            <>
+              <div style={{ fontSize: font.size.xs, color: colors.text.muted, marginBottom: 8 }}>
+                Media registrazioni e presenze per edizione · tra parentesi il numero di edizioni
+              </div>
+              <ResponsiveContainer width="100%" height={graphHeights.yearlyAvg || 260}>
+                <BarChart data={yearlyBarData}>
+                  <CartesianGrid strokeDasharray="3 3" stroke={colors.border.default} />
+                  <XAxis dataKey="year" tick={{ fill: colors.text.muted, fontSize: 11 }} />
+                  <YAxis tick={{ fill: colors.text.muted, fontSize: 10 }} />
+                  <Tooltip {...TOOLTIP_STYLE} formatter={(value, name) => {
+                    if (name === 'conv') return [`${value}%`, 'Conversione'];
+                    return [value, name === 'mediaReg' ? 'Media reg.' : 'Media presenze'];
                   }} />
-                  <span style={{
-                    fontSize: font.size.xs,
-                    color: isHidden ? colors.text.disabled : colors.text.muted,
-                    fontWeight: font.weight.medium,
-                    textDecoration: isHidden ? "line-through" : "none",
-                  }}>{year}</span>
-                </button>
-              );
-            })}
-          </div>
+                  <Bar dataKey="mediaReg" name="Media reg." fill={colors.brand.purple} radius={[4, 4, 0, 0]} maxBarSize={48} />
+                  <Bar dataKey="mediaPresenze" name="Media presenze" fill={colors.status.success} radius={[4, 4, 0, 0]} maxBarSize={48} />
+                </BarChart>
+              </ResponsiveContainer>
+              {/* Year stats */}
+              <div style={{ display: "flex", gap: 12, flexWrap: "wrap", justifyContent: "center", marginTop: 8 }}>
+                {yearlyBarData.map(y => (
+                  <span key={y.year} style={{ fontSize: font.size.xs, color: colors.text.muted }}>
+                    {y.year}: <strong style={{ color: colors.text.primary }}>{y.mediaReg}</strong> reg/ed · <strong style={{ color: colors.status.success }}>{y.conv}%</strong> conv · ({y.edizioni} ed.)
+                  </span>
+                ))}
+              </div>
+            </>
+          )}
           <ResizeHandle chartKey="yearlyAvg" graphHeights={graphHeights} setGraphHeights={setGraphHeights} />
         </Section></FadeIn>
       )}
