@@ -277,8 +277,8 @@ async function main() {
   console.log('   ✅ Pulizia completata\n');
 
   // 1. Parse biglietti
-  console.log('📄 Parsing biglietti-18-02.csv...');
-  const bigliettiRaw = readFileSync('C:\\Users\\filza\\Desktop\\CLUB DATA\\biglietti-18-02.csv', 'utf-8');
+  console.log('📄 Parsing biglietti-21-02.csv...');
+  const bigliettiRaw = readFileSync('C:\\Users\\filza\\Desktop\\CLUB DATA\\biglietti-21-02.csv', 'utf-8');
   const bigliettiRows = parse(bigliettiRaw, { columns: true, skip_empty_lines: true });
   console.log(`   ${bigliettiRows.length} righe trovate`);
 
@@ -295,11 +295,11 @@ async function main() {
   console.log(`   ${users.length} utenti processati\n`);
 
   // 3. Upload biglietti to Firestore
-  const bigliettiId = `ds_biglietti_18_02`;
+  const bigliettiId = `ds_biglietti_21_02`;
   console.log(`☁️  Salvando biglietti su Firestore (${records.length} record)...`);
 
   await setDoc(doc(db, 'datasets', bigliettiId), {
-    fileName: 'biglietti-18-02.csv',
+    fileName: 'biglietti-21-02.csv',
     fileType: 'biglietti',
     fileUrl: null,
     recordCount: records.length,
