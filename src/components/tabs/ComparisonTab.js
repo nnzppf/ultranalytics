@@ -147,8 +147,17 @@ export default function ComparisonTab({ data, filtered, selectedBrand: topSelect
   };
 
   const handleSelectBrand = (brand) => {
-    // If a brand is already selected and we pick a different one, open cross-brand comparison
-    if (effectiveBrand && brand !== effectiveBrand) {
+    // If a brand is already active (selected or from top bar) and we pick a different one, open cross-brand comparison
+    const activeBrand = selectedBrand || highlightBrand;
+    if (activeBrand && brand !== activeBrand) {
+      // Ensure primary brand is set for tracker
+      if (!selectedBrand && highlightBrand) {
+        setSelectedBrand(highlightBrand);
+        const brandInfo = trackerBrands.find(b => b.brand === highlightBrand);
+        if (brandInfo && brandInfo.editions.length >= 1) {
+          setLocalSelectedEdition(brandInfo.editions[brandInfo.editions.length - 1]);
+        }
+      }
       setCrossBrandTarget(brand);
       setCrossBrandEdition(null);
       setView('tracker');

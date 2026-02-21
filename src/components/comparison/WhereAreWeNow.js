@@ -930,10 +930,10 @@ function SingleBrandView({ comparisonData }) {
                 <Area
                   type="monotone"
                   dataKey={projDataKey}
-                  stroke={colors.status.success}
+                  stroke="#f59e0b"
                   fill="transparent"
-                  strokeWidth={2}
-                  strokeDasharray="6 4"
+                  strokeWidth={2.5}
+                  strokeDasharray="8 5"
                   dot={false}
                   connectNulls
                   name={`Proiezione (${PROJ_MODELS.find(m => m.key === projModel)?.label || ''})`}
@@ -1007,7 +1007,7 @@ function SingleBrandView({ comparisonData }) {
               }}>
                 <span style={{
                   width: 14, height: 2, display: "inline-block", borderRadius: 1,
-                  borderBottom: `2px dashed ${colors.status.success}`,
+                  borderBottom: `2.5px dashed #f59e0b`,
                 }} />
                 <span style={{
                   fontSize: font.size.xs,
