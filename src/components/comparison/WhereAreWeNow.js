@@ -405,13 +405,6 @@ function SingleBrandView({ comparisonData }) {
     return map;
   }, [comparisons]);
 
-  // Edition labels sorted same as comparison table (current first, then table order)
-  const sortedEditionLabels = useMemo(() => {
-    if (!allEditionLabels || allEditionLabels.length <= 1) return allEditionLabels;
-    const current = allEditionLabels[0];
-    return [current, ...sortedComparisons.map(c => c.editionLabel)];
-  }, [allEditionLabels, sortedComparisons]);
-
   const toggleYear = (year) => {
     setExcludedYears(prev => {
       const next = new Set(prev);
@@ -581,6 +574,14 @@ function SingleBrandView({ comparisonData }) {
   const hasComparisons = comparisons.length > 0;
   const hasFilteredComparisons = filteredComparisons.length > 0;
   const { sorted: sortedComparisons, sortKey: cSortKey, sortDir: cSortDir, toggleSort: cToggleSort } = useSortable(comparisons, 'eventDate', 'asc');
+
+  // Edition labels sorted same as comparison table (current first, then table order)
+  const sortedEditionLabels = useMemo(() => {
+    if (!allEditionLabels || allEditionLabels.length <= 1) return allEditionLabels;
+    const current = allEditionLabels[0];
+    return [current, ...sortedComparisons.map(c => c.editionLabel)];
+  }, [allEditionLabels, sortedComparisons]);
+
   const avgDelta = effectiveAvgAtSamePoint > 0
     ? parseFloat((((currentRegistrations - effectiveAvgAtSamePoint) / effectiveAvgAtSamePoint) * 100).toFixed(1))
     : null;
