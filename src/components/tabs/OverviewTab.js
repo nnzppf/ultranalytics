@@ -6,12 +6,13 @@ import ResizeHandle from '../shared/ResizeHandle';
 import ScaleToggle from '../shared/ScaleToggle';
 import { COLORS, TOOLTIP_STYLE } from '../../config/constants';
 import { colors, font, radius, alpha, transition as tr } from '../../config/designTokens';
-import { getHourlyData, getHourlyDataByGroup, getYearlyAvgCurves } from '../../utils/dataTransformers';
+import { getHourlyData, getHourlyDataByGroup, getHourlyAccessData, getHourlyAccessDataByGroup, getYearlyAvgCurves } from '../../utils/dataTransformers';
 import { FadeIn } from '../shared/Motion';
 
 export default function OverviewTab({ analytics, filtered, selectedBrand, graphHeights, setGraphHeights }) {
   const [timeGranularity, setTimeGranularity] = useState('hourly');
   const [stackedView, setStackedView] = useState(false);
+  const [hourlyMode, setHourlyMode] = useState('registrazioni'); // 'registrazioni' | 'accessi'
   const [logScale, setLogScale] = useState(false);
   const [logScaleYearly, setLogScaleYearly] = useState(false);
   const [hiddenYears, setHiddenYears] = useState(new Set());
@@ -82,10 +83,24 @@ export default function OverviewTab({ analytics, filtered, selectedBrand, graphH
     return getHourlyDataByGroup(filtered, groupKey, timeGranularity);
   }, [filtered, groupKey, timeGranularity, analytics.hourlyRegByEvent]);
 
+  const hourlyAccess = useMemo(() => {
+    if (!filtered || !filtered.length) return [];
+    return getHourlyAccessData(filtered, timeGranularity);
+  }, [filtered, timeGranularity]);
+
+  const hourlyAccessByEvent = useMemo(() => {
+    if (!filtered || !filtered.length) return null;
+    return getHourlyAccessDataByGroup(filtered, groupKey, timeGranularity);
+  }, [filtered, groupKey, timeGranularity]);
+
   const hourlyPeak = useMemo(() => {
+    if (hourlyMode === 'accessi') {
+      if (!hourlyAccess || !hourlyAccess.length) return null;
+      return hourlyAccess.reduce((max, h) => h.accessi > (max?.accessi || 0) ? h : max, null);
+    }
     if (!hourlyReg || !hourlyReg.length) return null;
     return hourlyReg.reduce((max, h) => h.registrazioni > (max?.registrazioni || 0) ? h : max, null);
-  }, [hourlyReg]);
+  }, [hourlyReg, hourlyAccess, hourlyMode]);
 
   // Show stacked if multiple brands OR single brand with multiple editions (groups in byEvent data)
   const hasStackableData = multiEvent || (hourlyRegByEvent && hourlyRegByEvent.groups && hourlyRegByEvent.groups.length > 1);
@@ -228,11 +243,19 @@ export default function OverviewTab({ analytics, filtered, selectedBrand, graphH
         </Section></FadeIn>
       )}
 
-      {/* Registrazioni per ora — full width */}
+      {/* Registrazioni/Accessi per ora — full width */}
       <FadeIn style={{ gridColumn: "1 / -1" }}><Section
-        title="Registrazioni per ora del giorno"
+        title={hourlyMode === 'accessi' ? "Accessi per ora del giorno" : "Registrazioni per ora del giorno"}
         extra={
-          <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+          <div style={{ display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap" }}>
+            {[{ key: 'registrazioni', label: 'Registrazioni' }, { key: 'accessi', label: 'Accessi' }].map(b => (
+              <button key={b.key} onClick={() => setHourlyMode(b.key)} style={{
+                padding: "3px 10px", borderRadius: radius.md, fontSize: font.size.xs, border: "none", cursor: "pointer",
+                background: hourlyMode === b.key ? colors.interactive.active : colors.interactive.inactive,
+                color: hourlyMode === b.key ? colors.interactive.activeText : colors.interactive.inactiveText, transition: tr.normal,
+              }}>{b.label}</button>
+            ))}
+            <span style={{ width: 1, height: 16, background: colors.border.default, margin: "0 4px" }} />
             {granButtons.map(b => (
               <button key={b.key} onClick={() => setTimeGranularity(b.key)} style={{
                 padding: "3px 10px", borderRadius: radius.md, fontSize: font.size.xs, border: "none", cursor: "pointer",
@@ -244,7 +267,7 @@ export default function OverviewTab({ analytics, filtered, selectedBrand, graphH
               <button onClick={() => setStackedView(v => !v)} style={{
                 padding: "3px 10px", borderRadius: radius.md, fontSize: font.size.xs, border: "none", cursor: "pointer",
                 background: stackedView ? colors.interactive.active : colors.interactive.inactive,
-                color: stackedView ? colors.interactive.activeText : colors.text.muted, marginLeft: 8,
+                color: stackedView ? colors.interactive.activeText : colors.text.muted, marginLeft: 4,
                 transition: tr.normal,
               }}>Stacked</button>
             )}
@@ -253,23 +276,38 @@ export default function OverviewTab({ analytics, filtered, selectedBrand, graphH
       >
         {hourlyPeak && (
           <div style={{ fontSize: font.size.xs, color: colors.text.muted, marginBottom: 8, display: "flex", gap: 6, alignItems: "center" }}>
-            <TrendingUp size={12} color={colors.brand.purple} />
-            Picco: <strong style={{ color: colors.text.primary }}>{hourlyPeak.hour}</strong> con {hourlyPeak.registrazioni} registrazioni
+            <TrendingUp size={12} color={hourlyMode === 'accessi' ? colors.status.success : colors.brand.purple} />
+            Picco: <strong style={{ color: colors.text.primary }}>{hourlyPeak.hour}</strong> con {hourlyMode === 'accessi' ? hourlyPeak.accessi : hourlyPeak.registrazioni} {hourlyMode === 'accessi' ? 'accessi' : 'registrazioni'}
           </div>
         )}
         <ResponsiveContainer width="100%" height={graphHeights.hourly || 250}>
-          <BarChart data={stackedView && hourlyRegByEvent ? hourlyRegByEvent.data : hourlyReg}>
-            <CartesianGrid strokeDasharray="3 3" stroke={colors.border.default} />
-            <XAxis dataKey="hour" tick={{ fill: colors.text.muted, fontSize: 9 }} interval={timeGranularity === '15min' ? 7 : timeGranularity === '30min' ? 3 : 1} />
-            <YAxis tick={{ fill: colors.text.muted, fontSize: 10 }} />
-            <Tooltip {...TOOLTIP_STYLE} />
-            {stackedView && hourlyRegByEvent
-              ? hourlyRegByEvent.groups.map((g, i) => (
-                  <Bar key={g} dataKey={g} stackId="a" fill={COLORS[i % COLORS.length]} maxBarSize={18} />
-                ))
-              : <Bar dataKey="registrazioni" fill={colors.brand.purple} radius={[4, 4, 0, 0]} maxBarSize={18} />
-            }
-          </BarChart>
+          {hourlyMode === 'accessi' ? (
+            <BarChart data={stackedView && hourlyAccessByEvent ? hourlyAccessByEvent.data : hourlyAccess}>
+              <CartesianGrid strokeDasharray="3 3" stroke={colors.border.default} />
+              <XAxis dataKey="hour" tick={{ fill: colors.text.muted, fontSize: 9 }} interval={timeGranularity === '15min' ? 7 : timeGranularity === '30min' ? 3 : 1} />
+              <YAxis tick={{ fill: colors.text.muted, fontSize: 10 }} />
+              <Tooltip {...TOOLTIP_STYLE} />
+              {stackedView && hourlyAccessByEvent
+                ? hourlyAccessByEvent.groups.map((g, i) => (
+                    <Bar key={g} dataKey={g} stackId="a" fill={COLORS[i % COLORS.length]} maxBarSize={18} />
+                  ))
+                : <Bar dataKey="accessi" fill={colors.status.success} radius={[4, 4, 0, 0]} maxBarSize={18} />
+              }
+            </BarChart>
+          ) : (
+            <BarChart data={stackedView && hourlyRegByEvent ? hourlyRegByEvent.data : hourlyReg}>
+              <CartesianGrid strokeDasharray="3 3" stroke={colors.border.default} />
+              <XAxis dataKey="hour" tick={{ fill: colors.text.muted, fontSize: 9 }} interval={timeGranularity === '15min' ? 7 : timeGranularity === '30min' ? 3 : 1} />
+              <YAxis tick={{ fill: colors.text.muted, fontSize: 10 }} />
+              <Tooltip {...TOOLTIP_STYLE} />
+              {stackedView && hourlyRegByEvent
+                ? hourlyRegByEvent.groups.map((g, i) => (
+                    <Bar key={g} dataKey={g} stackId="a" fill={COLORS[i % COLORS.length]} maxBarSize={18} />
+                  ))
+                : <Bar dataKey="registrazioni" fill={colors.brand.purple} radius={[4, 4, 0, 0]} maxBarSize={18} />
+              }
+            </BarChart>
+          )}
         </ResponsiveContainer>
         <ResizeHandle chartKey="hourly" graphHeights={graphHeights} setGraphHeights={setGraphHeights} />
       </Section></FadeIn>

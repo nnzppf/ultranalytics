@@ -34,6 +34,95 @@ export function getHourlyData(data, granularity = 'hourly') {
 }
 
 /**
+ * Get hourly access (entry) distribution — same logic as getHourlyData but uses scanDate.
+ * Only returns hours that have at least one access across the dataset.
+ */
+export function getHourlyAccessData(data, granularity = 'hourly') {
+  const buckets = {};
+
+  if (granularity === 'hourly') {
+    for (let h = 0; h < 24; h++) buckets[`${String(h).padStart(2,'0')}:00`] = 0;
+  } else if (granularity === '30min') {
+    for (let h = 0; h < 24; h++) {
+      buckets[`${String(h).padStart(2,'0')}:00`] = 0;
+      buckets[`${String(h).padStart(2,'0')}:30`] = 0;
+    }
+  } else {
+    for (let h = 0; h < 24; h++) {
+      for (const m of ['00','15','30','45']) buckets[`${String(h).padStart(2,'0')}:${m}`] = 0;
+    }
+  }
+
+  for (const d of data) {
+    if (!d.scanDate) continue;
+    const h = d.scanDate.getHours();
+    const min = d.scanDate.getMinutes();
+    let key;
+    if (granularity === 'hourly') key = `${String(h).padStart(2,'0')}:00`;
+    else if (granularity === '30min') key = `${String(h).padStart(2,'0')}:${min < 30 ? '00' : '30'}`;
+    else key = `${String(h).padStart(2,'0')}:${String(Math.floor(min/15)*15).padStart(2,'0')}`;
+    if (buckets[key] !== undefined) buckets[key]++;
+  }
+
+  // Filter: keep only hours with data + neighbouring context (typically 18:00–05:00)
+  const all = Object.entries(buckets).map(([hour, accessi]) => ({ hour, accessi }));
+  // Find first and last non-zero indices
+  const firstIdx = all.findIndex(b => b.accessi > 0);
+  const lastIdx = all.length - 1 - [...all].reverse().findIndex(b => b.accessi > 0);
+  if (firstIdx === -1) return all; // no data
+  // Expand range by 1 slot on each side for context
+  const start = Math.max(0, firstIdx - 1);
+  const end = Math.min(all.length - 1, lastIdx + 1);
+  return all.slice(start, end + 1);
+}
+
+/**
+ * Hourly access data stacked by a grouping key.
+ */
+export function getHourlyAccessDataByGroup(data, groupKey, granularity = 'hourly') {
+  const groups = [...new Set(data.map(d => d[groupKey]))].filter(Boolean);
+  const base = getHourlyAccessData([], granularity);
+
+  // Build full 24h buckets first, then filter
+  const fullBuckets = {};
+  if (granularity === 'hourly') {
+    for (let h = 0; h < 24; h++) fullBuckets[`${String(h).padStart(2,'0')}:00`] = {};
+  } else if (granularity === '30min') {
+    for (let h = 0; h < 24; h++) {
+      fullBuckets[`${String(h).padStart(2,'0')}:00`] = {};
+      fullBuckets[`${String(h).padStart(2,'0')}:30`] = {};
+    }
+  } else {
+    for (let h = 0; h < 24; h++) {
+      for (const m of ['00','15','30','45']) fullBuckets[`${String(h).padStart(2,'0')}:${m}`] = {};
+    }
+  }
+  for (const key of Object.keys(fullBuckets)) {
+    groups.forEach(g => { fullBuckets[key][g] = 0; });
+  }
+
+  for (const d of data) {
+    if (!d.scanDate || !d[groupKey]) continue;
+    const h = d.scanDate.getHours();
+    const min = d.scanDate.getMinutes();
+    let key;
+    if (granularity === 'hourly') key = `${String(h).padStart(2,'0')}:00`;
+    else if (granularity === '30min') key = `${String(h).padStart(2,'0')}:${min < 30 ? '00' : '30'}`;
+    else key = `${String(h).padStart(2,'0')}:${String(Math.floor(min/15)*15).padStart(2,'0')}`;
+    if (fullBuckets[key] && fullBuckets[key][d[groupKey]] !== undefined) fullBuckets[key][d[groupKey]]++;
+  }
+
+  const allEntries = Object.entries(fullBuckets).map(([hour, vals]) => ({ hour, ...vals }));
+  const hasData = (row) => groups.some(g => row[g] > 0);
+  const firstIdx = allEntries.findIndex(hasData);
+  const lastIdx = allEntries.length - 1 - [...allEntries].reverse().findIndex(hasData);
+  if (firstIdx === -1) return { data: base.length ? base.map(b => { const o = { hour: b.hour }; groups.forEach(g => { o[g] = 0; }); return o; }) : [], groups };
+  const start = Math.max(0, firstIdx - 1);
+  const end = Math.min(allEntries.length - 1, lastIdx + 1);
+  return { data: allEntries.slice(start, end + 1), groups };
+}
+
+/**
  * Hourly data stacked by a grouping key (brand, genre, etc.)
  */
 export function getHourlyDataByGroup(data, groupKey, granularity = 'hourly') {
