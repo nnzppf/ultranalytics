@@ -2,7 +2,7 @@
 import { useState, useMemo, useEffect, useCallback, useRef } from "react";
 import Papa from "papaparse";
 import * as XLSX from "xlsx";
-import { Users, Check, TrendingUp, X, Calendar, Gift, Cloud, CloudOff, Loader, Database, LogOut, Settings, Sun, Moon, SlidersHorizontal, Download } from "lucide-react";
+import { Users, Check, TrendingUp, X, Calendar, Gift, Cloud, CloudOff, Loader, Database, LogOut, Settings, Sun, Moon, SlidersHorizontal, Download, SearchX } from "lucide-react";
 
 import { useAuth } from "./contexts/AuthContext";
 import LoginScreen from "./components/screens/LoginScreen";
@@ -17,13 +17,12 @@ import { colors, font, radius, gradients, glass, shadows, transition as tr } fro
 import KPI from "./components/shared/KPI";
 import UploadScreen from "./components/screens/UploadScreen";
 import OverviewTab from "./components/tabs/OverviewTab";
-import HeatmapTab from "./components/tabs/HeatmapTab";
-import FasceTab from "./components/tabs/FasceTab";
-import TrendsTab from "./components/tabs/TrendsTab";
+import AnalisiTemporaleTab from "./components/tabs/AnalisiTemporaleTab";
 import UsersTab from "./components/tabs/UsersTab";
 import ComparisonTab from "./components/tabs/ComparisonTab";
 import BirthdaysTab from "./components/tabs/BirthdaysTab";
 import AiChat from "./components/AiChat";
+import EmptyState from "./components/shared/EmptyState";
 import { motion } from "framer-motion";
 import { StaggerList, StaggerItem, TabTransition } from "./components/shared/Motion";
 import { ToastProvider, useToast } from "./components/shared/Toast";
@@ -449,13 +448,19 @@ function AuthenticatedApp({ user, logout }) {
   // Tab definitions
   const tabs = [
     { key: "overview", label: "Panoramica" },
-    { key: "heatmap", label: "Heatmap" },
-    { key: "fasce", label: "Fasce Orarie" },
-    { key: "trends", label: "Trend" },
+    { key: "analisi-temporale", label: "Analisi Temporale" },
     { key: "confronti", label: "Confronti", highlight: true },
     { key: "utenti", label: "Utenti" },
     { key: "compleanni", label: "Compleanni", icon: Gift },
   ];
+
+  // Reset all filters
+  const resetAllFilters = () => {
+    setSelectedCategory("all");
+    setSelectedGenre("all");
+    setSelectedBrand("all");
+    setSelectedEdition("all");
+  };
 
   // Direction-aware tab switch
   const switchTab = (newKey) => {
@@ -763,6 +768,15 @@ function AuthenticatedApp({ user, logout }) {
 
       {/* Tab Content */}
       <div className="app-content" style={{ padding: "0 20px 40px" }}>
+        {filtered.length === 0 ? (
+          <EmptyState
+            icon={SearchX}
+            title="Nessun dato trovato"
+            description="Prova a cambiare i filtri o seleziona un altro brand/edizione"
+            action="Resetta filtri"
+            onAction={resetAllFilters}
+          />
+        ) : (
         <TabTransition tabKey={activeTab} direction={tabDirection}>
         {activeTab === "overview" && (
           <OverviewTab
@@ -774,24 +788,16 @@ function AuthenticatedApp({ user, logout }) {
           />
         )}
 
-        {activeTab === "heatmap" && (
-          <HeatmapTab heatmapGrid={analytics.heatmapGrid} />
-        )}
-
-        {activeTab === "fasce" && (
-          <FasceTab
+        {activeTab === "analisi-temporale" && (
+          <AnalisiTemporaleTab
+            heatmapGrid={analytics.heatmapGrid}
             fasciaData={analytics.fasciaData}
             convByFascia={analytics.convByFascia}
-            graphHeights={graphHeights}
-            setGraphHeights={setGraphHeights}
-          />
-        )}
-
-        {activeTab === "trends" && (
-          <TrendsTab
             trendData={analytics.trendData}
             trendByGroup={analytics.trendByGroup}
             multiEvent={analytics.multiEvent}
+            graphHeights={graphHeights}
+            setGraphHeights={setGraphHeights}
           />
         )}
 
@@ -813,6 +819,7 @@ function AuthenticatedApp({ user, logout }) {
           />
         )}
         </TabTransition>
+        )}
       </div>
 
       {/* AI Assistant */}

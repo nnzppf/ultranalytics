@@ -408,6 +408,14 @@ table {
     gap: 8px !important;
   }
 
+  /* Analisi Temporale sub-tabs — mobile dropdown */
+  .desktop-analisi-subtabs {
+    display: none !important;
+  }
+  .mobile-analisi-subtabs {
+    display: block !important;
+  }
+
   /* Comparison tab sub-tabs */
   .comparison-sub-tabs {
     gap: 3px !important;

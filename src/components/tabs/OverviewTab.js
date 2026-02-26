@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, AreaChart, Area, LineChart, Line } from 'recharts';
-import { TrendingUp } from 'lucide-react';
+import { TrendingUp, Lightbulb } from 'lucide-react';
 import Section from '../shared/Section';
 import ResizeHandle from '../shared/ResizeHandle';
 import ScaleToggle from '../shared/ScaleToggle';
@@ -101,6 +101,39 @@ export default function OverviewTab({ analytics, filtered, selectedBrand, graphH
     if (!hourlyReg || !hourlyReg.length) return null;
     return hourlyReg.reduce((max, h) => h.registrazioni > (max?.registrazioni || 0) ? h : max, null);
   }, [hourlyReg, hourlyAccess, hourlyMode]);
+
+  // Micro-insight: anno migliore
+  const yearlyInsight = useMemo(() => {
+    if (!yearlyBarData || yearlyBarData.length < 2) return null;
+    const best = yearlyBarData.reduce((a, b) => b.mediaReg > a.mediaReg ? b : a);
+    const prev = yearlyBarData.find(y => String(Number(best.year) - 1) === y.year);
+    if (!prev) return { year: best.year, reg: best.mediaReg };
+    const delta = Math.round(((best.mediaReg - prev.mediaReg) / prev.mediaReg) * 100);
+    return { year: best.year, reg: best.mediaReg, delta, prevYear: prev.year };
+  }, [yearlyBarData]);
+
+  // Micro-insight: giorno più forte
+  const dowInsight = useMemo(() => {
+    if (!dowData || dowData.length < 2) return null;
+    const total = dowData.reduce((s, d) => s + d.count, 0);
+    const avg = total / dowData.length;
+    const best = dowData.reduce((a, b) => b.count > a.count ? b : a);
+    const delta = Math.round(((best.count - avg) / avg) * 100);
+    return { day: best.giorno, delta };
+  }, [dowData]);
+
+  // Micro-insight: % ultimi 3 giorni
+  const daysBeforeInsight = useMemo(() => {
+    if (!daysBeforeData || !daysBeforeData.length) return null;
+    const total = daysBeforeData.reduce((s, d) => s + d.count, 0);
+    if (total === 0) return null;
+    const last3 = daysBeforeData.filter(d => {
+      const n = parseInt(d.days);
+      return !isNaN(n) && n >= -3 && n <= 0;
+    }).reduce((s, d) => s + d.count, 0);
+    const pct = Math.round((last3 / total) * 100);
+    return pct > 0 ? { pct } : null;
+  }, [daysBeforeData]);
 
   // Show stacked if multiple brands OR single brand with multiple editions (groups in byEvent data)
   const hasStackableData = multiEvent || (hourlyRegByEvent && hourlyRegByEvent.groups && hourlyRegByEvent.groups.length > 1);
@@ -239,6 +272,17 @@ export default function OverviewTab({ analytics, filtered, selectedBrand, graphH
               </ResponsiveContainer>
             </>
           )}
+          {yearlyInsight && (
+            <div style={{ fontSize: font.size.xs, color: colors.text.muted, marginTop: 8, display: "flex", gap: 6, alignItems: "center", justifyContent: "center" }}>
+              <Lightbulb size={12} color={colors.brand.purple} />
+              Anno migliore: <strong style={{ color: colors.text.primary }}>{yearlyInsight.year}</strong> con {yearlyInsight.reg} reg/ed
+              {yearlyInsight.delta != null && (
+                <span style={{ color: yearlyInsight.delta >= 0 ? colors.status.success : colors.status.error }}>
+                  ({yearlyInsight.delta >= 0 ? '+' : ''}{yearlyInsight.delta}% vs {yearlyInsight.prevYear})
+                </span>
+              )}
+            </div>
+          )}
           <ResizeHandle chartKey="yearlyAvg" graphHeights={graphHeights} setGraphHeights={setGraphHeights} />
         </Section></FadeIn>
       )}
@@ -324,6 +368,12 @@ export default function OverviewTab({ analytics, filtered, selectedBrand, graphH
             <Bar dataKey="partecipato" name="Presenze" fill={colors.status.success} radius={[4, 4, 0, 0]} maxBarSize={32} />
           </BarChart>
         </ResponsiveContainer>
+        {dowInsight && (
+          <div style={{ fontSize: font.size.xs, color: colors.text.muted, marginTop: 8, display: "flex", gap: 6, alignItems: "center" }}>
+            <Lightbulb size={12} color={colors.brand.purple} />
+            <strong style={{ color: colors.text.primary }}>{dowInsight.day}</strong> è il giorno più forte — {dowInsight.delta}% sopra la media
+          </div>
+        )}
         <ResizeHandle chartKey="dowData" graphHeights={graphHeights} setGraphHeights={setGraphHeights} />
       </Section></FadeIn>
 
@@ -341,6 +391,12 @@ export default function OverviewTab({ analytics, filtered, selectedBrand, graphH
             <Area type="monotone" dataKey="count" stroke={colors.brand.purple} fill={alpha.brand[20]} strokeWidth={2} connectNulls />
           </AreaChart>
         </ResponsiveContainer>
+        {daysBeforeInsight && (
+          <div style={{ fontSize: font.size.xs, color: colors.text.muted, marginTop: 8, display: "flex", gap: 6, alignItems: "center" }}>
+            <Lightbulb size={12} color={colors.brand.purple} />
+            Il <strong style={{ color: colors.text.primary }}>{daysBeforeInsight.pct}%</strong> si registra negli ultimi 3 giorni
+          </div>
+        )}
         <ResizeHandle chartKey="daysBeforeData" graphHeights={graphHeights} setGraphHeights={setGraphHeights} />
       </Section></FadeIn>
     </div>
