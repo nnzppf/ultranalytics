@@ -286,31 +286,50 @@ export function getTrendData(data) {
  */
 export function getTrendDataByGroup(data, groupKey, eventDates = null) {
   const groups = [...new Set(data.map(d => d[groupKey]))].filter(Boolean);
+
+  // Calcola cutoff per ogni gruppo (eventDate + 1 giorno)
+  const cutoffs = {};
+  if (eventDates) {
+    for (const g of groups) {
+      if (eventDates[g]) {
+        const c = new Date(eventDates[g]);
+        c.setDate(c.getDate() + 1);
+        c.setHours(23, 59, 59, 999);
+        cutoffs[g] = c;
+      }
+    }
+  }
+
+  // Traccia quali gruppi hanno dati reali su ogni data
   const byDate = {};
+  const hasData = {};
 
   for (const d of data) {
     if (!d.purchaseDate || !d[groupKey]) continue;
+    const grp = d[groupKey];
 
-    // Taglia dati dopo il giorno dopo l'evento
-    if (eventDates && eventDates[d[groupKey]]) {
-      const cutoff = new Date(eventDates[d[groupKey]]);
-      cutoff.setDate(cutoff.getDate() + 1);
-      cutoff.setHours(23, 59, 59, 999);
-      if (d.purchaseDate > cutoff) continue;
-    }
+    // Salta acquisti dopo il cutoff dell'evento
+    if (cutoffs[grp] && d.purchaseDate > cutoffs[grp]) continue;
 
     const key = d.purchaseDate.toLocaleDateString('it');
     if (!byDate[key]) {
       byDate[key] = { date: key, dateObj: new Date(d.purchaseDate) };
-      groups.forEach(g => { byDate[key][g] = 0; });
+      hasData[key] = new Set();
     }
-    byDate[key][d[groupKey]]++;
+    if (!byDate[key][grp]) byDate[key][grp] = 0;
+    byDate[key][grp]++;
+    hasData[key].add(grp);
   }
 
-  return {
-    data: Object.values(byDate).sort((a, b) => a.dateObj - b.dateObj),
-    groups,
-  };
+  // Imposta null per gruppi senza dati su una data (così Recharts non disegna la linea)
+  const sorted = Object.values(byDate).sort((a, b) => a.dateObj - b.dateObj);
+  for (const row of sorted) {
+    for (const g of groups) {
+      if (row[g] == null) row[g] = null;
+    }
+  }
+
+  return { data: sorted, groups };
 }
 
 /**
