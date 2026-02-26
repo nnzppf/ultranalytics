@@ -284,12 +284,21 @@ export function getTrendData(data) {
 /**
  * Daily trend stacked by group.
  */
-export function getTrendDataByGroup(data, groupKey) {
+export function getTrendDataByGroup(data, groupKey, eventDates = null) {
   const groups = [...new Set(data.map(d => d[groupKey]))].filter(Boolean);
   const byDate = {};
 
   for (const d of data) {
     if (!d.purchaseDate || !d[groupKey]) continue;
+
+    // Taglia dati dopo il giorno dopo l'evento
+    if (eventDates && eventDates[d[groupKey]]) {
+      const cutoff = new Date(eventDates[d[groupKey]]);
+      cutoff.setDate(cutoff.getDate() + 1);
+      cutoff.setHours(23, 59, 59, 999);
+      if (d.purchaseDate > cutoff) continue;
+    }
+
     const key = d.purchaseDate.toLocaleDateString('it');
     if (!byDate[key]) {
       byDate[key] = { date: key, dateObj: new Date(d.purchaseDate) };

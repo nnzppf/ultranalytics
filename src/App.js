@@ -396,7 +396,15 @@ function AuthenticatedApp({ user, logout }) {
       convByFascia: getConversionByFascia(filtered),
       heatmapGrid: getHeatmapData(filtered),
       trendData: getTrendData(filtered),
-      trendByGroup: getTrendDataByGroup(filtered, groupKey),
+      trendByGroup: (() => {
+        const eventDates = {};
+        for (const d of filtered) {
+          if (d[groupKey] && d.eventDate && !eventDates[d[groupKey]]) {
+            eventDates[d[groupKey]] = d.eventDate;
+          }
+        }
+        return getTrendDataByGroup(filtered, groupKey, eventDates);
+      })(),
       userStats: getUserStats(filtered),
       multiEvent: brands.length > 1,
     };
