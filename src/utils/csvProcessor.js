@@ -1,5 +1,3 @@
-import Papa from 'papaparse';
-import * as XLSX from 'xlsx';
 import { parseDateTime, parseItalianDate, isSentinelDate } from './dateParser';
 import { matchBrand, extractEventDate, editionLabelFromDate, repairText } from './eventNameCleaner';
 import { DAYS_JS, getFascia } from '../config/constants';
@@ -31,36 +29,6 @@ function parseBirthDate(raw) {
   }
 
   return null;
-}
-
-/**
- * Parse a file (CSV, TSV, XLSX) into rows.
- */
-export function parseFile(file) {
-  return new Promise((resolve, reject) => {
-    const name = file.name.toLowerCase();
-
-    if (name.endsWith('.csv') || name.endsWith('.tsv')) {
-      Papa.parse(file, {
-        header: true,
-        skipEmptyLines: true,
-        complete: (results) => resolve(results.data),
-        error: (err) => reject(err),
-      });
-    } else if (name.endsWith('.xlsx') || name.endsWith('.xls')) {
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        const wb = XLSX.read(e.target.result, { type: 'array' });
-        const ws = wb.Sheets[wb.SheetNames[0]];
-        const rows = XLSX.utils.sheet_to_json(ws);
-        resolve(rows);
-      };
-      reader.onerror = reject;
-      reader.readAsArrayBuffer(file);
-    } else {
-      reject(new Error(`Formato file non supportato: ${file.name}`));
-    }
-  });
 }
 
 /**
@@ -312,26 +280,6 @@ export function processUtentiRows(rows) {
   }
 
   return users;
-}
-
-/**
- * Main entry: process an array of {file, eventName} into enriched records.
- */
-export async function processFiles(fileList) {
-  const allRecords = [];
-
-  for (const { file, eventName } of fileList) {
-    const rows = await parseFile(file);
-    const keys = rows.length > 0 ? Object.keys(rows[0]) : [];
-
-    if (isBigliettiFormat(keys)) {
-      allRecords.push(...processBigliettiRows(rows));
-    } else {
-      allRecords.push(...processGenericRows(rows, eventName));
-    }
-  }
-
-  return allRecords;
 }
 
 /**

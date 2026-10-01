@@ -1,86 +1,103 @@
-import { db, storage } from '../config/firebase';
+import { db } from '../config/firebase';
 import {
   collection, doc, setDoc, getDocs, deleteDoc,
   query, orderBy, serverTimestamp
-} from 'firebase/firestore';
-import {
-  ref, deleteObject
-} from 'firebase/storage';
+} from 'firebase/firestore/lite';
 import { BRAND_REGISTRY } from '../config/eventConfig';
 import { mergeRecordLists, mergeUserLists, isSuperseded, linkPeopleByPhone } from '../utils/datasetMerge';
 import { matchBrand, editionLabelFromDate } from '../utils/eventNameCleaner';
 import { daysBeforeEvent } from '../utils/eventTime';
+import { FORMAT, compactRecords, expandRecords, compactUsers, expandUsers } from '../utils/compactFormat';
+import { getCachedItems, putCachedItems, keepOnlyCached } from './datasetCache';
 
 // Collection names
 const DATASETS_COL = 'datasets';      // metadata per dataset caricato
 const RECORDS_COL = 'records';         // biglietti processati (in sub-chunks)
 const UTENTI_COL = 'utenti';           // utenti processati
 
+// Items per chunk document (Firestore limit: 1 MB per document). Format 2 items
+// are ~150 bytes, so 1500 stay well under it.
+const CHUNK_SIZE = 1500;
+const PARALLEL_WRITES = 6;
+
 /**
- * Save a processed dataset to Firebase.
- * - Save processed records to Firestore (chunked to stay under 1MB doc limit)
- * - Save metadata
- * The original file is not stored: it would be one more copy of personal data
- * (and Storage is not enabled on the project).
+ * Save a processed dataset to Firebase (format 2, see utils/compactFormat).
+ * Chunks are written first, the metadata last: a dataset becomes visible only
+ * once complete, so an interrupted upload leaves nothing half-loaded behind.
+ * The original file is not stored: it would be one more copy of personal data.
  */
 export async function saveDataset({ fileName, records, utenti, fileType }) {
   const datasetId = `ds_${Date.now()}_${fileName.replace(/[^a-zA-Z0-9]/g, '_')}`;
+  const isUtenti = fileType === 'utenti';
+  const sub = isUtenti ? UTENTI_COL : RECORDS_COL;
+  const { events, items } = isUtenti
+    ? { events: null, items: compactUsers(utenti) }
+    : compactRecords(records);
 
-  // 1. Save metadata
+  const writes = chunkArray(items, CHUNK_SIZE).map((chunk, i) => () =>
+    setDoc(doc(db, DATASETS_COL, datasetId, sub, `chunk_${String(i).padStart(4, '0')}`), { items: chunk, index: i })
+  );
+  await runLimited(writes, PARALLEL_WRITES);
+
   await setDoc(doc(db, DATASETS_COL, datasetId), {
     fileName,
     fileType, // 'biglietti' | 'utenti'
-    fileUrl: null,
-    recordCount: fileType === 'utenti' ? utenti.length : records.length,
+    format: FORMAT,
+    complete: true,
+    recordCount: items.length,
+    ...(events ? { events } : {}),
     uploadedAt: serverTimestamp(),
   });
-
-  // 2. Save processed data in chunks (Firestore has 1MB doc limit)
-  const CHUNK_SIZE = 500;
-
-  if (fileType === 'utenti' && utenti.length > 0) {
-    const chunks = chunkArray(utenti.map(serializeUser), CHUNK_SIZE);
-    for (let i = 0; i < chunks.length; i++) {
-      await setDoc(
-        doc(db, DATASETS_COL, datasetId, UTENTI_COL, `chunk_${i}`),
-        { items: chunks[i], index: i }
-      );
-    }
-  } else if (records.length > 0) {
-    const chunks = chunkArray(records.map(serializeRecord), CHUNK_SIZE);
-    for (let i = 0; i < chunks.length; i++) {
-      await setDoc(
-        doc(db, DATASETS_COL, datasetId, RECORDS_COL, `chunk_${i}`),
-        { items: chunks[i], index: i }
-      );
-    }
-  }
 
   return datasetId;
 }
 
-async function loadDatasetItems(datasetId, fileType) {
-  const sub = fileType === 'utenti' ? UTENTI_COL : RECORDS_COL;
-  const chunksSnap = await getDocs(collection(db, DATASETS_COL, datasetId, sub));
-  const items = [];
-  for (const chunkDoc of chunksSnap.docs) items.push(...(chunkDoc.data().items || []));
-  return items;
+const isUtentiDataset = ds => ds.fileType === 'utenti';
+
+function cacheStamp(meta) {
+  const uploaded = meta.uploadedAt?.toMillis ? meta.uploadedAt.toMillis() : String(meta.uploadedAt);
+  return `${uploaded}|${meta.recordCount}|${meta.format || 1}`;
 }
 
+// Items of one dataset, from the local copy when it is there, in format-1 shape
+async function loadDatasetItems(meta) {
+  const stamp = cacheStamp(meta);
+  let stored = await getCachedItems(meta.id, stamp);
+  if (!stored) {
+    const sub = isUtentiDataset(meta) ? UTENTI_COL : RECORDS_COL;
+    const chunksSnap = await getDocs(collection(db, DATASETS_COL, meta.id, sub));
+    stored = [];
+    for (const chunkDoc of chunksSnap.docs) stored.push(...(chunkDoc.data().items || []));
+    putCachedItems(meta.id, stamp, stored);
+  }
+  if (meta.format === FORMAT) {
+    return isUtentiDataset(meta) ? expandUsers(stored) : expandRecords(stored, meta.events || []);
+  }
+  return stored;
+}
+
+// All complete datasets, oldest first, downloaded in parallel
 async function loadAllRaw() {
   const dsSnap = await getDocs(
     query(collection(db, DATASETS_COL), orderBy('uploadedAt', 'asc'))
   );
-  const datasets = [];
-  for (const dsDoc of dsSnap.docs) {
-    const meta = dsDoc.data();
-    const fileType = meta.fileType === 'utenti' ? 'utenti' : 'biglietti';
-    datasets.push({ id: dsDoc.id, ...meta, items: await loadDatasetItems(dsDoc.id, fileType) });
-  }
-  return datasets;
+  const metas = dsSnap.docs
+    .map(d => ({ id: d.id, ...d.data() }))
+    .filter(meta => !meta.format || meta.complete);
+  keepOnlyCached(metas.map(m => m.id));
+  return Promise.all(metas.map(async meta => ({ ...meta, items: await loadDatasetItems(meta) })));
 }
 
-const isUtentiDataset = ds => ds.fileType === 'utenti';
+async function runLimited(tasks, limit) {
+  let next = 0;
+  const worker = async () => {
+    while (next < tasks.length) {
+      const task = tasks[next++];
+      await task();
+    }
+  };
+  await Promise.all(Array.from({ length: Math.min(limit, tasks.length) }, worker));
+}
 
 // Datasets holding data that exists nowhere else: never deleted from the app
 // (Getfy tickets 2024/25 and the scans of Atipico 21.02.26 the portal lost)
@@ -99,11 +116,17 @@ function withDateEdition(record) {
   };
 }
 
-// Older uploads may hold events excluded since (tests, senior): apply today's rules
+// Older uploads may hold events excluded since (tests, senior): apply today's rules.
+// Checked once per event name (about a hundred), not once per registration.
+const includedByName = new Map();
 function isStillIncluded(record) {
-  if (!record.rawEventName) return true;
-  const match = matchBrand(record.rawEventName);
-  return !!match && match.category !== 'senior';
+  const name = record.rawEventName;
+  if (!name) return true;
+  if (!includedByName.has(name)) {
+    const match = matchBrand(name);
+    includedByName.set(name, !!match && match.category !== 'senior');
+  }
+  return includedByName.get(name);
 }
 
 /**
@@ -157,54 +180,15 @@ export async function pruneSupersededDatasets() {
  */
 export async function deleteDataset(datasetId) {
   if (isProtectedDataset(datasetId)) throw new Error(`Dataset protetto: ${datasetId}`);
-  // Delete record chunks
-  const recordsSnap = await getDocs(
-    collection(db, DATASETS_COL, datasetId, RECORDS_COL)
-  );
-  for (const d of recordsSnap.docs) await deleteDoc(d.ref);
-
-  // Delete utenti chunks
-  const utentiSnap = await getDocs(
-    collection(db, DATASETS_COL, datasetId, UTENTI_COL)
-  );
-  for (const d of utentiSnap.docs) await deleteDoc(d.ref);
-
-  // Delete storage file
-  const meta = (await getDocs(query(collection(db, DATASETS_COL)))).docs
-    .find(d => d.id === datasetId)?.data();
-  if (meta?.fileUrl) {
-    try {
-      const storageRef = ref(storage, `uploads/${datasetId}/${meta.fileName}`);
-      await deleteObject(storageRef);
-    } catch (e) {
-      console.warn('Could not delete storage file:', e);
-    }
-  }
-
-  // Delete metadata doc
+  // Metadata first: the dataset disappears at once, then its chunks are removed
   await deleteDoc(doc(db, DATASETS_COL, datasetId));
+  for (const sub of [RECORDS_COL, UTENTI_COL]) {
+    const snap = await getDocs(collection(db, DATASETS_COL, datasetId, sub));
+    await runLimited(snap.docs.map(d => () => deleteDoc(d.ref)), PARALLEL_WRITES);
+  }
 }
 
-/**
- * Check if there's any saved data in Firebase.
- */
-export async function hasStoredData() {
-  const snap = await getDocs(collection(db, DATASETS_COL));
-  return snap.size > 0;
-}
-
-// --- Serialization helpers ---
-// Dates must be converted to ISO strings for Firestore
-
-function serializeRecord(r) {
-  return {
-    ...r,
-    purchaseDate: r.purchaseDate?.toISOString() || null,
-    scanDate: r.scanDate?.toISOString() || null,
-    eventDate: r.eventDate?.toISOString() || null,
-    birthDate: r.birthDate?.toISOString() || null,
-  };
-}
+// --- Deserialization: format-1 shape (ISO strings) to Dates ---
 
 function lookupBrandGenres(brand) {
   if (!brand) return [];
@@ -231,14 +215,6 @@ function deserializeRecord(r) {
     scanDate: r.scanDate ? new Date(r.scanDate) : null,
     eventDate: r.eventDate ? new Date(r.eventDate) : null,
     birthDate: r.birthDate ? new Date(r.birthDate) : null,
-  };
-}
-
-function serializeUser(u) {
-  return {
-    ...u,
-    birthDate: u.birthDate?.toISOString() || null,
-    registrationDate: u.registrationDate?.toISOString() || null,
   };
 }
 

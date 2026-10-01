@@ -1,5 +1,5 @@
 import { db } from '../config/firebase';
-import { doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore';
+import { doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore/lite';
 
 const CONFIG_DOC = doc(db, 'appConfig', 'eventConfig');
 

@@ -1,5 +1,16 @@
 # Changelog - Ultranalytics
 
+## 1 Ottobre 2026 (v3) — Velocità di caricamento
+
+- Formato 2 per i dataset caricati (`utils/compactFormat.js`): i campi dell'evento sono salvati una volta per evento nei metadati, le date come numeri, i campi ricavabili non si salvano. Verificato sui dati reali: 0 differenze su 43.277 registrazioni e 19.854 utenti, ~4 volte meno dati (biglietti da ~25 a 6,9 MB)
+- Upload: i blocchi si scrivono in parallelo e i metadati per ultimi, così un caricamento interrotto non lascia dataset a metà
+- Apertura: un'unica lettura (prima ne faceva due), dataset scaricati in parallelo e copia locale nel browser (`services/datasetCache.js`): dalla seconda apertura si scarica solo ciò che è nuovo. La copia si cancella all'uscita (logout)
+- Il controllo degli eventi esclusi si fa una volta per nome evento invece che per registrazione (1 s risparmiato)
+- Firebase "lite" (niente tempo reale, che l'app non usa), tolto Storage, lettore Excel, chat AI e gestione eventi caricati solo quando servono, niente source map in produzione: bundle principale da 524 a 355 kB compressi
+- Rimossi `parseFile`/`processFiles` (non usati) e `hasStoredData`
+
+---
+
 ## 1 Ottobre 2026 (v2) — Numeri del Live Tracker
 
 ### Confronto "allo stesso punto"

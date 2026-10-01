@@ -1,5 +1,6 @@
 import { createContext, useContext, useState, useEffect } from 'react';
 import { onAuthStateChanged, signInWithPopup, signOut } from 'firebase/auth';
+import { clearDatasetCache } from '../services/datasetCache';
 import { auth, googleProvider } from '../config/firebase';
 
 // Whitelist of allowed emails
@@ -63,6 +64,8 @@ export function AuthProvider({ children }) {
 
   const logout = async () => {
     try {
+      // The local copy of the data holds personal data: it leaves with the user
+      await clearDatasetCache();
       await signOut(auth);
     } catch (error) {
       console.error('Logout error:', error);

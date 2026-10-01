@@ -1,7 +1,6 @@
 // Ultranalytics v3.1 - Multi-level comparison dashboard with Firebase persistence & auth
-import { useState, useMemo, useEffect, useCallback, useRef } from "react";
+import { useState, useMemo, useEffect, useCallback, useRef, lazy, Suspense } from "react";
 import Papa from "papaparse";
-import * as XLSX from "xlsx";
 import { Users, Check, TrendingUp, X, Calendar, Gift, Cloud, CloudOff, Loader, Database, LogOut, Settings, Sun, Moon, SlidersHorizontal, Download, SearchX } from "lucide-react";
 
 import { useAuth } from "./contexts/AuthContext";
@@ -10,9 +9,8 @@ import { processRawRows, isUtentiFormat, processUtentiRows } from "./utils/csvPr
 import { applyEventConfig } from "./utils/applyEventConfig";
 import { isEditionOver, conversionOf } from "./utils/eventTime";
 import { getHourlyData, getHourlyDataByGroup, getDowData, getFasciaData, getDaysBeforeData, getTrendData, getTrendDataByGroup, getConversionByFascia, getHeatmapData, getUserStats, getEventStats } from "./utils/dataTransformers";
-import { saveDataset, loadAllData, deleteDataset, hasStoredData, pruneSupersededDatasets, isProtectedDataset } from "./services/firebaseDataService";
+import { saveDataset, loadAllData, deleteDataset, pruneSupersededDatasets, isProtectedDataset } from "./services/firebaseDataService";
 import { loadEventConfig, saveEventConfig } from "./services/eventConfigService";
-import EventManagerModal from "./components/screens/EventManagerModal";
 
 import { GENRE_LABELS, BRAND_REGISTRY } from "./config/eventConfig";
 import { colors, font, radius, gradients, glass, shadows, transition as tr } from "./config/designTokens";
@@ -23,13 +21,16 @@ import AnalisiTemporaleTab from "./components/tabs/AnalisiTemporaleTab";
 import UsersTab from "./components/tabs/UsersTab";
 import ComparisonTab from "./components/tabs/ComparisonTab";
 import BirthdaysTab from "./components/tabs/BirthdaysTab";
-import AiChat from "./components/AiChat";
 import EmptyState from "./components/shared/EmptyState";
 import { motion } from "framer-motion";
 import { StaggerList, StaggerItem, TabTransition } from "./components/shared/Motion";
 import { ToastProvider, useToast } from "./components/shared/Toast";
 import { SkeletonDashboard } from "./components/shared/Skeleton";
 import Dropdown from "./components/shared/Dropdown";
+
+// Loaded on demand: not needed to show the dashboard
+const EventManagerModal = lazy(() => import("./components/screens/EventManagerModal"));
+const AiChat = lazy(() => import("./components/AiChat"));
 
 function eventNameFromFile(filename) {
   return filename.replace(/\.(csv|xlsx|xls|tsv)$/i, "").replace(/registrazioni[_\s]*/i, "").replace(/_/g, " ").trim();
@@ -114,15 +115,16 @@ function AuthenticatedApp({ user, logout }) {
   useEffect(() => {
     async function checkCloud() {
       try {
-        // Load event config and data in parallel
-        const [cfg, hasData] = await Promise.all([
+        // Load event config and data in parallel (datasets already on this device
+        // come from the local copy)
+        const [cfg, loaded] = await Promise.all([
           loadEventConfig().catch(() => null),
-          hasStoredData(),
+          loadAllData(),
         ]);
         if (cfg) setEventConfig(cfg);
 
-        if (hasData) {
-          const { records, utenti, datasets } = await loadAllData();
+        {
+          const { records, utenti, datasets } = loaded;
           if (records.length > 0 || utenti.length > 0) {
             // Apply event config to loaded data (renames, exclusions, etc.)
             const finalRecords = cfg ? applyEventConfig(records, cfg) : records;
@@ -154,7 +156,9 @@ function AuthenticatedApp({ user, logout }) {
         });
       } else if (name.endsWith('.xlsx') || name.endsWith('.xls')) {
         const reader = new FileReader();
-        reader.onload = (e) => {
+        reader.onload = async (e) => {
+          // Loaded on demand: the Excel reader is heavy and rarely needed
+          const XLSX = await import("xlsx");
           const wb = XLSX.read(e.target.result, { type: 'array' });
           const ws = wb.Sheets[wb.SheetNames[0]];
           resolve({ name: file.name, file, eventName: eventNameFromFile(file.name), rows: XLSX.utils.sheet_to_json(ws) });
@@ -827,16 +831,20 @@ function AuthenticatedApp({ user, logout }) {
       </div>
 
       {/* AI Assistant */}
-      <AiChat data={data} analytics={analytics} userStats={analytics?.userStats} />
+      <Suspense fallback={null}>
+        <AiChat data={data} analytics={analytics} userStats={analytics?.userStats} />
+      </Suspense>
 
       {/* Event Manager Modal */}
       {showEventManager && (
-        <EventManagerModal
-          data={data}
-          eventConfig={eventConfig}
-          onSave={handleSaveEventConfig}
-          onClose={() => setShowEventManager(false)}
-        />
+        <Suspense fallback={null}>
+          <EventManagerModal
+            data={data}
+            eventConfig={eventConfig}
+            onSave={handleSaveEventConfig}
+            onClose={() => setShowEventManager(false)}
+          />
+        </Suspense>
       )}
     </div>
   );
