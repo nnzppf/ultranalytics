@@ -69,8 +69,9 @@ export function mergeUserLists(lists) {
 }
 
 /**
- * True if a newer dataset makes `older` redundant: every item is in `newer`, and
- * every scan in `older` is also in `newer`.
+ * True if a newer dataset makes `older` redundant: every item is in `newer`, every
+ * scan in `older` is also in `newer`, and (users) no field filled in `older` is
+ * empty in `newer` (e.g. a birth date the new export lacks).
  */
 export function isSuperseded(olderItems, newerItems, fileType) {
   if (olderItems.length === 0) return false;
@@ -84,7 +85,8 @@ export function isSuperseded(olderItems, newerItems, fileType) {
     const key = keyFn(item);
     const match = key && newer.get(key);
     if (!match) return false;
-    return fileType === 'utenti' || !item.attended || match.attended;
+    if (fileType === 'utenti') return Object.entries(item).every(([field, value]) => !value || match[field]);
+    return !item.attended || match.attended;
   });
 }
 

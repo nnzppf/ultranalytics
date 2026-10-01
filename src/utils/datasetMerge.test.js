@@ -36,6 +36,14 @@ describe('isSuperseded', () => {
   });
 });
 
+describe('isSuperseded (users)', () => {
+  it('keeps an older export holding a field the newer one lacks', () => {
+    const older = [{ email: 'a@x.it', phone: '3331112222', birthDate: '2000-01-01' }];
+    expect(isSuperseded(older, [{ email: 'a@x.it', phone: '3331112222', birthDate: null }], 'utenti')).toBe(false);
+    expect(isSuperseded(older, [{ email: 'a@x.it', phone: '3331112222', birthDate: '2000-01-01' }], 'utenti')).toBe(true);
+  });
+});
+
 describe('users', () => {
   it('keeps accounts sharing a phone apart, and merges the same email', () => {
     const merged = mergeUserLists([
