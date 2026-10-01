@@ -64,7 +64,7 @@ export default function EventManagerModal({ data, eventConfig, onSave, onClose }
           category: config.category,
           genres: config.genres,
           venue: '',
-          editions: new Set(config.matchPatterns.map(p => p.edition)),
+          editions: new Set(),
           recordCount: 0,
           inRegistry: true,
         };

@@ -4,9 +4,11 @@ import {
   query, orderBy, serverTimestamp
 } from 'firebase/firestore';
 import {
-  ref, uploadBytes, getDownloadURL, deleteObject
+  ref, deleteObject
 } from 'firebase/storage';
 import { BRAND_REGISTRY } from '../config/eventConfig';
+import { mergeRecordLists, mergeUserLists, isSuperseded, linkPeopleByPhone } from '../utils/datasetMerge';
+import { matchBrand } from '../utils/eventNameCleaner';
 
 // Collection names
 const DATASETS_COL = 'datasets';      // metadata per dataset caricato
@@ -15,31 +17,24 @@ const UTENTI_COL = 'utenti';           // utenti processati
 
 /**
  * Save a processed dataset to Firebase.
- * - Upload original CSV to Storage
  * - Save processed records to Firestore (chunked to stay under 1MB doc limit)
  * - Save metadata
+ * The original file is not stored: it would be one more copy of personal data
+ * (and Storage is not enabled on the project).
  */
-export async function saveDataset({ fileName, fileBlob, records, utenti, fileType }) {
+export async function saveDataset({ fileName, records, utenti, fileType }) {
   const datasetId = `ds_${Date.now()}_${fileName.replace(/[^a-zA-Z0-9]/g, '_')}`;
 
-  // 1. Upload original file to Storage
-  let fileUrl = null;
-  if (fileBlob) {
-    const storageRef = ref(storage, `uploads/${datasetId}/${fileName}`);
-    await uploadBytes(storageRef, fileBlob);
-    fileUrl = await getDownloadURL(storageRef);
-  }
-
-  // 2. Save metadata
+  // 1. Save metadata
   await setDoc(doc(db, DATASETS_COL, datasetId), {
     fileName,
     fileType, // 'biglietti' | 'utenti'
-    fileUrl,
+    fileUrl: null,
     recordCount: fileType === 'utenti' ? utenti.length : records.length,
     uploadedAt: serverTimestamp(),
   });
 
-  // 3. Save processed data in chunks (Firestore has 1MB doc limit)
+  // 2. Save processed data in chunks (Firestore has 1MB doc limit)
   const CHUNK_SIZE = 500;
 
   if (fileType === 'utenti' && utenti.length > 0) {
@@ -63,46 +58,79 @@ export async function saveDataset({ fileName, fileBlob, records, utenti, fileTyp
   return datasetId;
 }
 
-/**
- * Load all datasets from Firebase.
- * Returns { records: [...], utenti: [...], datasets: [...metadata] }
- */
-export async function loadAllData() {
-  const allRecords = [];
-  const allUtenti = [];
-  const datasets = [];
+async function loadDatasetItems(datasetId, fileType) {
+  const sub = fileType === 'utenti' ? UTENTI_COL : RECORDS_COL;
+  const chunksSnap = await getDocs(collection(db, DATASETS_COL, datasetId, sub));
+  const items = [];
+  for (const chunkDoc of chunksSnap.docs) items.push(...(chunkDoc.data().items || []));
+  return items;
+}
 
-  // Get all dataset metadata
+async function loadAllRaw() {
   const dsSnap = await getDocs(
     query(collection(db, DATASETS_COL), orderBy('uploadedAt', 'asc'))
   );
-
+  const datasets = [];
   for (const dsDoc of dsSnap.docs) {
     const meta = dsDoc.data();
-    datasets.push({ id: dsDoc.id, ...meta });
+    const fileType = meta.fileType === 'utenti' ? 'utenti' : 'biglietti';
+    datasets.push({ id: dsDoc.id, ...meta, items: await loadDatasetItems(dsDoc.id, fileType) });
+  }
+  return datasets;
+}
 
-    if (meta.fileType === 'utenti') {
-      // Load utenti chunks
-      const chunksSnap = await getDocs(
-        collection(db, DATASETS_COL, dsDoc.id, UTENTI_COL)
-      );
-      for (const chunkDoc of chunksSnap.docs) {
-        const items = chunkDoc.data().items || [];
-        allUtenti.push(...items.map(deserializeUser));
-      }
-    } else {
-      // Load record chunks
-      const chunksSnap = await getDocs(
-        collection(db, DATASETS_COL, dsDoc.id, RECORDS_COL)
-      );
-      for (const chunkDoc of chunksSnap.docs) {
-        const items = chunkDoc.data().items || [];
-        allRecords.push(...items.map(deserializeRecord));
-      }
+const isUtentiDataset = ds => ds.fileType === 'utenti';
+
+// Older uploads may hold events excluded since (tests, senior): apply today's rules
+function isStillIncluded(record) {
+  if (!record.rawEventName) return true;
+  const match = matchBrand(record.rawEventName);
+  return !!match && match.category !== 'senior';
+}
+
+/**
+ * Load all datasets from Firebase, merged across overlapping exports
+ * (see utils/datasetMerge for the rules).
+ * Returns { records: [...], utenti: [...], datasets: [...metadata] }
+ */
+export async function loadAllData() {
+  const raw = await loadAllRaw();
+
+  const utentiItems = mergeUserLists(raw.filter(isUtentiDataset).map(ds => ds.items));
+  const recordItems = linkPeopleByPhone(
+    mergeRecordLists(raw.filter(ds => !isUtentiDataset(ds)).map(ds => ds.items)),
+    utentiItems
+  ).filter(isStillIncluded);
+  const datasets = raw.map(({ items, ...meta }) => meta);
+
+  return {
+    records: recordItems.map(deserializeRecord),
+    utenti: utentiItems.map(deserializeUser),
+    datasets,
+  };
+}
+
+/**
+ * Delete datasets made redundant by newer uploads: everything they hold, scans
+ * included, is also in later datasets of the same type. Returns the deleted file names.
+ */
+export async function pruneSupersededDatasets() {
+  const raw = await loadAllRaw();
+  const deleted = [];
+
+  for (let i = 0; i < raw.length; i++) {
+    const ds = raw[i];
+    const fileType = isUtentiDataset(ds) ? 'utenti' : 'biglietti';
+    const later = raw.slice(i + 1).filter(l => isUtentiDataset(l) === isUtentiDataset(ds)).map(l => l.items);
+    if (later.length === 0) continue;
+    const newerItems = fileType === 'utenti' ? mergeUserLists(later) : mergeRecordLists(later);
+    if (isSuperseded(ds.items, newerItems, fileType)) {
+      await deleteDataset(ds.id);
+      deleted.push(ds.fileName);
     }
   }
 
-  return { records: allRecords, utenti: allUtenti, datasets };
+  return deleted;
 }
 
 /**

@@ -1,7 +1,7 @@
 import Papa from 'papaparse';
 import * as XLSX from 'xlsx';
 import { parseDateTime, parseItalianDate, isSentinelDate } from './dateParser';
-import { matchBrand, extractEventDate } from './eventNameCleaner';
+import { matchBrand, extractEventDate, editionLabelFromDate, repairText } from './eventNameCleaner';
 import { DAYS_JS, getFascia } from '../config/constants';
 
 /**
@@ -85,6 +85,46 @@ function isBigliettiFormat(keys) {
 }
 
 /**
+ * Event date for each event name: from the name (year taken from when people
+ * registered), otherwise the night with most door scans.
+ */
+function buildEventDates(rows, eventCol, dateCol, scanCol) {
+  const byEvent = new Map();
+  for (const row of rows) {
+    const name = (row[eventCol] || '').trim();
+    if (!name) continue;
+    let ev = byEvent.get(name);
+    if (!ev) {
+      ev = { purchases: [], nights: new Map() };
+      byEvent.set(name, ev);
+    }
+    const purchase = parseDateTime(row[dateCol]);
+    if (purchase) ev.purchases.push(purchase.getTime());
+    const rawScan = (row[scanCol] || '').trim();
+    const scan = isSentinelDate(rawScan) ? null : parseDateTime(rawScan);
+    if (scan) {
+      // Scans until 6am belong to the night before
+      const night = new Date(scan.getTime() - 6 * 3600000);
+      const key = new Date(night.getFullYear(), night.getMonth(), night.getDate()).getTime();
+      ev.nights.set(key, (ev.nights.get(key) || 0) + 1);
+    }
+  }
+
+  const dates = new Map();
+  for (const [name, ev] of byEvent) {
+    ev.purchases.sort((a, b) => a - b);
+    const median = ev.purchases.length ? new Date(ev.purchases[Math.floor(ev.purchases.length / 2)]) : null;
+    let date = extractEventDate(name, median);
+    if (!date && ev.nights.size > 0) {
+      const [busiestNight] = [...ev.nights.entries()].sort((a, b) => b[1] - a[1])[0];
+      date = new Date(busiestNight);
+    }
+    dates.set(name, date);
+  }
+  return dates;
+}
+
+/**
  * Process rows from biglietti CSV format into enriched records.
  */
 function processBigliettiRows(rows, customConfig) {
@@ -102,6 +142,7 @@ function processBigliettiRows(rows, customConfig) {
   const birthCol = findCol(keys, ['data_nascita', 'nascita']);
   const codeCol = findCol(keys, ['codice', 'code']);
 
+  const eventDates = buildEventDates(rows, eventCol, dateCol, scanCol);
   const records = [];
 
   for (const row of rows) {
@@ -121,8 +162,7 @@ function processBigliettiRows(rows, customConfig) {
     const attended = !isSentinelDate(rawScan);
     const scanDate = attended ? parseDateTime(rawScan) : null;
 
-    // Extract event date from event name
-    const eventDate = extractEventDate(rawEventName);
+    const eventDate = eventDates.get(rawEventName) || null;
 
     // Calculate days before event
     let daysBefore = null;
@@ -134,9 +174,9 @@ function processBigliettiRows(rows, customConfig) {
     const surname = (row[surnameCol] || '').trim();
 
     records.push({
-      rawEventName,
+      rawEventName: repairText(rawEventName),
       brand: brandMatch.brand,
-      editionLabel: brandMatch.editionLabel,
+      editionLabel: editionLabelFromDate(eventDate),
       category: brandMatch.category,
       genres: brandMatch.genres,
       purchaseDate,
@@ -176,6 +216,8 @@ function processGenericRows(rows, eventName, customConfig) {
   const partCol = findCol(keys, ['partecipat', 'ha part', 'attended']);
 
   const records = [];
+  const brandMatch = matchBrand(eventName, customConfig);
+  const eventDate = extractEventDate(eventName);
 
   for (const row of rows) {
     let dateStr = (row[dateCol] || '').toString().trim();
@@ -188,19 +230,18 @@ function processGenericRows(rows, eventName, customConfig) {
     const attended = ['s', 'si', 'sì', '1', 'true', 'yes'].includes(rawPart);
 
     const fullName = (row[nameCol] || '').trim();
-    const brandMatch = matchBrand(eventName, customConfig);
 
     records.push({
       rawEventName: eventName,
       brand: brandMatch?.brand || eventName,
-      editionLabel: brandMatch?.editionLabel || 'single',
+      editionLabel: eventDate ? editionLabelFromDate(eventDate) : 'single',
       category: brandMatch?.category || 'unknown',
       genres: brandMatch?.genres || [],
       purchaseDate,
       scanDate: null,
       attended,
-      eventDate: null,
-      daysBefore: null,
+      eventDate,
+      daysBefore: eventDate ? Math.max(0, Math.floor((eventDate - purchaseDate) / 86400000)) : null,
       name: fullName,
       surname: '',
       fullName,

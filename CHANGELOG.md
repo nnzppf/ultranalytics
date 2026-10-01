@@ -1,5 +1,31 @@
 # Changelog - Ultranalytics
 
+## 1 Ottobre 2026
+
+### Export del portale da settembre 2025 a oggi
+- Brand riconosciuti per parole chiave (`BRAND_REGISTRY.keywords`), non più per singola edizione: i nuovi eventi non richiedono modifiche al codice. Aggiunti Giovedì Gelsi, El Party Rico, Halftime, La Maturanda, Spaziodetox, Forever
+- Edizione = data evento. Anno dedotto dalle date di registrazione (prima era fisso alla stagione 2025/26), data dagli ingressi per gli eventi senza data nel nome, `EVENT_DATE_OVERRIDES` per quelli futuri
+- Tollerati i caratteri persi dall'export (`GIOVED�`, `DEC� 90`) nel riconoscimento; nomi visualizzati riparati
+
+### Unione degli export (`utils/datasetMerge.js`)
+- Export sovrapposti non contano più due volte: un biglietto è identificato dal codice
+- Un ingresso registrato non si perde mai (il portale ha azzerato quelli dell'Atipico 21.02.26)
+- I biglietti della vecchia piattaforma (senza email) sono collegati alle persone per telefono
+- Dopo un upload vengono eliminati solo i dataset interamente contenuti nei successivi
+- Eventi esclusi (test, senior, Decò 90) filtrati anche dai dataset già caricati
+
+### Sicurezza
+- Regole Firestore in `firestore.rules`: solo gli account autorizzati (le regole di test erano scadute il 20/03/2026)
+- Il file originale non viene più caricato su Storage
+- CSV ed Excel esclusi da git
+
+### Fix
+- Rimossi import inutilizzati in `TrendsTab.js` che bloccavano la build su Vercel
+- "Ricarica dal cloud" applica di nuovo la configurazione eventi
+- La finestra Gestione eventi non dipende più dalle edizioni scritte nel registro
+
+---
+
 ## 20 Febbraio 2026 (v2)
 
 ### Live Tracker — Supporto brand con 1 sola edizione

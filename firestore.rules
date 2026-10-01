@@ -1,0 +1,21 @@
+rules_version = '2';
+
+// Firestore security rules for ultranalytics-8582c.
+// Published by hand from the Firebase console (Firestore > Regole): keep this file in sync.
+// Only the accounts allowed by src/contexts/AuthContext.js can read or write.
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function isAllowed() {
+      return request.auth != null
+        && request.auth.token.email_verified == true
+        && request.auth.token.email in [
+          'filzantrade@gmail.com',
+          'linopegoraro.dir@gmail.com'
+        ];
+    }
+
+    match /{document=**} {
+      allow read, write: if isAllowed();
+    }
+  }
+}

@@ -1,143 +1,142 @@
+/**
+ * Brand registry.
+ * A brand is recognised from the event name via `keywords` (accent/case-insensitive,
+ * tolerant to the "�" characters the ticketing export produces). The edition is NOT
+ * configured here: it is derived from the event date (see csvProcessor).
+ * Order matters: the first brand whose keyword matches wins, so keep the more
+ * specific brands first (e.g. "GIOVEDI GELSI W/DOBLE SOUND" is Giovedì Gelsi).
+ */
 export const BRAND_REGISTRY = {
-  "BESAME": {
+  "GIOVEDÌ GELSI": {
     category: "standard",
     genres: ["commerciale"],
-    matchPatterns: [
-      { edition: "01.11.25", patterns: ["01.11.25 besame"] },
-      { edition: "03.01.26", patterns: ["sabato 3 gennaio - besame"] },
-    ]
-  },
-  "STUDIOS CLUB OPENING PARTY": {
-    category: "standard",
-    genres: ["elettronica"],
-    matchPatterns: [
-      { edition: "04.10.25", patterns: ["04.10.25 studios club opening party"] },
-    ]
-  },
-  "PLUMA": {
-    category: "standard",
-    genres: ["commerciale"],
-    matchPatterns: [
-      { edition: "06.12.25", patterns: ["06.12 pluma"] },
-    ]
-  },
-  "ULTRAVIVID": {
-    category: "standard",
-    genres: ["commerciale", "elettronica"],
-    matchPatterns: [
-      { edition: "15.11.25", patterns: ["15.11.25 ultravivid"] },
-      { edition: "13.12.25", patterns: ["sabato 13 dicembre - ultravivid"] },
-      { edition: "31.01.26", patterns: ["31 gennaio - ultravivid"] },
-    ]
-  },
-  "ATIPICO": {
-    category: "standard",
-    genres: ["elettronica"],
-    matchPatterns: [
-      { edition: "18.10.25", patterns: ["18.10.25 too late opening party - atipico"] },
-      { edition: "22.11.25", patterns: ["22.11.25 atipico"] },
-      { edition: "17.01.26", patterns: ["17 gennaio - atipico"] },
-      { edition: "21.02.26", patterns: ["21 febbraio - atipico"] },
-    ]
-  },
-  "PURPLE RAIN": {
-    category: "standard",
-    genres: ["commerciale"],
-    matchPatterns: [
-      { edition: "20.12.25", patterns: ["20.12.25 purple rain"] },
-      { edition: "14.02.26", patterns: ["sabato 14 febbraio - purple rain"] },
-    ]
-  },
-  "POLPETTE": {
-    category: "standard",
-    genres: ["elettronica", "aperitivo"],
-    matchPatterns: [
-      { edition: "23.11.25", patterns: ["23.11.25 polpette 7th bday"] },
-      { edition: "24.12.25", patterns: ["24 dicembre - polpette classic presenta: vigilia"] },
-      { edition: "15.02.26", patterns: ["15 febbraio - love is everywhere by polpette"] },
-    ]
-  },
-  "2000 MANIA": {
-    category: "standard",
-    genres: ["commerciale"],
-    matchPatterns: [
-      { edition: "29.11.25", patterns: ["29.11 2000 mania"] },
-      { edition: "26.12.25", patterns: ["26.12 - 2000 mania", "26 dicembre - doble sound"] },
-      { edition: "24.01.26", patterns: ["24 gennaio 2026 - 2000 mania"] },
-    ]
+    keywords: ["giovedi gelsi"],
   },
   "JE SUIS MIMÌ": {
     category: "standard",
     genres: ["commerciale"],
-    matchPatterns: [
-      { edition: "31.12.25", patterns: ["31.12 saltacoda"] },
-    ]
-  },
-  "AMARCORD": {
-    category: "standard",
-    genres: ["commerciale"],
-    matchPatterns: [
-      { edition: "12.12.25", patterns: ["12 dicembre - amarcord"] },
-      { edition: "27.02.26", patterns: ["amarcord - venerd"] },
-    ]
-  },
-  "VISION": {
-    category: "standard",
-    genres: ["elettronica"],
-    matchPatterns: [
-      { edition: "06.12.25", patterns: ["sabato 6 dicembre - vision"] },
-      { edition: "07.02.26", patterns: ["sabato 7 febbraio - vision"] },
-    ]
-  },
-  "DOBLE SOUND": {
-    category: "standard",
-    genres: ["commerciale"],
-    matchPatterns: [
-      { edition: "26.12.25", patterns: ["26 dicembre - doble sound"] },
-    ]
-  },
-  "SUNDAYS X GG": {
-    category: "standard",
-    genres: ["commerciale", "aperitivo"],
-    matchPatterns: [
-      { edition: "07.12.25", patterns: ["domenica 7 dicembre - sundays"] },
-    ]
-  },
-  "ROOKIE": {
-    category: "young",
-    genres: ["live", "student"],
-    matchPatterns: [
-      { edition: "07.02.26", patterns: ["07 febbraio - rookie", "febbraio - rookie"] },
-    ]
+    keywords: ["je suis mimi", "saltacoda"],
   },
   "-100 ALLA MATURITA": {
     category: "young",
     genres: ["student"],
-    matchPatterns: [
-      { edition: "2026", patterns: ["\u2013100 alla maturit", "-100 alla maturit"] },
-    ]
+    keywords: ["100 alla maturita"],
   },
-  "STUDIOS PRESENTA: GLOCKY": {
+  "LA MATURANDA": {
     category: "young",
-    genres: ["live", "student"],
-    matchPatterns: [
-      { edition: "27.12.25", patterns: ["27.12.25 studios presenta: glocky"] },
-    ]
+    genres: ["student"],
+    keywords: ["la maturanda"],
   },
   "EUPHORIA": {
     category: "young",
     genres: ["student"],
-    matchPatterns: [
-      { edition: "Carnival 2026", patterns: ["euphoria: jungle carnival", "euphoria"] },
-    ]
+    keywords: ["euphoria"],
+  },
+  "ROOKIE": {
+    category: "young",
+    genres: ["live", "student"],
+    keywords: ["rookie"],
+  },
+  "STUDIOS PRESENTA: GLOCKY": {
+    category: "young",
+    genres: ["live", "student"],
+    keywords: ["glocky"],
+  },
+  "STUDIOS CLUB OPENING PARTY": {
+    category: "standard",
+    genres: ["elettronica"],
+    keywords: ["studios club opening party"],
+  },
+  "ATIPICO": {
+    category: "standard",
+    genres: ["elettronica"],
+    keywords: ["atipico"],
+  },
+  "ULTRAVIVID": {
+    category: "standard",
+    genres: ["commerciale", "elettronica"],
+    keywords: ["ultravivid"],
+  },
+  "PURPLE RAIN": {
+    category: "standard",
+    genres: ["commerciale"],
+    keywords: ["purple rain"],
+  },
+  "POLPETTE": {
+    category: "standard",
+    genres: ["elettronica", "aperitivo"],
+    keywords: ["polpette"],
+  },
+  "2000 MANIA": {
+    category: "standard",
+    genres: ["commerciale"],
+    keywords: ["2000 mania"],
   },
   "JESUS LOVES DISCO": {
     category: "standard",
     genres: ["commerciale"],
-    matchPatterns: [
-      { edition: "Jesus Loves Disco is Back", patterns: ["jesus loves disco", "28 febbraio - jesus loves disco"] },
-    ]
+    keywords: ["jesus loves disco"],
   },
+  "AMARCORD": {
+    category: "standard",
+    genres: ["commerciale"],
+    keywords: ["amarcord"],
+  },
+  "VISION": {
+    category: "standard",
+    genres: ["elettronica"],
+    keywords: ["vision"],
+  },
+  "PLUMA": {
+    category: "standard",
+    genres: ["commerciale"],
+    keywords: ["pluma"],
+  },
+  "BESAME": {
+    category: "standard",
+    genres: ["commerciale"],
+    keywords: ["besame"],
+  },
+  "SUNDAYS X GG": {
+    category: "standard",
+    genres: ["commerciale", "aperitivo"],
+    keywords: ["sundays"],
+  },
+  "DOBLE SOUND": {
+    category: "standard",
+    genres: ["commerciale"],
+    keywords: ["doble sound"],
+  },
+  "EL PARTY RICO": {
+    category: "standard",
+    genres: ["commerciale"],
+    keywords: ["party rico"],
+  },
+  "HALFTIME": {
+    category: "standard",
+    genres: ["commerciale"],
+    keywords: ["halftime"],
+  },
+  "SPAZIODETOX": {
+    category: "standard",
+    genres: ["elettronica"],
+    keywords: ["spaziodetox"],
+  },
+  "FOREVER": {
+    category: "standard",
+    genres: ["commerciale"],
+    keywords: ["forever"],
+  },
+};
+
+/**
+ * Event dates for events whose name carries no date, as "YYYY-MM-DD".
+ * Keys are matched like brand keywords. Past events don't need an entry
+ * (their date is inferred from the door scans); upcoming ones do.
+ */
+export const EVENT_DATE_OVERRIDES = {
+  "rookie w/nabi": "2026-10-10",
+  "too late - opening party w/germano ventura": "2026-10-09",
 };
 
 export const GENRE_LABELS = {
@@ -156,7 +155,7 @@ export const CATEGORY_LABELS = {
 
 export const EXCLUDED_EVENTS = [
   "evento registrazione gratuita",
-  "evento test scanner",
+  "evento test",
   "besame summer tour",
   "deco 90",
 ];

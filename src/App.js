@@ -8,7 +8,7 @@ import { useAuth } from "./contexts/AuthContext";
 import LoginScreen from "./components/screens/LoginScreen";
 import { processRawRows, isUtentiFormat, processUtentiRows } from "./utils/csvProcessor";
 import { getHourlyData, getHourlyDataByGroup, getDowData, getFasciaData, getDaysBeforeData, getTrendData, getTrendDataByGroup, getConversionByFascia, getHeatmapData, getUserStats, getEventStats } from "./utils/dataTransformers";
-import { saveDataset, loadAllData, deleteDataset, hasStoredData } from "./services/firebaseDataService";
+import { saveDataset, loadAllData, deleteDataset, hasStoredData, pruneSupersededDatasets } from "./services/firebaseDataService";
 import { loadEventConfig, saveEventConfig } from "./services/eventConfigService";
 import EventManagerModal from "./components/screens/EventManagerModal";
 
@@ -209,6 +209,7 @@ function AuthenticatedApp({ user, logout }) {
   const buildData = useCallback(async () => {
     const allRecords = [];
     const allUtenti = [];
+    let saveFailed = false;
     setCloudStatus("saving");
 
     for (const f of files) {
@@ -223,48 +224,65 @@ function AuthenticatedApp({ user, logout }) {
         try {
           await saveDataset({
             fileName: f.name,
-            fileBlob: f.file,
             records: [],
             utenti: users,
             fileType: 'utenti',
           });
         } catch (e) {
           console.error("Firebase save failed for", f.name, e);
+          saveFailed = true;
         }
       } else {
-        const records = processRawRows(f.rows, f.eventName);
+        const records = processRawRows(f.rows, f.eventName, eventConfig);
         allRecords.push(...records);
 
         // Save to Firebase
         try {
           await saveDataset({
             fileName: f.name,
-            fileBlob: f.file,
             records,
             utenti: [],
             fileType: 'biglietti',
           });
         } catch (e) {
           console.error("Firebase save failed for", f.name, e);
+          saveFailed = true;
         }
       }
     }
 
-    // Merge with existing data (if adding new files to existing datasets)
-    setData(prev => prev.length > 0 ? [...prev, ...allRecords] : allRecords);
-    setUtentiData(prev => prev.length > 0 ? [...prev, ...allUtenti] : allUtenti);
-    setCloudStatus("saved");
-    toast("Dati salvati nel cloud", "success");
+    // Older exports fully contained in the new ones are dropped, then everything is
+    // reloaded de-duplicated (overlapping exports must not be counted twice)
+    try {
+      if (saveFailed) throw new Error("save failed");
+      const pruned = await pruneSupersededDatasets();
+      if (pruned.length > 0) {
+        toast(`Rimossi export precedenti già inclusi: ${pruned.join(", ")}`, "success");
+      }
+      const { records, utenti, datasets } = await loadAllData();
+      setData(eventConfig ? applyEventConfig(records, eventConfig) : records);
+      setUtentiData(utenti);
+      setSavedDatasets(datasets);
+      setCloudStatus("saved");
+      toast("Dati salvati nel cloud", "success");
+    } catch (e) {
+      console.error("Reload after save failed:", e);
+      setData(prev => prev.length > 0 ? [...prev, ...allRecords] : allRecords);
+      setUtentiData(prev => prev.length > 0 ? [...prev, ...allUtenti] : allUtenti);
+      setCloudStatus("error");
+      toast("Dati caricati, ma il salvataggio nel cloud non è completo", "error");
+    }
+    setFiles([]);
     setStep("dashboard");
     setActiveTab("overview");
-  }, [files, toast]);
+  }, [files, toast, eventConfig]);
 
   // Reload from Firebase
   const reloadFromCloud = useCallback(async () => {
     setCloudStatus("saving");
     try {
       const { records, utenti, datasets } = await loadAllData();
-      setData(records);
+      setData(eventConfig ? applyEventConfig(records, eventConfig) : records);
       setUtentiData(utenti);
       setSavedDatasets(datasets);
       setCloudStatus("saved");
@@ -277,7 +295,7 @@ function AuthenticatedApp({ user, logout }) {
       setCloudStatus("error");
       toast("Errore nel caricamento dati", "error");
     }
-  }, [toast]);
+  }, [toast, eventConfig]);
 
   // Delete a dataset from Firebase
   const handleDeleteDataset = useCallback(async (datasetId) => {

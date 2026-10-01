@@ -5,7 +5,7 @@ Web app React per analisi dati eventi/serate di club (Studios Club & Co). Deploy
 
 ## Stack
 - React 18 (CRA), Recharts per grafici, Lucide React per icone
-- Firebase: Firestore (config eventi, dati) + Auth (Google login) + Storage
+- Firebase: Firestore (config eventi, dati) + Auth (Google login). Database in `europe-west1` (Belgio). Storage non usato
 - Vercel: hosting + deploy automatico
 - Nessun CSS framework — tutto inline styles con design tokens centralizzati
 
@@ -16,19 +16,20 @@ src/
 ├── App.js                          # Root: auth, data loading, tab routing, eventConfig boot
 ├── config/
 │   ├── designTokens.js             # colors, alpha, font, radius, gradients, presets, spacing
-│   ├── eventConfig.js              # BRAND_REGISTRY, EXCLUDED_EVENTS, GENRE_LABELS
+│   ├── eventConfig.js              # BRAND_REGISTRY (keywords per brand), EVENT_DATE_OVERRIDES, EXCLUDED_EVENTS, GENRE_LABELS
 │   ├── firebase.js                 # Firebase init (progetto: ultranalytics-8582c)
 │   └── constants.js                # TOOLTIP_STYLE, ecc.
 ├── utils/
 │   ├── comparisonEngine.js         # Core analytics: WhereAreWeNow, cross-brand, genre/brand/location comparison
 │   ├── csvProcessor.js             # Parsing CSV upload → record strutturati
-│   ├── eventNameCleaner.js         # Normalizzazione nomi eventi → brand + edizione
+│   ├── eventNameCleaner.js         # Nome evento → brand, data evento, etichetta edizione (tollera i "�" dell'export)
+│   ├── datasetMerge.js             # Unione export sovrapposti: dedup per codice, ingressi mai persi, persone per telefono
 │   ├── dataTransformers.js         # getUserStats, fasce orarie, heatmap, trends
 │   ├── whatsapp.js                 # URL WhatsApp, templates retarget con {nome}/{brand}/{data}/{link}
 │   └── dateParser.js               # Parsing date italiane
 ├── services/
 │   ├── eventConfigService.js       # Firestore: load/save eventConfig (appConfig/eventConfig)
-│   ├── firebaseDataService.js      # Persistenza dati su Firestore
+│   ├── firebaseDataService.js      # Persistenza dati su Firestore, load con merge, pulizia export superati
 │   └── geminiService.js            # AI chat con Gemini
 ├── components/
 │   ├── tabs/
@@ -53,6 +54,13 @@ src/
 └── contexts/
     └── AuthContext.js              # Auth context Firebase
 ```
+
+## Dati e privacy
+- I dati arrivano dagli export del portale creazioni (`biglietti_*.csv`, `utenti_*.csv`, separatore `;`) caricati dalla UI. Contengono dati personali: **mai committare CSV/Excel** (sono in `.gitignore`).
+- Accesso al database: `firestore.rules` (solo gli account di `AuthContext.js`). Le regole si pubblicano a mano dalla console Firebase (Firestore > Regole): tenere il file allineato.
+- Export sovrapposti: `loadAllData()` unisce tutti i dataset con le regole di `datasetMerge.js`. Un biglietto = un codice; la copia più recente vince ma un ingresso non si perde mai (il portale ha perso gli ingressi dell'Atipico 21.02.26, salvati solo nel dataset di febbraio). Gli export di feb e ott 2026 differiscono di 1h sugli orari invernali.
+- Dopo un upload, `pruneSupersededDatasets()` elimina solo i dataset interamente contenuti nei successivi, ingressi compresi. `ds_biglietti_21_02` contiene anche i 4 Atipico 2024/25 della vecchia piattaforma (senza email, collegati alle persone per telefono): non va cancellato.
+- Edizione = data evento (`DD.MM.YY`). La data viene dal nome (anno dedotto dalle registrazioni), altrimenti dalla notte con più ingressi, altrimenti da `EVENT_DATE_OVERRIDES` (da aggiornare per eventi futuri senza data nel nome).
 
 ## Pattern Importanti
 
@@ -91,7 +99,8 @@ In `whatsapp.js` (retarget) e `BirthdaysTab.js` (compleanni). Tutti includono di
 
 ## Convenzioni
 - UI tutta in italiano
-- `npm run build` deve passare a zero errori/warning prima di push
+- `npm run build` deve passare a zero errori/warning prima di push (Vercel builda con CI=true: i warning bloccano il deploy)
+- Test: `npx react-scripts test --watchAll=false`
 - Test su Vercel deploy (PC + iPhone)
 - Git tag per stati stabili (es. `v2.1-stable`)
 - Commit message in inglese, UI in italiano
