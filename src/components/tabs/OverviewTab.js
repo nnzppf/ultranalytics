@@ -8,6 +8,7 @@ import { COLORS, TOOLTIP_STYLE } from '../../config/constants';
 import { colors, font, radius, alpha, transition as tr } from '../../config/designTokens';
 import { getHourlyData, getHourlyDataByGroup, getHourlyAccessData, getHourlyAccessDataByGroup, getYearlyAvgCurves } from '../../utils/dataTransformers';
 import { FadeIn } from '../shared/Motion';
+import { isEditionOver } from '../../utils/eventTime';
 
 export default function OverviewTab({ analytics, filtered, selectedBrand, graphHeights, setGraphHeights }) {
   const [timeGranularity, setTimeGranularity] = useState('hourly');
@@ -38,19 +39,25 @@ export default function OverviewTab({ analytics, filtered, selectedBrand, graphH
   const yearlyBarData = useMemo(() => {
     if (!eventStats || !eventStats.length) return [];
     const byYear = {};
+    // Only concluded editions (one still on sale would pull the year down); entries
+    // and conversion only from editions whose scans were exported
     for (const ev of eventStats) {
-      if (!ev.eventDate) continue;
+      if (!ev.eventDate || !isEditionOver(ev.eventDate)) continue;
       const year = ev.eventDate.getFullYear();
-      if (!byYear[year]) byYear[year] = { year, totalReg: 0, totalEnt: 0, editions: 0 };
+      if (!byYear[year]) byYear[year] = { year, totalReg: 0, editions: 0, scannedReg: 0, scannedEnt: 0, scannedEditions: 0 };
       byYear[year].totalReg += ev.registrations;
-      byYear[year].totalEnt += ev.entries;
       byYear[year].editions++;
+      if (ev.entries > 0) {
+        byYear[year].scannedReg += ev.registrations;
+        byYear[year].scannedEnt += ev.entries;
+        byYear[year].scannedEditions++;
+      }
     }
     return Object.values(byYear).sort((a, b) => a.year - b.year).map(y => ({
       year: String(y.year),
       mediaReg: Math.round(y.totalReg / y.editions),
-      mediaPresenze: Math.round(y.totalEnt / y.editions),
-      conv: y.totalReg > 0 ? parseFloat(((y.totalEnt / y.totalReg) * 100).toFixed(1)) : 0,
+      mediaPresenze: y.scannedEditions ? Math.round(y.scannedEnt / y.scannedEditions) : 0,
+      conv: y.scannedReg > 0 ? parseFloat(((y.scannedEnt / y.scannedReg) * 100).toFixed(1)) : null,
       edizioni: y.editions,
     }));
   }, [eventStats]);
@@ -127,10 +134,8 @@ export default function OverviewTab({ analytics, filtered, selectedBrand, graphH
     if (!daysBeforeData || !daysBeforeData.length) return null;
     const total = daysBeforeData.reduce((s, d) => s + d.count, 0);
     if (total === 0) return null;
-    const last3 = daysBeforeData.filter(d => {
-      const n = parseInt(d.days);
-      return !isNaN(n) && n >= -3 && n <= 0;
-    }).reduce((s, d) => s + d.count, 0);
+    // Event day plus the 2 days before ("Giorno evento" is dayNum 0)
+    const last3 = daysBeforeData.filter(d => d.dayNum <= 2).reduce((s, d) => s + d.count, 0);
     const pct = Math.round((last3 / total) * 100);
     return pct > 0 ? { pct } : null;
   }, [daysBeforeData]);
@@ -236,7 +241,7 @@ export default function OverviewTab({ analytics, filtered, selectedBrand, graphH
                   <YAxis tick={{ fill: colors.text.muted, fontSize: 10 }} />
                   <Tooltip {...TOOLTIP_STYLE} formatter={(value, name) => {
                     if (name === 'conv') return [`${value}%`, 'Conversione'];
-                    return [value, name === 'mediaReg' ? 'Media reg.' : 'Media presenze'];
+                    return [value, name];
                   }} />
                   <Bar dataKey="mediaReg" name="Media reg." fill={colors.brand.purple} radius={[4, 4, 0, 0]} maxBarSize={48} />
                   <Bar dataKey="mediaPresenze" name="Media presenze" fill={colors.status.success} radius={[4, 4, 0, 0]} maxBarSize={48} />
@@ -246,7 +251,7 @@ export default function OverviewTab({ analytics, filtered, selectedBrand, graphH
               <div style={{ display: "flex", gap: 12, flexWrap: "wrap", justifyContent: "center", marginTop: 8 }}>
                 {yearlyBarData.map(y => (
                   <span key={y.year} style={{ fontSize: font.size.xs, color: colors.text.muted }}>
-                    {y.year}: <strong style={{ color: colors.text.primary }}>{y.mediaReg}</strong> reg/ed · <strong style={{ color: colors.status.success }}>{y.conv}%</strong> conv · ({y.edizioni} ed.)
+                    {y.year}: <strong style={{ color: colors.text.primary }}>{y.mediaReg}</strong> reg/ed · <strong style={{ color: colors.status.success }}>{y.conv != null ? `${y.conv}%` : 'n.d.'}</strong> conv · ({y.edizioni} ed.)
                   </span>
                 ))}
               </div>
@@ -394,7 +399,7 @@ export default function OverviewTab({ analytics, filtered, selectedBrand, graphH
         {daysBeforeInsight && (
           <div style={{ fontSize: font.size.xs, color: colors.text.muted, marginTop: 8, display: "flex", gap: 6, alignItems: "center" }}>
             <Lightbulb size={12} color={colors.brand.purple} />
-            Il <strong style={{ color: colors.text.primary }}>{daysBeforeInsight.pct}%</strong> si registra negli ultimi 3 giorni
+            Il <strong style={{ color: colors.text.primary }}>{daysBeforeInsight.pct}%</strong> si registra il giorno dell'evento o nei 2 giorni prima
           </div>
         )}
         <ResizeHandle chartKey="daysBeforeData" graphHeights={graphHeights} setGraphHeights={setGraphHeights} />

@@ -1,3 +1,4 @@
+import { isEditionOver } from './eventTime';
 import { DAYS_SHORT, FASCE_SHORT, getFascia } from '../config/constants';
 
 /**
@@ -482,14 +483,16 @@ export function getEventStats(data) {
  * @returns {{ data: Array<{day: number, [year]: number}>, years: string[] }}
  */
 export function getYearlyAvgCurves(data, maxDays = 30) {
-  // 1. Group records by edition
+  // 1. Group records by edition (brand + edition: two brands on the same night are
+  // two editions), concluded editions only (one on sale is a partial curve)
   const byEdition = {};
   for (const d of data) {
-    if (!d.editionLabel || d.daysBefore == null || !d.eventDate) continue;
-    if (!byEdition[d.editionLabel]) {
-      byEdition[d.editionLabel] = { year: d.eventDate.getFullYear(), rows: [] };
+    if (!d.editionLabel || d.daysBefore == null || !d.eventDate || !isEditionOver(d.eventDate)) continue;
+    const key = `${d.brand}|${d.editionLabel}`;
+    if (!byEdition[key]) {
+      byEdition[key] = { year: d.eventDate.getFullYear(), rows: [] };
     }
-    byEdition[d.editionLabel].rows.push(d);
+    byEdition[key].rows.push(d);
   }
 
   // 2. Build cumulative curve for each edition: { daysBefore → cumulative count }

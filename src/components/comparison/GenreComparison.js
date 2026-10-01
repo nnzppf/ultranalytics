@@ -28,7 +28,7 @@ export default function GenreComparison({ genreStats, onSelectGenre, highlightGe
     },
     ...chartData.map(g => ({
       name: g.label,
-      registrazioni: g.avgPerBrand,
+      registrazioni: g.avgPerEdition,
       conversione: g.avgConversion,
       color: g.color,
       isBrand: false,
@@ -134,7 +134,7 @@ export default function GenreComparison({ genreStats, onSelectGenre, highlightGe
         {chartData.map(g => {
           const isHL = g.isHighlighted;
           const brandDelta = hasBrandContext
-            ? highlightBrandStats.avgPerEdition - g.avgPerBrand
+            ? highlightBrandStats.avgPerEdition - g.avgPerEdition
             : null;
 
           return (
@@ -169,12 +169,12 @@ export default function GenreComparison({ genreStats, onSelectGenre, highlightGe
                   <div style={{ color: colors.text.primary, fontWeight: font.weight.semibold }}>{g.brandCount}</div>
                 </div>
                 <div>
-                  <div style={{ color: colors.text.disabled }}>Media/brand</div>
-                  <div style={{ color: colors.text.primary, fontWeight: font.weight.semibold }}>{g.avgPerBrand}</div>
+                  <div style={{ color: colors.text.disabled }}>Media/edizione</div>
+                  <div style={{ color: colors.text.primary, fontWeight: font.weight.semibold }}>{g.avgPerEdition}</div>
                 </div>
                 <div>
                   <div style={{ color: colors.text.disabled }}>Conversione</div>
-                  <div style={{ color: colors.status.success, fontWeight: font.weight.semibold }}>{g.avgConversion}%</div>
+                  <div style={{ color: colors.status.success, fontWeight: font.weight.semibold }}>{g.avgConversion != null ? `${g.avgConversion}%` : 'n.d.'}</div>
                 </div>
                 {brandDelta !== null && (
                   <div>

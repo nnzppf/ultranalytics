@@ -80,7 +80,7 @@ export default function BrandComparison({ brandStats, onSelectBrand, highlightBr
                   </div>
                   <div>
                     <div style={presets.statLabel}>Conversione</div>
-                    <div style={{ fontSize: font.size.lg, fontWeight: font.weight.bold, color: colors.status.success }}>{b.avgConversion}%</div>
+                    <div style={{ fontSize: font.size.lg, fontWeight: font.weight.bold, color: colors.status.success }}>{b.avgConversion != null ? `${b.avgConversion}%` : 'n.d.'}</div>
                   </div>
                   <div>
                     <div style={presets.statLabel}>Crescita</div>

@@ -527,13 +527,12 @@ export function buildTrackerSummary(comparisonData) {
   if (!comparisonData) return 'Nessun dato tracker disponibile.';
 
   const {
-    brand, edition, eventDate, currentDaysBefore, isEventPast,
+    brand, edition, eventDate, currentDaysBefore, pointDaysBefore, isEventPast,
     currentRegistrations, dataRegistrations, isOverridden,
     currentAttended, currentConversion,
-    comparisons, avgAtSamePoint,
-    regressionProjection, ensembleProjection,
+    comparisons, avgAtSamePoint, projection,
     avgFinal, progressPercent, targetCumulative,
-    snapshotHour,
+    snapshotHour, dataAsOf,
   } = comparisonData;
 
   const lines = [];
@@ -544,11 +543,11 @@ export function buildTrackerSummary(comparisonData) {
   lines.push(`Edizione: ${edition}`);
   lines.push(`Data evento: ${eventDate ? eventDate.toLocaleDateString('it', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }) : 'n/a'}`);
   lines.push(`Stato: ${isEventPast ? 'Evento concluso' : `Mancano ${currentDaysBefore} giorni`}`);
-  lines.push(`Snapshot ore: ${snapshotHour || 'n/a'}`);
+  lines.push(`Dati aggiornati a: ${dataAsOf ? dataAsOf.toLocaleString('it') : 'n/a'} (confronto fatto a -${pointDaysBefore}gg alle ${snapshotHour})`);
   lines.push(`Registrazioni attuali: ${currentRegistrations}${isOverridden ? ` (dato live, da file: ${dataRegistrations})` : ''}`);
   if (isEventPast) {
     lines.push(`Presenze: ${currentAttended}`);
-    lines.push(`Conversione: ${currentConversion}%`);
+    lines.push(`Conversione: ${currentConversion != null ? `${currentConversion}%` : 'ingressi non disponibili'}`);
   }
   lines.push('');
 
@@ -573,11 +572,11 @@ export function buildTrackerSummary(comparisonData) {
       const date = c.eventDate ? c.eventDate.toLocaleDateString('it') : 'n/a';
       const year = c.eventDate ? c.eventDate.getFullYear() : 'n/a';
       lines.push(`### ${c.editionLabel} (${date}, anno ${year})`);
-      lines.push(`- Allo stesso punto (${isEventPast ? 'finale' : `-${currentDaysBefore}gg ${snapshotHour || ''}`}): ${c.atSamePointAdjusted ?? c.atSamePoint} registrazioni`);
+      lines.push(`- Allo stesso punto (${isEventPast ? 'finale' : `-${pointDaysBefore}gg ${snapshotHour || ''}`}): ${c.atSamePointAdjusted ?? c.atSamePoint} registrazioni`);
       lines.push(`- Delta vs attuale: ${c.deltaPercent != null ? `${c.deltaPercent > 0 ? '+' : ''}${c.deltaPercent}%` : 'n/a'}`);
       lines.push(`- Registrazioni finali: ${c.totalFinal}`);
-      lines.push(`- Presenze: ${c.totalAttended}, Conversione: ${c.finalConversion}%`);
-      lines.push(`- Completamento a -${currentDaysBefore}gg: ${c.completionPercent}% del totale finale`);
+      lines.push(`- Presenze: ${c.totalAttended}, Conversione: ${c.finalConversion != null ? `${c.finalConversion}%` : 'ingressi non disponibili'}`);
+      lines.push(`- Completamento a -${pointDaysBefore}gg: ${c.completionPercent}% del totale finale`);
       // Cumulative milestones for this edition
       if (c.cumulative) {
         const mils = [14, 7, 3, 1, 0].filter(d => c.cumulative[d] != null);
@@ -594,11 +593,8 @@ export function buildTrackerSummary(comparisonData) {
   lines.push(`Media allo stesso punto: ${avgAtSamePoint}`);
   lines.push(`Media finale edizioni precedenti: ${avgFinal}`);
   lines.push(`Progresso vs media finale: ${progressPercent}%`);
-  if (regressionProjection != null) {
-    lines.push(`Proiezione (regressione lineare): ${regressionProjection}`);
-  }
-  if (ensembleProjection != null) {
-    lines.push(`Proiezione (modello bilanciato): ${ensembleProjection}`);
+  if (projection) {
+    lines.push(`Proiezione finale: ~${projection.value} (tra ${projection.low} e ${projection.high}, su ${projection.basedOn} edizioni${projection.reliable ? '' : ', stima incerta'})`);
   }
   lines.push('');
 

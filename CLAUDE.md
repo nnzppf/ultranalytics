@@ -78,7 +78,9 @@ Document Firestore `appConfig/eventConfig`:
 Caricato al boot con `Promise.all([loadEventConfig(), hasStoredData()])`, applicato ai record tramite `applyEventConfig()` in App.js.
 
 ### Live Tracker (comparisonEngine.js)
-- `computeWhereAreWeNow(allData, brand, edition, overrides)` — tracker singolo brand con confronto edizioni precedenti
+- `computeWhereAreWeNow(allData, brand, edition, overrides, { now, dataAsOf })` — tracker singolo brand con confronto edizioni precedenti. Il punto di confronto è l'ora dell'ultima registrazione nei dati (l'ora attuale se c'è un override), come momento relativo al giorno evento; solo edizioni concluse e con data
+- `summarizeComparisons(comps, current, isPast)` — media allo stesso punto, media finale e proiezione (mediana dei rapporti + intervallo): unica fonte per KPI, grafico, filtri per anno e report AI
+- Regole di tempo in `utils/eventTime.js`: giorni all'evento per calendario, edizione conclusa alle 6 del giorno dopo, `conversionOf` solo su serate concluse con ingressi
 - `computeCrossBrandComparison(allData, brandA, brandB, specificEditionB?)` — confronto tra brand
 - `buildCumulativeCurve(rows)` — curva cumulativa registrazioni per daysBefore
 - Override: `{ mode: 'now', value }` o `{ mode: 'daily', days: { daysBefore: cumulative } }`

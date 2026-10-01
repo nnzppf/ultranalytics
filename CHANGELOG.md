@@ -1,5 +1,32 @@
 # Changelog - Ultranalytics
 
+## 1 Ottobre 2026 (v2) — Numeri del Live Tracker
+
+### Confronto "allo stesso punto"
+- Il confronto con le edizioni passate si fa all'ora dell'ultima registrazione presente nei dati ("Dati alle HH:MM", in ambra se più vecchi di 12 ore), non all'ora in cui si apre l'app: con un export delle 14 guardato alle 22 il tracker dava -64% su un'edizione in linea. Con il numero inserito a mano il riferimento resta l'ora attuale
+- Il punto è un momento relativo al giorno dell'evento (es. "-2gg alle 14:10", "dopo mezzanotte alle 01:30"): dopo mezzanotte della serata il tracker dava +529%
+- Confrontate solo le edizioni concluse e con data: quelle ancora in vendita (Giovedì Gelsi) abbassavano media e proiezione
+- La media allo stesso punto conta come 0 le edizioni che a quel punto non avevano iscritti (anche nelle medie per anno e nella card condivisibile)
+- La curva dell'edizione corrente si ferma dove finiscono i dati (non prosegue piatta nel futuro)
+
+### Proiezione
+- Un solo modello: registrazioni attuali × mediana del rapporto finale/allo-stesso-punto delle edizioni passate, con intervallo (interquartile, min-max sotto 4 edizioni) e numero di edizioni usate; "stima incerta" con meno di 3 edizioni o quando a quel punto le edizioni passate avevano meno del 20% del finale
+- KPI, linea del grafico, filtri per anno e report AI usano la stessa funzione (`summarizeComparisons`)
+
+### Altri numeri
+- Giorni all'evento contati per giorni di calendario (la registrazione del giorno prima alle 18 è -1, non 0); ricalcolati anche sui dati già caricati
+- Conversione e no-show solo sulle serate concluse con ingressi registrati (le serate future o senza scansioni non sono no-show); "n.d." altrimenti
+- Confronto con l'edizione precedente nascosto per le edizioni ancora in vendita; crescita del brand tra edizioni concluse; generi confrontati per edizione
+- "Trend per brand" non scarta più le edizioni successive alla prima; curve annuali per brand+edizione e solo edizioni concluse
+- "% che si registra negli ultimi giorni" include il giorno dell'evento; tooltip delle barre annuali corretto
+- Lista "da ricontattare": solo chi è entrato almeno una volta, una persona per telefono, esclusi i già registrati anche con un'altra email
+- Il tracker si apre sull'edizione di stasera o la prossima; i brand sono ordinati per prossimo evento
+
+### Test
+- `utils/eventTime.js` (regole di tempo condivise) e test con orologio simulato su tracker, conversione e ricontatti; test di render della schermata del tracker. Rimosso il test di esempio di CRA, rotto dall'inizio
+
+---
+
 ## 1 Ottobre 2026
 
 ### Export del portale da settembre 2025 a oggi

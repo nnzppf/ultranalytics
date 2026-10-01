@@ -9,6 +9,7 @@ import {
 import { BRAND_REGISTRY } from '../config/eventConfig';
 import { mergeRecordLists, mergeUserLists, isSuperseded, linkPeopleByPhone } from '../utils/datasetMerge';
 import { matchBrand, editionLabelFromDate } from '../utils/eventNameCleaner';
+import { daysBeforeEvent } from '../utils/eventTime';
 
 // Collection names
 const DATASETS_COL = 'datasets';      // metadata per dataset caricato
@@ -88,8 +89,14 @@ export const isProtectedDataset = id => PROTECTED_DATASETS.includes(id);
 
 // Older uploads (Getfy, Feb 2026) used the event name as edition: key every edition by
 // its date like new uploads; names given in the catalog are re-applied by applyEventConfig
+// daysBefore is recomputed too: uploads before Oct 2026 stored it shifted by a day
 function withDateEdition(record) {
-  return record.eventDate ? { ...record, editionLabel: editionLabelFromDate(record.eventDate) } : record;
+  if (!record.eventDate) return record;
+  return {
+    ...record,
+    editionLabel: editionLabelFromDate(record.eventDate),
+    daysBefore: daysBeforeEvent(record.purchaseDate, record.eventDate),
+  };
 }
 
 // Older uploads may hold events excluded since (tests, senior): apply today's rules

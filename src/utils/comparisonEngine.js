@@ -1,6 +1,8 @@
 /**
  * Comparison Engine - Multi-level comparison and "Where Are We Now" feature.
  */
+import { midnight, dayDiff, isEditionOver, samePointFor, latestPurchase, conversionOf } from './eventTime';
+import { normalizePhone } from './datasetMerge';
 
 /**
  * Simple linear regression: y = a*x + b
@@ -51,16 +53,73 @@ function buildCumulativeCurve(rows) {
 }
 
 /**
+ * Average, progress and projection from the comparable past editions.
+ * Shared by the engine, the tracker screen (year filters) and the AI report, so
+ * they always show the same numbers.
+ *
+ * Projection: each past edition says "at this point I had X, I ended with Y";
+ * the current count is scaled by the median of Y/X (robust to one odd edition),
+ * with the interquartile range (min-max under 4 editions) as uncertainty.
+ * It is flagged unreliable when, at this point, past editions typically had less
+ * than 20% of their final registrations, or when fewer than 3 editions back it.
+ */
+export function summarizeComparisons(comps, currentRegistrations, isEventPast) {
+  const n = comps.length;
+  const avgAtSamePoint = n ? Math.round(comps.reduce((s, c) => s + (c.atSamePointAdjusted || 0), 0) / n) : 0;
+  const avgFinal = n ? Math.round(comps.reduce((s, c) => s + c.totalFinal, 0) / n) : 0;
+  const progressPercent = avgFinal > 0 ? Math.round((currentRegistrations / avgFinal) * 100) : 0;
+
+  let projection = null;
+  if (!isEventPast && currentRegistrations > 0) {
+    const ratios = comps
+      .filter(c => c.atSamePointAdjusted > 0 && c.totalFinal > 0)
+      .map(c => c.totalFinal / c.atSamePointAdjusted)
+      .sort((a, b) => a - b);
+    if (ratios.length > 0) {
+      const lowRatio = ratios.length >= 4 ? quantile(ratios, 0.25) : ratios[0];
+      const highRatio = ratios.length >= 4 ? quantile(ratios, 0.75) : ratios[ratios.length - 1];
+      const completion = quantile(
+        comps.filter(c => c.totalFinal > 0).map(c => c.atSamePointAdjusted / c.totalFinal).sort((a, b) => a - b),
+        0.5
+      );
+      projection = {
+        value: Math.round(currentRegistrations * quantile(ratios, 0.5)),
+        low: Math.round(currentRegistrations * lowRatio),
+        high: Math.round(currentRegistrations * highRatio),
+        basedOn: ratios.length,
+        typicalCompletion: completion,
+        reliable: ratios.length >= 3 && completion >= 0.2,
+      };
+    }
+  }
+
+  return { avgAtSamePoint, avgFinal, progressPercent, projection };
+}
+
+function quantile(sorted, q) {
+  if (!sorted.length) return 0;
+  const pos = (sorted.length - 1) * q;
+  const lo = Math.floor(pos), hi = Math.ceil(pos);
+  return sorted[lo] + (sorted[hi] - sorted[lo]) * (pos - lo);
+}
+
+/**
  * "WHERE ARE WE NOW" - The killer feature.
  * For a given brand and target edition (upcoming/current), compare registration
  * progress against the same point in time of previous editions.
- */
-/**
+ *
+ * The same point is a wall-clock moment relative to the event day ("2 days before
+ * at 14:10", "after midnight at 01:30"). It is the time of the newest registration
+ * in the data, because the data is as recent as the last export; when the current
+ * count is typed in by hand (overrides) it is now. Only past editions that are
+ * over and have a date are compared.
+ *
  * overrides: optional object with two modes
  *   { mode: 'now', value: 70 }           — override current total only
  *   { mode: 'daily', days: { 2: 55, 1: 65, 0: 70 } } — cumulative totals for specific days-before
+ * options: { now, dataAsOf } — injectable clock and data freshness (tests)
  */
-export function computeWhereAreWeNow(allData, targetBrand, targetEdition, overrides) {
+export function computeWhereAreWeNow(allData, targetBrand, targetEdition, overrides, options = {}) {
   const brandData = allData.filter(d => d.brand === targetBrand);
   const targetRows = brandData.filter(d => d.editionLabel === targetEdition);
 
@@ -69,24 +128,32 @@ export function computeWhereAreWeNow(allData, targetBrand, targetEdition, overri
   const targetEventDate = targetRows[0].eventDate;
   if (!targetEventDate) return null;
 
-  const now = new Date();
-  // Compare dates at midnight to avoid time-of-day rounding issues
-  const todayMidnight = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-  const eventMidnight = new Date(targetEventDate.getFullYear(), targetEventDate.getMonth(), targetEventDate.getDate());
-  const currentDaysBefore = Math.max(0, Math.round((eventMidnight - todayMidnight) / 86400000));
-  // Intra-day fraction: 0.0 (midnight) → ~1.0 (23:59) for time-adjusted projections
-  const dayFraction = (now.getHours() * 60 + now.getMinutes()) / (24 * 60);
-  // Event is "past" only after the day AFTER the event (registrations can arrive
-  // until ~3am the next morning — people registering at the door)
-  const dayAfterEvent = new Date(targetEventDate);
-  dayAfterEvent.setDate(dayAfterEvent.getDate() + 1);
-  dayAfterEvent.setHours(6, 0, 0, 0); // grace period until 6am the next day
-  const isEventPast = now > dayAfterEvent;
+  const now = options.now || new Date();
+  const eventDay = midnight(targetEventDate);
+  // Days to the event as of today (badge, manual inputs)
+  const currentDaysBefore = Math.max(0, dayDiff(now, eventDay));
+  // Event is "past" only after 6am the day after (door registrations until ~3am)
+  const isEventPast = isEditionOver(targetEventDate, now);
   const dataRegistrations = targetRows.length;
   const currentAttended = targetRows.filter(r => r.attended).length;
 
-  // Build the target's own cumulative curve from file data
+  const hasOverride = !isEventPast && !!overrides && (
+    (overrides.mode === 'now' && overrides.value > 0) ||
+    (overrides.mode === 'daily' && overrides.days?.[currentDaysBefore] > 0)
+  );
+  const dataAsOf = options.dataAsOf !== undefined ? options.dataAsOf : latestPurchase(allData);
+  const reference = (hasOverride || !dataAsOf || dataAsOf > now) ? now : dataAsOf;
+  // Days before the event at the comparison point (where the data stops)
+  const pointDaysBefore = isEventPast ? 0 : Math.max(0, dayDiff(reference, eventDay));
+  const isDataStale = !isEventPast && !hasOverride && !!dataAsOf && (now - dataAsOf) > 12 * 3600000;
+
+  // Build the target's own cumulative curve from file data, up to where the data stops
   const rawTargetCumulative = buildCumulativeCurve(targetRows);
+  if (!isEventPast) {
+    for (const d of Object.keys(rawTargetCumulative).map(Number)) {
+      if (d < pointDaysBefore) delete rawTargetCumulative[d];
+    }
+  }
 
   // Detect missing/incomplete days based on actual registration timestamps
   const rowsWithDays = targetRows.filter(r => r.daysBefore !== null && r.daysBefore !== undefined);
@@ -163,7 +230,8 @@ export function computeWhereAreWeNow(allData, targetBrand, targetEdition, overri
     }
   }
 
-  // Get all other editions for this brand
+  // Past editions of this brand that are over and have a date: editions still
+  // on sale (weekly events) or undated would drag the averages down
   const otherEditions = [...new Set(brandData.map(d => d.editionLabel))]
     .filter(e => e !== targetEdition);
 
@@ -174,25 +242,17 @@ export function computeWhereAreWeNow(allData, targetBrand, targetEdition, overri
     if (!edRows.length) continue;
 
     const edEventDate = edRows[0].eventDate;
+    if (!edEventDate || !isEditionOver(edEventDate, now)) continue;
     const cumulative = buildCumulativeCurve(edRows);
     const totalFinal = edRows.length;
     const totalAttended = edRows.filter(r => r.attended).length;
-    const atSamePoint = cumulative[currentDaysBefore] || 0;
+    const atSamePoint = cumulative[pointDaysBefore] || 0;
 
-    // Precise time-adjusted comparison: count actual registrations that arrived
-    // by the same hour:minute relative to the edition's own event date.
-    let atSamePointAdjusted;
-    if (isEventPast) {
-      atSamePointAdjusted = atSamePoint;
-    } else if (edEventDate) {
-      const edEventMidnight = new Date(edEventDate.getFullYear(), edEventDate.getMonth(), edEventDate.getDate());
-      const cutoff = new Date(edEventMidnight);
-      cutoff.setDate(cutoff.getDate() - currentDaysBefore);
-      cutoff.setHours(now.getHours(), now.getMinutes(), 59, 999);
-      atSamePointAdjusted = edRows.filter(r => r.purchaseDate && r.purchaseDate <= cutoff).length;
-    } else {
-      atSamePointAdjusted = atSamePoint;
-    }
+    // Registrations that had arrived by the same moment relative to this edition's day
+    const cutoff = samePointFor(edEventDate, reference, targetEventDate);
+    const atSamePointAdjusted = isEventPast
+      ? totalFinal
+      : edRows.filter(r => r.purchaseDate && r.purchaseDate <= cutoff).length;
 
     const delta = currentRegistrations - atSamePointAdjusted;
     const deltaPercent = atSamePointAdjusted > 0
@@ -212,7 +272,8 @@ export function computeWhereAreWeNow(allData, targetBrand, targetEdition, overri
       eventDate: edEventDate,
       totalFinal,
       totalAttended,
-      finalConversion: totalFinal > 0 ? parseFloat(((totalAttended / totalFinal) * 100).toFixed(1)) : 0,
+      // No scans at all means the entries were not exported, not that nobody came
+      finalConversion: totalAttended > 0 ? parseFloat(((totalAttended / totalFinal) * 100).toFixed(1)) : null,
       cumulative,
       atSamePoint,
       atSamePointAdjusted,
@@ -223,75 +284,8 @@ export function computeWhereAreWeNow(allData, targetBrand, targetEdition, overri
     });
   }
 
-  // Average metrics (use time-adjusted values for fair comparison)
-  const validComps = comparisons.filter(c => c.atSamePoint > 0);
-  const avgAtSamePoint = validComps.length
-    ? Math.round(validComps.reduce((s, c) => s + c.atSamePointAdjusted, 0) / validComps.length)
-    : 0;
-  const validProjections = validComps.filter(c => c.projectedFinal != null);
-  const avgProjectedFinal = (!isEventPast && validProjections.length)
-    ? Math.round(validProjections.reduce((s, c) => s + c.projectedFinal, 0) / validProjections.length)
-    : null;
-  const avgFinal = comparisons.length
-    ? Math.round(comparisons.reduce((s, c) => s + c.totalFinal, 0) / comparisons.length)
-    : 0;
-
-  // --- Advanced projection models ---
-  // Model A: Regression — linear fit on (atSamePointAdjusted, totalFinal)
-  let regressionProjection = null;
-  if (!isEventPast && validComps.length >= 2) {
-    const regPoints = validComps.map(c => ({ x: c.atSamePointAdjusted, y: c.totalFinal }));
-    const reg = linReg(regPoints);
-    if (reg && reg.a > 0) {
-      regressionProjection = Math.round(reg.a * currentRegistrations + reg.b);
-      if (regressionProjection < currentRegistrations) regressionProjection = null;
-    }
-  }
-
-  // Model B: Ensemble — per-day regressions with exponential decay + current point
-  let ensembleProjection = null;
-  if (!isEventPast && validComps.length >= 2) {
-    const DECAY = 2;
-    const dayPredictions = [];
-
-    // Per-day regressions: for each daysBefore d, fit total = a*cumulative[d] + b
-    const maxDayComp = Math.max(
-      ...comparisons.map(c => Math.max(...Object.keys(c.cumulative).map(Number), 0)), 0
-    );
-    for (let d = maxDayComp; d >= 1; d--) {
-      const pts = [];
-      for (const c of comparisons) {
-        const val = c.cumulative[d];
-        if (val != null && val > 0) {
-          pts.push({ x: val, y: c.totalFinal });
-        }
-      }
-      if (pts.length < 2) continue;
-      const reg = linReg(pts);
-      if (!reg || reg.a <= 0) continue;
-      const currVal = targetCumulative[d];
-      if (currVal == null || currVal <= 0) continue;
-      const pred = Math.round(reg.a * currVal + reg.b);
-      if (pred > currVal) dayPredictions.push({ day: d, pred });
-    }
-
-    // Add time-adjusted current point (regression model) as most recent prediction
-    if (regressionProjection != null) {
-      dayPredictions.push({ day: 0, pred: regressionProjection });
-    }
-
-    if (dayPredictions.length > 0) {
-      const maxDay = Math.max(...dayPredictions.map(p => p.day));
-      let wSum = 0, wTotal = 0;
-      for (const p of dayPredictions) {
-        const w = Math.pow(DECAY, maxDay - p.day);
-        wSum += p.pred * w;
-        wTotal += w;
-      }
-      ensembleProjection = Math.round(wSum / wTotal);
-      if (ensembleProjection < currentRegistrations) ensembleProjection = null;
-    }
-  }
+  const { avgAtSamePoint, avgFinal, progressPercent, projection } =
+    summarizeComparisons(comparisons, currentRegistrations, isEventPast);
 
   // Build overlay chart data (all editions on same x-axis of days-before)
   const maxDaysAll = Math.max(
@@ -307,49 +301,37 @@ export function computeWhereAreWeNow(allData, targetBrand, targetEdition, overri
     for (const comp of comparisons) {
       point[comp.editionLabel] = comp.cumulative[d] != null ? comp.cumulative[d] : null;
     }
-    // Add projection lines for each model: from currentDaysBefore to event day (day 0)
-    const projModels = { _projRegression: regressionProjection, _projEnsemble: ensembleProjection };
-    for (const [key, projVal] of Object.entries(projModels)) {
-      if (!isEventPast && projVal != null && d <= currentDaysBefore) {
-        if (d === currentDaysBefore) {
-          point[key] = currentRegistrations;
-        } else if (d === 0) {
-          point[key] = projVal;
-        } else if (currentDaysBefore > 0) {
-          const progress = (currentDaysBefore - d) / currentDaysBefore;
-          point[key] = Math.round(currentRegistrations + (projVal - currentRegistrations) * progress);
-        }
-      }
-    }
     overlayData.push(point);
   }
 
+  const pad = n => String(n).padStart(2, '0');
   return {
     brand: targetBrand,
     edition: targetEdition,
     eventDate: targetEventDate,
     currentDaysBefore,
+    pointDaysBefore,
     isEventPast,
     currentRegistrations,
     dataRegistrations,
     isOverridden,
     missingDays,
     currentAttended,
-    currentConversion: currentRegistrations > 0
+    currentConversion: isEventPast && currentAttended > 0
       ? parseFloat(((currentAttended / currentRegistrations) * 100).toFixed(1))
-      : 0,
+      : null,
     comparisons,
     avgAtSamePoint,
-    avgProjectedFinal,
-    regressionProjection,
-    ensembleProjection,
     avgFinal,
-    progressPercent: avgFinal > 0 ? Math.round((currentRegistrations / avgFinal) * 100) : 0,
+    progressPercent,
+    projection,
     overlayData,
     allEditionLabels: [targetEdition, ...comparisons.map(c => c.editionLabel)],
     targetCumulative,
-    dayFraction,
-    snapshotHour: `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`,
+    dataAsOf,
+    isDataStale,
+    referenceTime: reference,
+    snapshotHour: `${pad(reference.getHours())}:${pad(reference.getMinutes())}`,
   };
 }
 
@@ -383,7 +365,7 @@ export function computeCrossBrandComparison(allData, brandA, brandB, specificEdi
         displayLabel: `${brandName} ${ed}`,
         totalRegistrations: edRows.length,
         totalAttended: attended,
-        conversion: edRows.length > 0 ? parseFloat(((attended / edRows.length) * 100).toFixed(1)) : 0,
+        conversion: conversionOf(edRows),
         eventDate,
         cumulative,
       };
@@ -401,7 +383,7 @@ export function computeCrossBrandComparison(allData, brandA, brandB, specificEdi
       totalRegistrations: rows.length,
       avgPerEdition: editions.length > 0 ? Math.round(rows.length / editions.length) : 0,
       totalAttended: attended,
-      avgConversion: rows.length > 0 ? parseFloat(((attended / rows.length) * 100).toFixed(1)) : 0,
+      avgConversion: conversionOf(rows),
       editionCount: editions.length,
     };
   }
@@ -448,14 +430,14 @@ export function compareBrands(allData, brandNames = null) {
     const editions = [...new Set(rows.map(d => d.editionLabel))];
     const attended = rows.filter(r => r.attended).length;
 
-    // Growth: first edition vs last edition
+    // Growth: first vs last concluded edition (one still on sale has a partial count)
     let growth = null;
-    if (editions.length >= 2) {
-      const editionStats = editions.map(ed => ({
-        edition: ed,
-        count: rows.filter(r => r.editionLabel === ed).length,
-        eventDate: rows.find(r => r.editionLabel === ed)?.eventDate,
-      })).sort((a, b) => (a.eventDate || 0) - (b.eventDate || 0));
+    const editionStats = editions.map(ed => ({
+      edition: ed,
+      count: rows.filter(r => r.editionLabel === ed).length,
+      eventDate: rows.find(r => r.editionLabel === ed)?.eventDate,
+    })).filter(e => isEditionOver(e.eventDate)).sort((a, b) => a.eventDate - b.eventDate);
+    if (editionStats.length >= 2) {
 
       const first = editionStats[0].count;
       const last = editionStats[editionStats.length - 1].count;
@@ -471,9 +453,7 @@ export function compareBrands(allData, brandNames = null) {
       totalRegistrations: rows.length,
       avgPerEdition: editions.length > 0 ? Math.round(rows.length / editions.length) : 0,
       totalAttended: attended,
-      avgConversion: rows.length > 0
-        ? parseFloat(((attended / rows.length) * 100).toFixed(1))
-        : 0,
+      avgConversion: conversionOf(rows),
       growth,
       editions,
     };
@@ -500,10 +480,12 @@ export function compareGenres(allData, excludeBrand = null) {
       brands,
       totalRegistrations: rows.length,
       avgPerBrand: brands.length > 0 ? Math.round(rows.length / brands.length) : 0,
+      avgPerEdition: (() => {
+        const eds = new Set(rows.map(d => `${d.brand}|${d.editionLabel}`)).size;
+        return eds > 0 ? Math.round(rows.length / eds) : 0;
+      })(),
       totalAttended: attended,
-      avgConversion: rows.length > 0
-        ? parseFloat(((attended / rows.length) * 100).toFixed(1))
-        : 0,
+      avgConversion: conversionOf(rows),
     };
   }).sort((a, b) => b.totalRegistrations - a.totalRegistrations);
 }
@@ -525,17 +507,17 @@ export function compareLocations(allData) {
       brands,
       totalRegistrations: rows.length,
       totalAttended: attended,
-      avgConversion: rows.length > 0
-        ? parseFloat(((attended / rows.length) * 100).toFixed(1))
-        : 0,
+      avgConversion: conversionOf(rows),
     };
   }).sort((a, b) => b.totalRegistrations - a.totalRegistrations);
 }
 
 /**
- * Get all brands available for the Live Tracker (1+ edition).
+ * Get all brands available for the Live Tracker (1+ edition), brands with an
+ * upcoming edition first (nearest first). defaultEdition is the edition to open:
+ * tonight's or the next one, otherwise the most recent.
  */
-export function getBrandsForTracker(allData) {
+export function getBrandsForTracker(allData, now = new Date()) {
   const brandEditions = {};
   for (const d of allData) {
     if (!d.brand) continue;
@@ -550,18 +532,28 @@ export function getBrandsForTracker(allData) {
   }
   return Object.entries(brandEditions)
     .filter(([_, eds]) => Object.keys(eds).length >= 1)
-    .map(([brand, eds]) => ({
-      brand,
-      editions: Object.entries(eds)
-        .sort((a, b) => (a[1] || 0) - (b[1] || 0))
-        .map(([label]) => label),
-    }));
+    .map(([brand, eds]) => {
+      const sorted = Object.entries(eds).sort((a, b) => (a[1] || 0) - (b[1] || 0));
+      const upcoming = sorted.find(([, date]) => date && !isEditionOver(date, now));
+      return {
+        brand,
+        editions: sorted.map(([label]) => label),
+        nextEventDate: upcoming ? upcoming[1] : null,
+        defaultEdition: upcoming ? upcoming[0] : sorted[sorted.length - 1][0],
+      };
+    })
+    .sort((a, b) => {
+      if (a.nextEventDate && b.nextEventDate) return a.nextEventDate - b.nextEventDate;
+      if (a.nextEventDate) return -1;
+      if (b.nextEventDate) return 1;
+      return a.brand.localeCompare(b.brand);
+    });
 }
 
 /**
  * Compute registered users and retarget users for a specific brand + edition.
  * Registered = unique users in the target edition.
- * Retarget = unique users from past editions of the same brand NOT in the target edition.
+ * Retarget = people who came to past editions of the same brand and are NOT registered to the target edition.
  */
 export function computeEditionUserLists(allData, targetBrand, targetEdition) {
   const brandData = allData.filter(d => d.brand === targetBrand);
@@ -592,14 +584,20 @@ export function computeEditionUserLists(allData, targetBrand, targetEdition) {
   }
   const registered = Object.values(regMap);
 
-  // --- Retarget users (past editions, not in current) ---
-  const currentKeys = new Set(Object.keys(regMap));
+  // --- Retarget users: people who came (scanned) to past editions and are not
+  // registered to this one. Identified by phone first: the same person can register
+  // with different emails, and two rows with one phone must get one message.
+  const currentPhones = new Set(targetRows.map(d => normalizePhone(d.phone)).filter(Boolean));
+  const currentEmails = new Set(targetRows.map(d => (d.email || '').toLowerCase()).filter(Boolean));
   const retargetMap = {};
 
   for (const d of brandData) {
-    if (d.editionLabel === targetEdition) continue;
-    const key = (d.email || d.fullName || d.name || '').toLowerCase().trim();
-    if (!key || currentKeys.has(key)) continue;
+    if (d.editionLabel === targetEdition || !d.attended) continue;
+    const phone = normalizePhone(d.phone);
+    const email = (d.email || '').toLowerCase();
+    if ((phone && currentPhones.has(phone)) || (email && currentEmails.has(email))) continue;
+    const key = phone || email || (d.fullName || d.name || '').toLowerCase().trim();
+    if (!key) continue;
 
     if (!retargetMap[key]) {
       retargetMap[key] = {
@@ -625,10 +623,11 @@ export function computeEditionUserLists(allData, targetBrand, targetEdition) {
     pastEditionCount: u.pastEditions.size || u.pastEditions.length,
   }));
 
-  // Sort: users with phone first (actionable), then by most recent event
+  // Sort: users with phone first (actionable), then who came most often, then most recent
   retarget.sort((a, b) => {
     if (a.phone && !b.phone) return -1;
     if (!a.phone && b.phone) return 1;
+    if (b.pastEditionCount !== a.pastEditionCount) return b.pastEditionCount - a.pastEditionCount;
     return (b.lastEventDate || 0) - (a.lastEventDate || 0);
   });
 

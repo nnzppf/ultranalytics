@@ -155,7 +155,7 @@ export default function ComparisonTab({ data, filtered, selectedBrand: topSelect
         setSelectedBrand(highlightBrand);
         const brandInfo = trackerBrands.find(b => b.brand === highlightBrand);
         if (brandInfo && brandInfo.editions.length >= 1) {
-          setLocalSelectedEdition(brandInfo.editions[brandInfo.editions.length - 1]);
+          setLocalSelectedEdition(brandInfo.defaultEdition);
         }
       }
       setCrossBrandTarget(brand);
@@ -171,7 +171,7 @@ export default function ComparisonTab({ data, filtered, selectedBrand: topSelect
     setDailyCounts({});
     const brandInfo = trackerBrands.find(b => b.brand === brand);
     if (brandInfo && brandInfo.editions.length >= 1) {
-      setLocalSelectedEdition(brandInfo.editions[brandInfo.editions.length - 1]);
+      setLocalSelectedEdition(brandInfo.defaultEdition);
       setView('tracker');
     }
   };
@@ -184,7 +184,7 @@ export default function ComparisonTab({ data, filtered, selectedBrand: topSelect
     if (view === 'tracker' && highlightBrand && !selectedBrand && !selectedEdition) {
       const brandInfo = trackerBrands.find(b => b.brand === highlightBrand);
       if (brandInfo && brandInfo.editions.length > 0) {
-        setLocalSelectedEdition(brandInfo.editions[brandInfo.editions.length - 1]);
+        setLocalSelectedEdition(brandInfo.defaultEdition);
       }
     }
   }, [view, highlightBrand, selectedBrand, selectedEdition, trackerBrands]);
@@ -274,14 +274,14 @@ export default function ComparisonTab({ data, filtered, selectedBrand: topSelect
               </div>
               {/* Desktop: buttons */}
               <div className="tracker-brand-buttons" style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                {[...trackerBrands].sort((a, b) => a.brand.localeCompare(b.brand)).map(b => (
+                {trackerBrands.map(b => (
                   <button key={b.brand} onClick={() => handleSelectBrand(b.brand)} style={{
                     padding: "8px 16px", borderRadius: radius.lg, fontSize: font.size.sm,
                     border: `1px solid ${colors.border.default}`,
                     cursor: "pointer", background: colors.bg.card,
                     color: colors.text.primary,
                   }}>
-                    {b.brand} <span style={{ color: colors.text.disabled }}>({b.editions.length} edizioni)</span>
+                    {b.brand} <span style={{ color: colors.text.disabled }}>{b.nextEventDate ? `· ${b.nextEventDate.toLocaleDateString('it', { day: 'numeric', month: 'short' })}` : `(${b.editions.length} edizioni)`}</span>
                   </button>
                 ))}
               </div>
@@ -291,7 +291,7 @@ export default function ComparisonTab({ data, filtered, selectedBrand: topSelect
                   value={null}
                   onChange={(brand) => handleSelectBrand(brand)}
                   placeholder="Seleziona brand..."
-                  options={[...trackerBrands].sort((a, b) => a.brand.localeCompare(b.brand)).map(b => ({ value: b.brand, label: b.brand, count: b.editions.length }))}
+                  options={trackerBrands.map(b => ({ value: b.brand, label: b.nextEventDate ? `${b.brand} · ${b.nextEventDate.toLocaleDateString('it', { day: 'numeric', month: 'short' })}` : b.brand, count: b.editions.length }))}
                 />
               </div>
             </div>

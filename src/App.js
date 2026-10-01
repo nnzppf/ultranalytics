@@ -8,6 +8,7 @@ import { useAuth } from "./contexts/AuthContext";
 import LoginScreen from "./components/screens/LoginScreen";
 import { processRawRows, isUtentiFormat, processUtentiRows } from "./utils/csvProcessor";
 import { applyEventConfig } from "./utils/applyEventConfig";
+import { isEditionOver, conversionOf } from "./utils/eventTime";
 import { getHourlyData, getHourlyDataByGroup, getDowData, getFasciaData, getDaysBeforeData, getTrendData, getTrendDataByGroup, getConversionByFascia, getHeatmapData, getUserStats, getEventStats } from "./utils/dataTransformers";
 import { saveDataset, loadAllData, deleteDataset, hasStoredData, pruneSupersededDatasets, isProtectedDataset } from "./services/firebaseDataService";
 import { loadEventConfig, saveEventConfig } from "./services/eventConfigService";
@@ -333,8 +334,10 @@ function AuthenticatedApp({ user, logout }) {
 
     const total = filtered.length;
     const entered = filtered.filter(r => r.attended).length;
-    const conv = total > 0 ? parseFloat(((entered / total) * 100).toFixed(1)) : 0;
-    const noShowRate = total > 0 ? parseFloat((((total - entered) / total) * 100).toFixed(1)) : 0;
+    // Conversion only on nights that are over and whose entries were exported:
+    // future nights and nights without scans are not no-shows
+    const conv = conversionOf(filtered);
+    const noShowRate = conv != null ? parseFloat((100 - conv).toFixed(1)) : null;
     const brands = [...new Set(filtered.map(r => r.brand))].filter(Boolean);
     const eventStats = getEventStats(filtered);
 
@@ -344,9 +347,17 @@ function AuthenticatedApp({ user, logout }) {
     const hourlyRegByEvent = getHourlyDataByGroup(filtered, groupKey);
     const hourlyPeak = hourlyReg.reduce((max, h) => h.registrazioni > (max?.registrazioni || 0) ? h : max, null);
 
-    // Compute trend vs previous edition (if a single edition is selected)
+    // Determine if the selected edition is a future event (not yet happened)
+    let isEditionFuture = false;
+    if (selectedEdition !== "all") {
+      const edRow = filtered.find(r => r.eventDate);
+      isEditionFuture = !!edRow && !isEditionOver(edRow.eventDate);
+    }
+
+    // Compute trend vs previous edition (if a single, concluded edition is selected:
+    // a partial count against a final one is meaningless)
     let trend = null;
-    if (selectedEdition !== "all" && selectedBrand !== "all") {
+    if (selectedEdition !== "all" && selectedBrand !== "all" && !isEditionFuture) {
       // Find all editions of this brand sorted by date
       const brandRecords = data.filter(r => r.brand === selectedBrand);
       const editions = [...new Set(brandRecords.map(r => r.editionLabel))].filter(Boolean);
@@ -361,26 +372,13 @@ function AuthenticatedApp({ user, logout }) {
         const prevRecords = brandRecords.filter(r => r.editionLabel === prevEdition);
         const prevTotal = prevRecords.length;
         const prevEntered = prevRecords.filter(r => r.attended).length;
-        const prevConv = prevTotal > 0 ? parseFloat(((prevEntered / prevTotal) * 100).toFixed(1)) : 0;
+        const prevConv = conversionOf(prevRecords);
         trend = {
           prevEdition,
           total: prevTotal > 0 ? parseFloat((((total - prevTotal) / prevTotal) * 100).toFixed(1)) : null,
           entered: prevEntered > 0 ? parseFloat((((entered - prevEntered) / prevEntered) * 100).toFixed(1)) : null,
-          conv: prevConv > 0 ? parseFloat((conv - prevConv).toFixed(1)) : null,
+          conv: prevConv != null && conv != null ? parseFloat((conv - prevConv).toFixed(1)) : null,
         };
-      }
-    }
-
-    // Determine if the selected edition is a future event (not yet happened)
-    // Use the 6 AM day-after grace period (same as comparisonEngine)
-    let isEditionFuture = false;
-    if (selectedEdition !== "all") {
-      const edRow = filtered.find(r => r.eventDate);
-      if (edRow?.eventDate) {
-        const dayAfter = new Date(edRow.eventDate);
-        dayAfter.setDate(dayAfter.getDate() + 1);
-        dayAfter.setHours(6, 0, 0, 0);
-        isEditionFuture = new Date() < dayAfter;
       }
     }
 
@@ -400,6 +398,8 @@ function AuthenticatedApp({ user, logout }) {
       heatmapGrid: getHeatmapData(filtered),
       trendData: getTrendData(filtered),
       trendByGroup: (() => {
+        // Cut each line the day after its event: only per edition (a brand has many)
+        if (groupKey !== 'editionLabel') return getTrendDataByGroup(filtered, groupKey);
         const eventDates = {};
         for (const d of filtered) {
           if (d[groupKey] && d.eventDate && !eventDates[d[groupKey]]) {
@@ -721,7 +721,7 @@ function AuthenticatedApp({ user, logout }) {
                         <TrendingUp size={12} color={colors.brand.cyan} style={{ flexShrink: 0 }} />
                         <span style={{ fontSize: font.size.xs, color: colors.text.muted, textTransform: "uppercase", letterSpacing: "0.05em", whiteSpace: "nowrap" }}>Conv.</span>
                       </div>
-                      <div style={{ fontSize: font.size["3xl"], fontWeight: font.weight.bold, color: colors.text.primary, whiteSpace: "nowrap" }}>{analytics.conv}%</div>
+                      <div style={{ fontSize: font.size["3xl"], fontWeight: font.weight.bold, color: colors.text.primary, whiteSpace: "nowrap" }}>{analytics.conv != null ? `${analytics.conv}%` : 'n.d.'}</div>
                     </div>
                     <div style={{ width: 1, background: colors.border.default, alignSelf: "stretch" }} />
                     <div style={{ flex: 1, minWidth: 0 }}>
@@ -729,7 +729,7 @@ function AuthenticatedApp({ user, logout }) {
                         <X size={12} color={colors.status.error} style={{ flexShrink: 0 }} />
                         <span style={{ fontSize: font.size.xs, color: colors.text.muted, textTransform: "uppercase", letterSpacing: "0.05em", whiteSpace: "nowrap" }}>No-Show</span>
                       </div>
-                      <div style={{ fontSize: font.size["3xl"], fontWeight: font.weight.bold, color: colors.text.primary, whiteSpace: "nowrap" }}>{analytics.noShowRate}%</div>
+                      <div style={{ fontSize: font.size["3xl"], fontWeight: font.weight.bold, color: colors.text.primary, whiteSpace: "nowrap" }}>{analytics.noShowRate != null ? `${analytics.noShowRate}%` : 'n.d.'}</div>
                     </div>
                   </div>
                 </motion.div>

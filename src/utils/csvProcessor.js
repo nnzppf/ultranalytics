@@ -3,6 +3,7 @@ import * as XLSX from 'xlsx';
 import { parseDateTime, parseItalianDate, isSentinelDate } from './dateParser';
 import { matchBrand, extractEventDate, editionLabelFromDate, repairText } from './eventNameCleaner';
 import { DAYS_JS, getFascia } from '../config/constants';
+import { daysBeforeEvent } from './eventTime';
 
 /**
  * Parse a birth date string. Returns Date or null.
@@ -167,7 +168,7 @@ function processBigliettiRows(rows, customConfig) {
     // Calculate days before event
     let daysBefore = null;
     if (eventDate && purchaseDate) {
-      daysBefore = Math.max(0, Math.floor((eventDate - purchaseDate) / 86400000));
+      daysBefore = daysBeforeEvent(purchaseDate, eventDate);
     }
 
     const name = (row[nameCol] || '').trim();
@@ -241,7 +242,7 @@ function processGenericRows(rows, eventName, customConfig) {
       scanDate: null,
       attended,
       eventDate,
-      daysBefore: eventDate ? Math.max(0, Math.floor((eventDate - purchaseDate) / 86400000)) : null,
+      daysBefore: daysBeforeEvent(purchaseDate, eventDate),
       name: fullName,
       surname: '',
       fullName,

@@ -66,7 +66,7 @@ export default function LocationComparison({ locationStats, highlightLocation, h
                 </div>
                 <div>
                   <div style={{ color: colors.text.disabled }}>Conversione</div>
-                  <div style={{ color: colors.status.success, fontWeight: font.weight.semibold }}>{loc.avgConversion}%</div>
+                  <div style={{ color: colors.status.success, fontWeight: font.weight.semibold }}>{loc.avgConversion != null ? `${loc.avgConversion}%` : 'n.d.'}</div>
                 </div>
               </div>
             </div>

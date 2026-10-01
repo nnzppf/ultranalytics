@@ -6,7 +6,7 @@ import ScaleToggle from '../shared/ScaleToggle';
 import { useSortable, Th } from '../shared/SortableTable';
 import DataCards from '../shared/DataCards';
 import { TOOLTIP_STYLE } from '../../config/constants';
-import { linReg } from '../../utils/comparisonEngine';
+import { summarizeComparisons } from '../../utils/comparisonEngine';
 import { buildTrackerSummary } from '../../utils/dataSummarizer';
 import { escapeHtml } from '../../utils/escapeHtml';
 import { generateTrackerReport, isGeminiConfigured } from '../../services/geminiService';
@@ -56,8 +56,8 @@ function CrossBrandView({ comparisonData }) {
         for (const c of curves) for (const d of Object.keys(c)) allDays.add(Number(d));
         const avgCurve = {};
         for (const d of allDays) {
-          const vals = curves.map(c => c[d]).filter(v => v != null);
-          if (vals.length > 0) avgCurve[d] = Math.round(vals.reduce((s, v) => s + v, 0) / vals.length);
+          const vals = curves.map(c => c[d] ?? 0);
+          avgCurve[d] = Math.round(vals.reduce((s, v) => s + v, 0) / vals.length);
         }
         result[`${brand} media ${year}`] = { curve: avgCurve, brand, year: Number(year) };
       }
@@ -106,7 +106,7 @@ function CrossBrandView({ comparisonData }) {
   }, [overlayData, compressed, filteredEditionLabels, yearAvgCurves, yearAvgKeys]);
 
   const deltaReg = aggA.avgPerEdition - aggB.avgPerEdition;
-  const deltaConv = parseFloat((aggA.avgConversion - aggB.avgConversion).toFixed(1));
+  const deltaConv = aggA.avgConversion != null && aggB.avgConversion != null ? parseFloat((aggA.avgConversion - aggB.avgConversion).toFixed(1)) : null;
 
   // Table data: all editions of both brands
   const tableDataRaw = allStats.map(s => ({
@@ -149,7 +149,7 @@ function CrossBrandView({ comparisonData }) {
             </div>
             <div>
               <div style={presets.statLabel}>Conversione</div>
-              <div style={{ fontSize: font.size.xl, fontWeight: font.weight.black, color: colors.status.success }}>{aggA.avgConversion}%</div>
+              <div style={{ fontSize: font.size.xl, fontWeight: font.weight.black, color: colors.status.success }}>{aggA.avgConversion != null ? `${aggA.avgConversion}%` : 'n.d.'}</div>
             </div>
           </div>
         </div>
@@ -168,7 +168,7 @@ function CrossBrandView({ comparisonData }) {
             fontSize: font.size.lg, fontWeight: font.weight.black,
             color: deltaConv > 0 ? colors.status.success : deltaConv < 0 ? colors.status.error : colors.text.muted,
           }}>
-            {deltaConv > 0 ? "+" : ""}{deltaConv}%
+            {deltaConv != null ? `${deltaConv > 0 ? '+' : ''}${deltaConv}%` : 'n.d.'}
           </div>
         </div>
 
@@ -190,7 +190,7 @@ function CrossBrandView({ comparisonData }) {
             </div>
             <div>
               <div style={presets.statLabel}>Conversione</div>
-              <div style={{ fontSize: font.size.xl, fontWeight: font.weight.black, color: colors.status.success }}>{aggB.avgConversion}%</div>
+              <div style={{ fontSize: font.size.xl, fontWeight: font.weight.black, color: colors.status.success }}>{aggB.avgConversion != null ? `${aggB.avgConversion}%` : 'n.d.'}</div>
             </div>
           </div>
         </div>
@@ -223,7 +223,7 @@ function CrossBrandView({ comparisonData }) {
                   <td style={{ padding: "8px", color: colors.text.primary }}>{s.editionLabel}</td>
                   <td style={{ padding: "8px", color: colors.text.primary, textAlign: "center", fontWeight: font.weight.semibold }}>{s.totalRegistrations}</td>
                   <td style={{ padding: "8px", color: colors.text.muted, textAlign: "center" }}>{s.totalAttended}</td>
-                  <td style={{ padding: "8px", color: colors.status.success, textAlign: "center" }}>{s.conversion}%</td>
+                  <td style={{ padding: "8px", color: colors.status.success, textAlign: "center" }}>{s.conversion != null ? `${s.conversion}%` : 'n.d.'}</td>
                 </tr>
               ))}
             </tbody>
@@ -237,7 +237,7 @@ function CrossBrandView({ comparisonData }) {
             { key: 'editionLabel', label: 'Edizione', badge: true },
             { key: 'totalRegistrations', label: 'Registrazioni' },
             { key: 'totalAttended', label: 'Presenze' },
-            { key: 'conversion', label: 'Conv.', render: s => `${s.conversion}%`, color: () => colors.status.success },
+            { key: 'conversion', label: 'Conv.', render: s => (s.conversion != null ? `${s.conversion}%` : 'n.d.'), color: () => colors.status.success },
           ]}
         />
       </div>
@@ -450,24 +450,18 @@ function CrossBrandView({ comparisonData }) {
 }
 
 // Original single-brand tracker view
-const PROJ_MODELS = [
-  { key: 'regression', label: 'Regressione' },
-  { key: 'ensemble', label: 'Bilanciato' },
-];
 
 function SingleBrandView({ comparisonData }) {
   const {
-    brand, edition, eventDate, currentDaysBefore, isEventPast,
+    brand, edition, eventDate, currentDaysBefore, pointDaysBefore, isEventPast,
     currentRegistrations, dataRegistrations, isOverridden,
     currentAttended, currentConversion,
-    comparisons, avgAtSamePoint,
-    regressionProjection, ensembleProjection,
+    comparisons, avgAtSamePoint, projection,
     avgFinal, progressPercent, overlayData, allEditionLabels,
-    snapshotHour,
+    snapshotHour, dataAsOf, isDataStale,
   } = comparisonData;
   const [logScale, setLogScale] = useState(false);
   const [compressed, setCompressed] = useState(true);
-  const [projModel, setProjModel] = useState('regression');
   // Track which lines are visible (all visible by default, plus projection)
   const [hiddenLines, setHiddenLines] = useState(new Set());
   // Year filter: excluded years for avg/projection recalculation
@@ -513,7 +507,7 @@ function SingleBrandView({ comparisonData }) {
     const currentLabel = allEditionLabels[0];
     const pastLabels = allEditionLabels.slice(1);
     return overlayData.map(pt => {
-      const vals = pastLabels.map(l => pt[l]).filter(v => v != null);
+      const vals = pastLabels.map(l => pt[l] ?? 0);
       return {
         daysBefore: pt.daysBefore,
         label: pt.label,
@@ -602,10 +596,8 @@ function SingleBrandView({ comparisonData }) {
       }
       const avgCurve = {};
       for (const d of allDays) {
-        const vals = comps.map(c => c.cumulative[d]).filter(v => v != null);
-        if (vals.length > 0) {
-          avgCurve[d] = Math.round(vals.reduce((s, v) => s + v, 0) / vals.length);
-        }
+        const vals = comps.map(c => c.cumulative[d] ?? 0);
+        avgCurve[d] = Math.round(vals.reduce((s, v) => s + v, 0) / vals.length);
       }
       result[year] = avgCurve;
     }
@@ -624,127 +616,20 @@ function SingleBrandView({ comparisonData }) {
     });
   }, [comparisons, excludedYears, hiddenLines]);
 
-  // Recompute averages and projections from filtered comparisons
-  // When showAvgCurves is ON, always use yearly avg curves for KPIs and projection
-  const filtered = useMemo(() => {
-    // --- Use yearly avg curves when "Medie per anno" is active ---
-    if (showAvgCurves && yearAvgKeys.length > 0) {
-      // Compute grand avg curve across all yearly avg curves
-      const allDays = new Set();
-      for (const year of yearAvgKeys) {
-        for (const d of Object.keys(yearAvgCurves[year])) allDays.add(Number(d));
-      }
-      const grandAvg = {};
-      for (const d of allDays) {
-        const vals = yearAvgKeys.map(y => yearAvgCurves[y][d]).filter(v => v != null);
-        if (vals.length > 0) grandAvg[d] = Math.round(vals.reduce((s, v) => s + v, 0) / vals.length);
-      }
+  // Recompute averages and projection from the editions still included, with the
+  // same function the engine and the AI report use
+  const filtered = useMemo(
+    () => summarizeComparisons(filteredComparisons, currentRegistrations, isEventPast),
+    [filteredComparisons, currentRegistrations, isEventPast]
+  );
 
-      // avgAtSamePoint: interpolate grand avg at currentDaysBefore
-      const db = currentDaysBefore;
-      let fAvgAtSamePoint = grandAvg[db] != null ? grandAvg[db] : 0;
-      // Try interpolation if exact day not available
-      if (!fAvgAtSamePoint) {
-        const days = Object.keys(grandAvg).map(Number).sort((a, b) => a - b);
-        const lower = days.filter(d => d <= db).pop();
-        const upper = days.filter(d => d >= db).shift();
-        if (lower != null && upper != null && lower !== upper) {
-          const ratio = (db - lower) / (upper - lower);
-          fAvgAtSamePoint = Math.round(grandAvg[lower] + ratio * (grandAvg[upper] - grandAvg[lower]));
-        } else if (lower != null) {
-          fAvgAtSamePoint = grandAvg[lower];
-        } else if (upper != null) {
-          fAvgAtSamePoint = grandAvg[upper];
-        }
-      }
-
-      // avgFinal: value at day 0
-      const fAvgFinal = grandAvg[0] || 0;
-      const fProgressPercent = fAvgFinal > 0 ? Math.round((currentRegistrations / fAvgFinal) * 100) : 0;
-
-      // Projection: scale final by current/avgAtSamePoint ratio
-      let fRegProj = null;
-      let fEnsProj = null;
-      if (fAvgAtSamePoint > 0 && fAvgFinal > 0) {
-        const ratio = currentRegistrations / fAvgAtSamePoint;
-        const projected = Math.round(fAvgFinal * ratio);
-        if (projected >= currentRegistrations) {
-          fRegProj = projected;
-          fEnsProj = projected;
-        }
-      }
-
-      return { avgAtSamePoint: fAvgAtSamePoint, avgFinal: fAvgFinal, progressPercent: fProgressPercent, regressionProjection: fRegProj, ensembleProjection: fEnsProj };
-    }
-
-    // --- Normal path: use filteredComparisons ---
-    const validComps = filteredComparisons.filter(c => c.atSamePoint > 0);
-    const fAvgAtSamePoint = validComps.length
-      ? Math.round(validComps.reduce((s, c) => s + (c.atSamePointAdjusted ?? c.atSamePoint), 0) / validComps.length)
-      : 0;
-    const fAvgFinal = filteredComparisons.length
-      ? Math.round(filteredComparisons.reduce((s, c) => s + c.totalFinal, 0) / filteredComparisons.length)
-      : 0;
-    const fProgressPercent = fAvgFinal > 0 ? Math.round((currentRegistrations / fAvgFinal) * 100) : 0;
-
-    // Regression projection
-    let fRegProj = null;
-    if (!isEventPast && validComps.length >= 2) {
-      const pts = validComps.map(c => ({ x: c.atSamePointAdjusted ?? c.atSamePoint, y: c.totalFinal }));
-      const reg = linReg(pts);
-      if (reg && reg.a > 0) {
-        fRegProj = Math.round(reg.a * currentRegistrations + reg.b);
-        if (fRegProj < currentRegistrations) fRegProj = null;
-      }
-    }
-
-    // Ensemble projection
-    let fEnsProj = null;
-    if (!isEventPast && validComps.length >= 2) {
-      const DECAY = 2;
-      const dayPredictions = [];
-      const maxDayComp = Math.max(...filteredComparisons.map(c => Math.max(...Object.keys(c.cumulative).map(Number), 0)), 0);
-      for (let d = maxDayComp; d >= 1; d--) {
-        const pts = [];
-        for (const c of filteredComparisons) {
-          const val = c.cumulative[d];
-          if (val != null && val > 0) pts.push({ x: val, y: c.totalFinal });
-        }
-        if (pts.length < 2) continue;
-        const reg = linReg(pts);
-        if (!reg || reg.a <= 0) continue;
-        const currVal = comparisonData.targetCumulative?.[d];
-        if (currVal == null || currVal <= 0) continue;
-        const pred = Math.round(reg.a * currVal + reg.b);
-        if (pred > currVal) dayPredictions.push({ day: d, pred });
-      }
-      if (fRegProj != null) dayPredictions.push({ day: 0, pred: fRegProj });
-      if (dayPredictions.length > 0) {
-        const maxDay = Math.max(...dayPredictions.map(p => p.day));
-        let wSum = 0, wTotal = 0;
-        for (const p of dayPredictions) {
-          const w = Math.pow(DECAY, maxDay - p.day);
-          wSum += p.pred * w;
-          wTotal += w;
-        }
-        fEnsProj = Math.round(wSum / wTotal);
-        if (fEnsProj < currentRegistrations) fEnsProj = null;
-      }
-    }
-
-    return { avgAtSamePoint: fAvgAtSamePoint, avgFinal: fAvgFinal, progressPercent: fProgressPercent, regressionProjection: fRegProj, ensembleProjection: fEnsProj };
-  }, [filteredComparisons, currentRegistrations, isEventPast, comparisonData.targetCumulative, showAvgCurves, yearAvgCurves, yearAvgKeys, currentDaysBefore]);
-
-  // Use filtered values when year filter or hidden lines are active
   const isYearFiltered = excludedYears.size > 0 || hiddenLines.size > 0;
-  const effectiveAvgAtSamePoint = isYearFiltered ? filtered.avgAtSamePoint : avgAtSamePoint;
-  const effectiveAvgFinal = isYearFiltered ? filtered.avgFinal : avgFinal;
-  const effectiveProgressPercent = isYearFiltered ? filtered.progressPercent : progressPercent;
-  const effectiveRegProj = isYearFiltered ? filtered.regressionProjection : regressionProjection;
-  const effectiveEnsProj = isYearFiltered ? filtered.ensembleProjection : ensembleProjection;
-
-  const activeProjection = projModel === 'ensemble' ? effectiveEnsProj : effectiveRegProj;
-  const projDataKey = projModel === 'ensemble' ? '_projEnsemble' : '_projRegression';
+  const effective = isYearFiltered ? filtered : { avgAtSamePoint, avgFinal, progressPercent, projection };
+  const effectiveAvgAtSamePoint = effective.avgAtSamePoint;
+  const effectiveAvgFinal = effective.avgFinal;
+  const effectiveProgressPercent = effective.progressPercent;
+  const effectiveProjection = effective.projection;
+  const activeProjection = effectiveProjection?.value ?? null;
   const toggleLine = (label) => {
     setHiddenLines(prev => {
       const next = new Set(prev);
@@ -763,9 +648,15 @@ function SingleBrandView({ comparisonData }) {
         const val = yearAvgCurves[year]?.[pt.daysBefore];
         enriched[key] = val != null ? val : null;
       }
+      if (!isEventPast && activeProjection != null && pt.daysBefore <= pointDaysBefore) {
+        const d = pt.daysBefore;
+        enriched._proj = d === pointDaysBefore
+          ? currentRegistrations
+          : Math.round(currentRegistrations + (activeProjection - currentRegistrations) * (pointDaysBefore - d) / pointDaysBefore);
+      }
       return enriched;
     });
-  }, [overlayData, yearAvgCurves, yearAvgKeys]);
+  }, [overlayData, yearAvgCurves, yearAvgKeys, isEventPast, activeProjection, pointDaysBefore, currentRegistrations]);
 
   // Compressed overlay: keep only days where at least one edition changes value,
   // plus always keep day 0 (event), currentDaysBefore (today), and first/last data points
@@ -774,7 +665,7 @@ function SingleBrandView({ comparisonData }) {
     if (!compressed || !data || data.length === 0) return data;
     const avgKeys = yearAvgKeys.map(y => `_avg${y}`);
     const allKeys = [...allEditionLabels, ...avgKeys];
-    const keep = new Set([0, currentDaysBefore]);
+    const keep = new Set([0, currentDaysBefore, pointDaysBefore]);
     for (let i = 0; i < data.length; i++) {
       const pt = data[i];
       for (const k of allKeys) {
@@ -788,10 +679,10 @@ function SingleBrandView({ comparisonData }) {
           }
         }
       }
-      if (pt._projRegression != null || pt._projEnsemble != null) keep.add(pt.daysBefore);
+      if (pt._proj != null) keep.add(pt.daysBefore);
     }
     return data.filter(pt => keep.has(pt.daysBefore));
-  }, [enrichedOverlayData, compressed, allEditionLabels, currentDaysBefore, yearAvgKeys]);
+  }, [enrichedOverlayData, compressed, allEditionLabels, currentDaysBefore, pointDaysBefore, yearAvgKeys]);
 
   const hasComparisons = comparisons.length > 0;
   const hasFilteredComparisons = filteredComparisons.length > 0;
@@ -834,6 +725,16 @@ function SingleBrandView({ comparisonData }) {
             }}>
               {isEventPast ? "Concluso" : currentDaysBefore === 0 ? "OGGI" : `-${currentDaysBefore} giorni`}
             </div>
+            {!isEventPast && dataAsOf && (
+              <div title="Ora dell'ultima registrazione presente nei dati caricati" style={{
+                padding: "2px 8px", borderRadius: radius.lg, fontSize: font.size.xs, fontWeight: font.weight.semibold,
+                background: colors.bg.page,
+                color: isDataStale ? colors.status.warning : colors.text.muted,
+              }}>
+                Dati alle {dataAsOf.toLocaleTimeString('it', { hour: '2-digit', minute: '2-digit' })}
+                {dataAsOf.toDateString() !== new Date().toDateString() && ` del ${dataAsOf.toLocaleDateString('it', { day: 'numeric', month: 'numeric' })}`}
+              </div>
+            )}
             {isGeminiConfigured() && (
               <button onClick={handleGenerateReport} disabled={reportLoading} style={{
                 display: "flex", alignItems: "center", gap: 4, padding: "3px 10px",
@@ -875,7 +776,7 @@ function SingleBrandView({ comparisonData }) {
         {isEventPast && (
           <div style={{ background: colors.bg.page, borderRadius: radius.xl, padding: 12, textAlign: "center" }}>
             <div style={{ fontSize: font.size.xs, color: colors.text.muted, marginBottom: 4 }}>Conversione</div>
-            <div style={{ fontSize: font.size["4xl"], fontWeight: font.weight.black, color: colors.status.success }}>{currentConversion}%</div>
+            <div style={{ fontSize: font.size["4xl"], fontWeight: font.weight.black, color: colors.status.success }}>{currentConversion != null ? `${currentConversion}%` : 'n.d.'}</div>
           </div>
         )}
         {hasComparisons && (
@@ -899,19 +800,15 @@ function SingleBrandView({ comparisonData }) {
         {!isEventPast && activeProjection != null && (
           <div style={{ background: colors.bg.page, borderRadius: radius.xl, padding: 12, textAlign: "center" }}>
             <div style={{ fontSize: font.size.xs, color: colors.text.muted, marginBottom: 4 }}>Proiezione finale</div>
-            <div style={{ fontSize: font.size["4xl"], fontWeight: font.weight.black, color: colors.status.success }}>~{activeProjection}</div>
-            {/* Model toggle */}
-            <div style={{ display: "flex", gap: 4, justifyContent: "center", marginTop: 6 }}>
-              {PROJ_MODELS.map(m => (
-                <button key={m.key} onClick={() => setProjModel(m.key)} style={{
-                  padding: "2px 8px", borderRadius: radius.md, fontSize: 10, fontWeight: font.weight.medium,
-                  border: `1px solid ${projModel === m.key ? colors.brand.purple : colors.border.default}`,
-                  background: projModel === m.key ? alpha.brand[15] : "transparent",
-                  color: projModel === m.key ? colors.brand.purple : colors.text.disabled,
-                  cursor: "pointer", transition: "all 0.15s ease",
-                }}>{m.label}</button>
-              ))}
+            <div style={{ fontSize: font.size["4xl"], fontWeight: font.weight.black, color: effectiveProjection.reliable ? colors.status.success : colors.text.secondary }}>~{activeProjection}</div>
+            <div style={{ fontSize: font.size.xs, color: colors.text.muted, marginTop: 4 }}>
+              tra {effectiveProjection.low} e {effectiveProjection.high} · su {effectiveProjection.basedOn} {effectiveProjection.basedOn === 1 ? 'edizione' : 'edizioni'}
             </div>
+            {!effectiveProjection.reliable && (
+              <div style={{ fontSize: font.size.xs, color: colors.status.warning, marginTop: 2 }}>
+                {effectiveProjection.basedOn < 3 ? 'stima incerta: poche edizioni' : 'stima incerta: è presto, la maggior parte si registra dopo'}
+              </div>
+            )}
           </div>
         )}
       </div>
@@ -945,11 +842,11 @@ function SingleBrandView({ comparisonData }) {
               <thead>
                 <tr style={{ borderBottom: `1px solid ${colors.border.default}` }}>
                   <Th columnKey="editionLabel" sortKey={cSortKey} sortDir={cSortDir} onSort={cToggleSort}>Edizione</Th>
-                  <Th columnKey="atSamePoint" sortKey={cSortKey} sortDir={cSortDir} onSort={cToggleSort} align="center">A -{currentDaysBefore}gg{!isEventPast && snapshotHour ? ` (${snapshotHour})` : ''}</Th>
+                  <Th columnKey="atSamePoint" sortKey={cSortKey} sortDir={cSortDir} onSort={cToggleSort} align="center">{isEventPast ? 'Finale' : `A -${pointDaysBefore}gg (${snapshotHour})`}</Th>
                   <Th columnKey="deltaPercent" sortKey={cSortKey} sortDir={cSortDir} onSort={cToggleSort} align="center">Delta</Th>
                   <Th columnKey="totalFinal" sortKey={cSortKey} sortDir={cSortDir} onSort={cToggleSort} align="center">Finale</Th>
                   <Th columnKey="finalConversion" sortKey={cSortKey} sortDir={cSortDir} onSort={cToggleSort} align="center">Conv.</Th>
-                  <Th columnKey="completionPercent" sortKey={cSortKey} sortDir={cSortDir} onSort={cToggleSort} align="center">% a -{currentDaysBefore}gg</Th>
+                  <Th columnKey="completionPercent" sortKey={cSortKey} sortDir={cSortDir} onSort={cToggleSort} align="center">% a -{pointDaysBefore}gg</Th>
                 </tr>
               </thead>
               <tbody>
@@ -963,7 +860,7 @@ function SingleBrandView({ comparisonData }) {
                       <DeltaBadge value={c.deltaPercent} />
                     </td>
                     <td style={{ padding: "8px", color: colors.text.muted, textAlign: "center" }}>{c.totalFinal}</td>
-                    <td style={{ padding: "8px", color: colors.text.muted, textAlign: "center" }}>{c.finalConversion}%</td>
+                    <td style={{ padding: "8px", color: colors.text.muted, textAlign: "center" }}>{c.finalConversion != null ? `${c.finalConversion}%` : 'n.d.'}</td>
                     <td style={{ padding: "8px", color: colors.text.muted, textAlign: "center" }}>{c.completionPercent}%</td>
                   </tr>
                 ))}
@@ -983,7 +880,7 @@ function SingleBrandView({ comparisonData }) {
                   {c.editionLabel}
                 </div>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4 }}>
-                  <span style={{ fontSize: 10, color: colors.text.disabled }}>A -{currentDaysBefore}gg</span>
+                  <span style={{ fontSize: 10, color: colors.text.disabled }}>A -{pointDaysBefore}gg</span>
                   <span style={{ fontSize: font.size.xs, fontWeight: font.weight.semibold, color: colors.text.primary }}>
                     {!isEventPast && c.atSamePointAdjusted != null ? c.atSamePointAdjusted : c.atSamePoint}
                   </span>
@@ -998,7 +895,7 @@ function SingleBrandView({ comparisonData }) {
                 </div>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                   <span style={{ fontSize: 10, color: colors.text.disabled }}>Conv.</span>
-                  <span style={{ fontSize: font.size.xs, color: colors.text.muted }}>{c.finalConversion}%</span>
+                  <span style={{ fontSize: font.size.xs, color: colors.text.muted }}>{c.finalConversion != null ? `${c.finalConversion}%` : 'n.d.'}</span>
                 </div>
               </div>
             ))}
@@ -1148,17 +1045,17 @@ function SingleBrandView({ comparisonData }) {
                 );
               })}
               {/* Projection line — shows selected model */}
-              {!hiddenLines.has('_projection') && chartData.some(p => p[projDataKey] != null) && (
+              {!hiddenLines.has('_projection') && chartData.some(p => p._proj != null) && (
                 <Area
                   type="monotone"
-                  dataKey={projDataKey}
+                  dataKey="_proj"
                   stroke="#f59e0b"
                   fill="transparent"
                   strokeWidth={2.5}
                   strokeDasharray="8 5"
                   dot={false}
                   connectNulls
-                  name={`Proiezione (${PROJ_MODELS.find(m => m.key === projModel)?.label || ''})`}
+                  name="Proiezione"
                 />
               )}
             </AreaChart>
@@ -1219,7 +1116,7 @@ function SingleBrandView({ comparisonData }) {
               );
             })}
             {/* Projection toggle */}
-            {chartData.some(p => p._projRegression != null || p._projEnsemble != null) && (
+            {chartData.some(p => p._proj != null) && (
               <button onClick={() => toggleLine('_projection')} style={{
                 display: "flex", alignItems: "center", gap: 4, padding: "2px 8px",
                 borderRadius: radius.md, border: "none", cursor: "pointer",
