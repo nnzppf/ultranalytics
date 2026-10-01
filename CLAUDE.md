@@ -10,7 +10,12 @@ Web app React per analisi dati eventi/serate di club (Studios Club & Co). Pubbli
 - Il dominio del sito deve essere tra i domini autorizzati di Firebase Auth, altrimenti il login Google fallisce
 - Nessun CSS framework — tutto inline styles con design tokens centralizzati
 
-## Struttura Chiave
+## Due interfacce
+- **Nuova** (predefinita): `src/nuova/` — `NewApp.js` (guscio, calcoli condivisi), `useUltraData.js` (dati + catalogo), `model.js` (calcoli puri, testati), `charts.js` (SVG), `ui.js`, `format.js`, `nuova.css` (classi `nx-*`, tema da `html.light`), `sections/` (Stasera, Eventi, Confronta + Tabelle, Andamenti, Persone, Dati). Qui gli stili sono in CSS (`nuova.css`), non inline.
+- **Classica**: `AuthenticatedApp` in `App.js` e `components/` (UI originale, tag `v3.0-dashboard-classica`). La scelta è in `localStorage.ua_ui`; auguri/WhatsApp sono solo qui.
+- Import degli export condiviso: `services/importService.js`.
+
+## Struttura Chiave (vista classica)
 
 ```
 src/

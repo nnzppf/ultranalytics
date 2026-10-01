@@ -1,15 +1,14 @@
 // Ultranalytics v3.1 - Multi-level comparison dashboard with Firebase persistence & auth
 import { useState, useMemo, useEffect, useCallback, useRef, lazy, Suspense } from "react";
-import Papa from "papaparse";
 import { Users, Check, TrendingUp, X, Calendar, Gift, Cloud, CloudOff, Loader, Database, LogOut, Settings, Sun, Moon, SlidersHorizontal, Download, SearchX } from "lucide-react";
 
 import { useAuth } from "./contexts/AuthContext";
 import LoginScreen from "./components/screens/LoginScreen";
-import { processRawRows, isUtentiFormat, processUtentiRows } from "./utils/csvProcessor";
 import { applyEventConfig } from "./utils/applyEventConfig";
 import { isEditionOver, conversionOf } from "./utils/eventTime";
 import { getHourlyData, getHourlyDataByGroup, getDowData, getFasciaData, getDaysBeforeData, getTrendData, getTrendDataByGroup, getConversionByFascia, getHeatmapData, getUserStats, getEventStats } from "./utils/dataTransformers";
-import { saveDataset, loadAllData, deleteDataset, pruneSupersededDatasets, isProtectedDataset } from "./services/firebaseDataService";
+import { loadAllData, deleteDataset, isProtectedDataset } from "./services/firebaseDataService";
+import { parseUploadFile, importFiles } from "./services/importService";
 import { loadEventConfig, saveEventConfig } from "./services/eventConfigService";
 
 import { GENRE_LABELS, BRAND_REGISTRY } from "./config/eventConfig";
@@ -31,10 +30,8 @@ import Dropdown from "./components/shared/Dropdown";
 // Loaded on demand: not needed to show the dashboard
 const EventManagerModal = lazy(() => import("./components/screens/EventManagerModal"));
 const AiChat = lazy(() => import("./components/AiChat"));
+const NewApp = lazy(() => import("./nuova/NewApp"));
 
-function eventNameFromFile(filename) {
-  return filename.replace(/\.(csv|xlsx|xls|tsv)$/i, "").replace(/registrazioni[_\s]*/i, "").replace(/_/g, " ").trim();
-}
 
 export default function ClubAnalytics() {
   return (
@@ -65,10 +62,25 @@ function ClubAnalyticsInner() {
     return <LoginScreen />;
   }
 
-  return <AuthenticatedApp user={user} logout={logout} />;
+  return <ChooseInterface user={user} logout={logout} />;
 }
 
-function AuthenticatedApp({ user, logout }) {
+// New interface by default; the classic dashboard stays one click away
+function ChooseInterface({ user, logout }) {
+  const [ui, setUi] = useState(() => { try { return localStorage.getItem("ua_ui") || "nuova"; } catch { return "nuova"; } });
+  const choose = (value) => {
+    try { localStorage.setItem("ua_ui", value); } catch { /* no storage */ }
+    setUi(value);
+  };
+  if (ui === "classica") return <AuthenticatedApp user={user} logout={logout} onOpenNew={() => choose("nuova")} />;
+  return (
+    <Suspense fallback={<div style={{ minHeight: "100vh", background: colors.bg.page }} />}>
+      <NewApp user={user} logout={logout} onOpenClassic={() => choose("classica")} />
+    </Suspense>
+  );
+}
+
+function AuthenticatedApp({ user, logout, onOpenNew }) {
   const toast = useToast();
   const [step, setStep] = useState("loading"); // loading | upload | dashboard
   const [files, setFiles] = useState([]);
@@ -145,29 +157,7 @@ function AuthenticatedApp({ user, logout }) {
   }, []);
 
   // File processing
-  const processFile = useCallback(async (file) => {
-    const name = file.name.toLowerCase();
-    return new Promise((resolve, reject) => {
-      if (name.endsWith('.csv') || name.endsWith('.tsv')) {
-        Papa.parse(file, {
-          header: true, skipEmptyLines: true,
-          complete: (r) => resolve({ name: file.name, file, eventName: eventNameFromFile(file.name), rows: r.data }),
-          error: reject,
-        });
-      } else if (name.endsWith('.xlsx') || name.endsWith('.xls')) {
-        const reader = new FileReader();
-        reader.onload = async (e) => {
-          // Loaded on demand: the Excel reader is heavy and rarely needed
-          const XLSX = await import("xlsx");
-          const wb = XLSX.read(e.target.result, { type: 'array' });
-          const ws = wb.Sheets[wb.SheetNames[0]];
-          resolve({ name: file.name, file, eventName: eventNameFromFile(file.name), rows: XLSX.utils.sheet_to_json(ws) });
-        };
-        reader.onerror = reject;
-        reader.readAsArrayBuffer(file);
-      }
-    });
-  }, []);
+  const processFile = useCallback((file) => parseUploadFile(file), []);
 
   const handleFilesAdded = useCallback(async (fileList) => {
     const newFiles = [];
@@ -183,55 +173,12 @@ function AuthenticatedApp({ user, logout }) {
 
   // Build data from files + save to Firebase
   const buildData = useCallback(async () => {
-    const allRecords = [];
-    const allUtenti = [];
-    let saveFailed = false;
     setCloudStatus("saving");
+    const { records: allRecords, utenti: allUtenti, saveFailed, pruned } = await importFiles(files, eventConfig);
 
-    for (const f of files) {
-      const keys = f.rows.length > 0 ? Object.keys(f.rows[0]) : [];
-      const isUtenti = isUtentiFormat(keys);
-
-      if (isUtenti) {
-        const users = processUtentiRows(f.rows);
-        allUtenti.push(...users);
-
-        // Save to Firebase
-        try {
-          await saveDataset({
-            fileName: f.name,
-            records: [],
-            utenti: users,
-            fileType: 'utenti',
-          });
-        } catch (e) {
-          console.error("Firebase save failed for", f.name, e);
-          saveFailed = true;
-        }
-      } else {
-        const records = processRawRows(f.rows, f.eventName, eventConfig);
-        allRecords.push(...records);
-
-        // Save to Firebase
-        try {
-          await saveDataset({
-            fileName: f.name,
-            records,
-            utenti: [],
-            fileType: 'biglietti',
-          });
-        } catch (e) {
-          console.error("Firebase save failed for", f.name, e);
-          saveFailed = true;
-        }
-      }
-    }
-
-    // Older exports fully contained in the new ones are dropped, then everything is
-    // reloaded de-duplicated (overlapping exports must not be counted twice)
+    // Everything is reloaded de-duplicated (overlapping exports must not be counted twice)
     try {
       if (saveFailed) throw new Error("save failed");
-      const pruned = await pruneSupersededDatasets();
       if (pruned.length > 0) {
         toast(`Rimossi export precedenti già inclusi: ${pruned.join(", ")}`, "success");
       }
@@ -651,6 +598,15 @@ function AuthenticatedApp({ user, logout }) {
           }}>
             <Settings size={13} />
           </button>
+          {onOpenNew && (
+            <button onClick={onOpenNew} title="Torna alla nuova interfaccia" style={{
+              background: colors.brand.purple, border: "none", borderRadius: radius.md,
+              color: colors.text.inverse, fontSize: font.size.xs, padding: "5px 12px", cursor: "pointer",
+              fontWeight: font.weight.semibold,
+            }}>
+              Nuova vista
+            </button>
+          )}
           <button onClick={() => { setStep("upload"); setFiles([]); }} style={{
             background: colors.bg.elevated, border: "none", borderRadius: radius.md,
             color: colors.text.muted, fontSize: font.size.xs, padding: "5px 12px", cursor: "pointer",

@@ -1,5 +1,21 @@
 # Changelog - Ultranalytics
 
+## 1 Ottobre 2026 (v4) — Nuova interfaccia
+
+La dashboard classica resta (tag `v3.0-dashboard-classica` e tasto "Vista classica"); la nuova interfaccia è quella predefinita.
+
+- `src/nuova/`: guscio con menu laterale (barra in basso da telefono), filtro per locale, orario dei dati, tema chiaro/scuro e link diretti alle sezioni (`#confronta`, `#eventi/<serata>`)
+- **Stasera**: numeri principali, prossimi eventi contro le edizioni passate alla stessa distanza (fascia min–max, mediana, proiezione, da ricontattare), serata in corso ora per ora contro le serate dello stesso brand (o il tracker del prossimo evento), compleanni, ultime serate contro la media del brand
+- **Eventi**: tracker di ogni evento in programma
+- **Confronta**: libreria di tutte le serate e tavolo di confronto (trascina o "+", fino a 8): curve per giorni all'evento, % del finale o ore della serata; numeri affiancati (conversione, anticipo, ore di picco, età, donne, già venuti); pubblico in comune; previsione di una serata in vendita con le serate scelte come riferimento. Tab "Generi, locali e brand" con le tabelle di confronto
+- **Andamenti**: serate nel tempo per locale, ora della notte (12→12), anticipo delle registrazioni, mappa giorno × ora
+- **Persone**: pubblico, ritorni, età, sesso, compleanni (auguri e WhatsApp restano nella vista classica)
+- **Dati**: caricamento export, dataset salvati (eliminazione con conferma scritta, dataset protetti), catalogo eventi
+- Import degli export condiviso tra le due viste (`services/importService.js`); grafici SVG senza librerie esterne; calcoli in `nuova/model.js` con test
+- Catalogo: "Villa Peggy's" unificato in "Tenuta Villa Peggy's"
+
+---
+
 ## 1 Ottobre 2026 (v3) — Velocità di caricamento
 
 - Formato 2 per i dataset caricati (`utils/compactFormat.js`): i campi dell'evento sono salvati una volta per evento nei metadati, le date come numeri, i campi ricavabili non si salvano. Verificato sui dati reali: 0 differenze su 43.277 registrazioni e 19.854 utenti, ~4 volte meno dati (biglietti da ~25 a 6,9 MB)
