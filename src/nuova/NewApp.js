@@ -4,8 +4,10 @@ import { useUltraData } from './useUltraData';
 import {
   indexEditions, summaryKpis, brandTable, hourCounts, peopleStats, birthdaysNext,
   upcomingEvents, tonightEdition, liveNight, attendanceIndex, venueKey, VENUES,
-  indexSeries, withSeries, withoutSeries,
+  indexSeries, withSeries, withoutSeries, nightId,
 } from './model';
+import { projectionAccuracy, enrichUpcoming } from './compare';
+import { nightNameKey } from '../utils/eventNameCleaner';
 import { latestPurchase } from '../utils/eventTime';
 import { VenueDot } from './ui';
 import { dmy, hm } from './format';
@@ -76,12 +78,23 @@ export default function NewApp({ user, logout, onOpenClassic }) {
   const brandRows = useMemo(() => brandTable(eds), [eds]);
   const hours = useMemo(() => hourCounts(records), [records]);
   const seriesIdx = useMemo(() => indexSeries(eds, data.config?.series), [eds, data.config]);
-  const upcoming = useMemo(() => upcomingEvents(records, eds, now, 60, seriesIdx), [records, eds, now, seriesIdx]);
+  const counts = data.config?.counts;
+  const accuracy = useMemo(() => projectionAccuracy(eds, seriesIdx), [eds, seriesIdx]);
+  const upcoming = useMemo(
+    () => enrichUpcoming(upcomingEvents(records, eds, now, 60, seriesIdx, counts), eds, seriesIdx, accuracy),
+    [records, eds, now, seriesIdx, counts, accuracy]
+  );
   const tonight = useMemo(() => tonightEdition(eds, now), [eds, now]);
   const live = useMemo(() => (tonight ? liveNight(tonight, eds, records, now, seriesIdx) : null), [tonight, eds, records, now, seriesIdx]);
-  const { config, saveConfig } = data;
+  const { config, saveConfig, patchConfig } = data;
   const saveSeries = useCallback((name, nights) => saveConfig(withSeries(config, name, nights, eds)), [config, saveConfig, eds]);
   const deleteSeries = useCallback((name) => saveConfig(withoutSeries(config, name)), [config, saveConfig]);
+  // Notes, counts typed in from the portal and event dates: one field each, saved online
+  const who = user?.email ? user.email.split('@')[0] : '';
+  const stamp = useCallback(() => ({ by: who, at: new Date().toISOString() }), [who]);
+  const saveNote = useCallback((ed, text) => patchConfig(['notes', nightId(ed)], text.trim() ? { text: text.trim(), ...stamp() } : null), [patchConfig, stamp]);
+  const saveCount = useCallback((ed, value) => patchConfig(['counts', nightId(ed)], value > 0 ? { value, ...stamp() } : null), [patchConfig, stamp]);
+  const saveDate = useCallback((rawName, iso) => patchConfig(['dates', nightNameKey(rawName)], iso ? { name: rawName, date: iso, ...stamp() } : null), [patchConfig, stamp]);
   const birthdays = useMemo(() => birthdaysNext(data.utenti, now), [data.utenti, now]);
   const attendance = useMemo(() => attendanceIndex(records), [records]);
   const dataAsOf = useMemo(() => latestPurchase(data.records), [data.records]);
@@ -100,7 +113,7 @@ export default function NewApp({ user, logout, onOpenClassic }) {
     selectedEvent: section === 'eventi' ? route.param : null,
     seedKey: section === 'confronta' ? route.param : null,
     clearSeed, goTo, openClassic: onOpenClassic, windowDays, setWindowDays,
-    seriesIdx, saveSeries, deleteSeries,
+    seriesIdx, saveSeries, deleteSeries, accuracy, notes: config?.notes || {}, saveNote, saveCount, saveDate, dataAsOf,
   };
   const nav = (cls) => Object.entries(SECTIONS).map(([k, s]) => (
     <button key={k} className={cls} aria-current={section === k ? 'page' : undefined} onClick={() => goTo(k)}>

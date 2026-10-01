@@ -1,14 +1,18 @@
-import { useState, lazy, Suspense } from 'react';
+import { useState, useMemo, lazy, Suspense } from 'react';
+import { indexEditions } from '../model';
 import { Panel } from '../ui';
 import { fmt, dmy } from '../format';
 import { parseUploadFile } from '../../services/importService';
 import { isProtectedDataset } from '../../services/firebaseDataService';
+import { EventDates, Catalog } from './Catalogo';
 
 const EventManagerModal = lazy(() => import('../../components/screens/EventManagerModal'));
 
 /** Uploads, datasets and the event catalog. */
 export default function Dati({ ctx }) {
-  const { data, records } = ctx;
+  const { data, records, saveDate, now } = ctx;
+  // Every venue, whatever the venue filter says
+  const allEds = useMemo(() => indexEditions(data.records, now), [data.records, now]);
   const [files, setFiles] = useState([]);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState(null);
@@ -71,11 +75,13 @@ export default function Dati({ ctx }) {
         )}
         {message && <p className="nx-note" style={{ color: message.kind === 'error' ? 'var(--nx-bad)' : 'var(--nx-good)' }}>{message.text}</p>}
       </Panel>
-      <Panel span={5} title="Catalogo eventi" hint="brand, generi, locali e nomi delle edizioni">
-        <p className="nx-note" style={{ marginTop: 0 }}>Rinomina brand ed edizioni, unisci doppioni, assegna generi e locali, escludi serate. Vale per entrambe le viste.</p>
-        <button className="nx-btn" onClick={() => setCatalogOpen(true)}>Apri il catalogo</button>
-        <button className="nx-btn" style={{ marginLeft: 8 }} onClick={data.reload}>Ricarica i dati</button>
+      <Panel span={5} title="Aggiorna" hint="dati e catalogo">
+        <p className="nx-note" style={{ marginTop: 0 }}>Il catalogo eventi e le date sono qui sotto e valgono per entrambe le viste. Alias e unioni avanzate restano nel catalogo della vista classica.</p>
+        <button className="nx-btn" onClick={data.reload}>Ricarica i dati</button>
+        <button className="nx-btn" style={{ marginLeft: 8 }} onClick={() => setCatalogOpen(true)}>Catalogo completo</button>
       </Panel>
+      <EventDates eds={allEds} dates={data.config?.dates} saveDate={saveDate} />
+      <Catalog eds={allEds} config={data.config} patchConfig={data.patchConfig} />
       <Panel span={12} title="Dataset salvati" hint={`${fmt(records.length)} registrazioni in totale, senza doppioni`}>
         <div className="nx-tw">
           <table>

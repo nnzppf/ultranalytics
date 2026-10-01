@@ -5,8 +5,10 @@
 import { isEditionOver, midnight, dayDiff, samePointFor, latestPurchase, conversionOf } from '../utils/eventTime';
 import { computeWhereAreWeNow, summarizeComparisons, computeEditionUserLists } from '../utils/comparisonEngine';
 import { normalizePhone } from '../utils/datasetMerge';
+import { nightNameKey } from '../utils/eventNameCleaner';
 
 const HOUR = 3600000;
+const DAY = 24 * HOUR;
 const round1 = (n) => Math.round(n * 10) / 10;
 
 export const VENUE_KEYS = {
@@ -39,11 +41,12 @@ export function indexEditions(records, now = new Date()) {
     const key = `${r.brand}|${r.editionLabel}`;
     let e = map.get(key);
     if (!e) {
-      e = { key, brand: r.brand, edition: r.editionLabel, date: r.eventDate || null, genres: r.genres || [], category: r.category, rawName: r.rawEventName, rawNames: new Set(), venueCount: {}, rows: [], reg: 0, ent: 0 };
+      e = { key, brand: r.brand, edition: r.editionLabel, date: r.eventDate || null, genres: r.genres || [], category: r.category, rawName: r.rawEventName, rawNames: new Set(), venueCount: {}, rows: [], reg: 0, ent: 0, firstReg: null };
       map.set(key, e);
     }
     e.rows.push(r);
     if (r.rawEventName) e.rawNames.add(r.rawEventName);
+    if (r.purchaseDate && (!e.firstReg || r.purchaseDate < e.firstReg)) e.firstReg = r.purchaseDate;
     e.reg++;
     if (r.attended) e.ent++;
     if (!e.date && r.eventDate) e.date = r.eventDate;
@@ -59,8 +62,28 @@ export function indexEditions(records, now = new Date()) {
     e.conv = e.over && e.hasScans ? round1((100 * e.ent) / e.reg) : null;
     // Catalog names ("ATIPICO w/ DANTE from LOSTBOYS") are more telling than the date
     e.title = isDateLabel(e.edition) ? e.brand : e.edition;
+    // Days before the event when registrations opened (first registration)
+    e.openLead = e.date && e.firstReg ? Math.max(0, dayDiff(e.firstReg, e.date)) : null;
+    e.season = e.date ? seasonOf(e.date) : null;
   }
-  return [...map.values()].sort((a, b) => (a.date || 0) - (b.date || 0));
+  const list = [...map.values()].sort((a, b) => (a.date || 0) - (b.date || 0));
+  // Position in the season: 1st Atipico of 25-26, 1st night at TooLate of 25-26
+  const nth = new Map();
+  for (const e of list) {
+    if (!e.date) continue;
+    for (const [field, k] of [['seasonNo', `b|${e.brand}|${e.season}`], ['venueSeasonNo', `v|${e.venue}|${e.season}`]]) {
+      const n = (nth.get(k) || 0) + 1;
+      nth.set(k, n);
+      e[field] = n;
+    }
+  }
+  return list;
+}
+
+/** Season of a night: September to August, as "25-26". */
+export function seasonOf(date) {
+  const y = date.getMonth() >= 8 ? date.getFullYear() : date.getFullYear() - 1;
+  return `${String(y).slice(2)}-${String(y + 1).slice(2)}`;
 }
 
 export function summaryKpis(records, eds, people) {
@@ -132,6 +155,34 @@ export function groupTable(eds, keysOf) {
   }));
 }
 
+/**
+ * Registrations by promoter link (the export's "promoter" column; "lanza*" and
+ * "lanza" are the same promoter). Conversion on concluded nights with entries.
+ */
+export function promoterTable(records, eds) {
+  const night = new Map(eds.map((e) => [e.key, e]));
+  const map = new Map();
+  let tagged = 0;
+  for (const r of records) {
+    const name = (r.promoter || '').toLowerCase().replace(/\*+$/, '').trim();
+    if (!name) continue;
+    tagged++;
+    if (!map.has(name)) map.set(name, { name, reg: 0, nights: new Set(), convReg: 0, convEnt: 0, last: null });
+    const p = map.get(name);
+    p.reg++;
+    const key = `${r.brand}|${r.editionLabel}`;
+    p.nights.add(key);
+    const e = night.get(key);
+    if (e?.over && e.hasScans) { p.convReg++; if (r.attended) p.convEnt++; }
+    if (r.eventDate && (!p.last || r.eventDate > p.last)) p.last = r.eventDate;
+  }
+  const rows = [...map.values()].map((p) => ({
+    name: p.name, reg: p.reg, nights: p.nights.size, ent: p.convEnt,
+    conv: p.convReg ? round1((100 * p.convEnt) / p.convReg) : null, last: p.last,
+  })).sort((a, b) => b.reg - a.reg);
+  return { rows, tagged, share: records.length ? round1((100 * tagged) / records.length) : 0 };
+}
+
 export function hourCounts(records) {
   const reg = Array(24).fill(0), ent = Array(24).fill(0);
   const dowHour = Array.from({ length: 7 }, () => Array(24).fill(0));
@@ -196,12 +247,23 @@ export function birthdaysNext(utenti, now = new Date(), days = 7) {
  * name in the export and its day, which survive brand renames and new exports.
  */
 const ymd = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-// Accented letters are dropped whole, so "VENERDÌ" and the export's "VENERD�" match
-const nameKey = (raw) => String(raw || '').toLowerCase().normalize('NFD').replace(/[a-z][̀-ͯ]+/g, '').replace(/[^a-z0-9]/g, '');
-const memberKey = (name, day) => `${nameKey(name)}|${day}`;
+const memberKey = (name, day) => `${nightNameKey(name)}|${day}`;
 const editionMemberKeys = (e) => (e.date ? e.rawNames.map((n) => memberKey(n, ymd(e.date))) : []);
 
 export const seriesMember = (ed) => ({ name: ed.rawName, date: ymd(ed.date) });
+
+/** Catalog id of a night (notes, typed-in counts): its day and export name. */
+export const nightId = (ed) => (ed.date && ed.rawName ? `${ymd(ed.date)}_${nightNameKey(ed.rawName)}` : null);
+
+/** A night's entry in a catalog map keyed by nightId, whichever export name it was saved under. */
+export function lookupNight(map, ed) {
+  if (!map || !ed?.date) return null;
+  for (const n of ed.rawNames || [ed.rawName]) {
+    const v = map[`${ymd(ed.date)}_${nightNameKey(n)}`];
+    if (v) return v;
+  }
+  return null;
+}
 
 /** Series with their nights (oldest first) and the series of each night. */
 export function indexSeries(eds, series) {
@@ -258,7 +320,7 @@ const SERIES_BRAND = '\u0000series';
  * Tracker for the upcoming nights within `horizonDays`, nearest first. A night in a
  * series is compared with the other nights of the series instead of its brand.
  */
-export function upcomingEvents(records, eds, now = new Date(), horizonDays = 60, seriesIdx = null) {
+export function upcomingEvents(records, eds, now = new Date(), horizonDays = 60, seriesIdx = null, counts = null) {
   const dataAsOf = latestPurchase(records);
   return eds
     .filter((e) => e.date && !e.over && dayDiff(now, e.date) <= horizonDays)
@@ -271,7 +333,13 @@ export function upcomingEvents(records, eds, now = new Date(), horizonDays = 60,
         brand = SERIES_BRAND;
         edition = e.key;
       }
-      const t = computeWhereAreWeNow(pool, brand, edition, null, { now, dataAsOf });
+      // A count typed in from the ticketing portal, newer than the export, is today's number
+      const typed = lookupNight(counts, e);
+      const typedAt = typed ? new Date(typed.at) : null;
+      const manual = typed && typed.value > 0 && (!dataAsOf || typedAt > dataAsOf) ? { ...typed, at: typedAt } : null;
+      const t = manual
+        ? computeWhereAreWeNow(pool, brand, edition, { mode: 'now', value: manual.value }, { now: manual.at, dataAsOf })
+        : computeWhereAreWeNow(pool, brand, edition, null, { now, dataAsOf });
       if (!t) return null;
       const at = t.comparisons.map((c) => c.atSamePointAdjusted);
       const lists = computeEditionUserLists(pool, brand, edition);
@@ -284,6 +352,7 @@ export function upcomingEvents(records, eds, now = new Date(), horizonDays = 60,
       return {
         ed: e,
         series,
+        manual,
         tracker: t,
         range: at.length ? [Math.min(...at), median(at), Math.max(...at)] : null,
         retarget: lists.retarget.filter((u) => u.phone).length,
@@ -381,7 +450,7 @@ function mode(values) {
 }
 
 /** Side-by-side numbers for one night. */
-export function editionMetrics(ed, attendance) {
+export function editionMetrics(ed, attendance, now = new Date()) {
   const rows = ed.rows;
   const people = new Set(rows.map(personKey).filter(Boolean));
   const at = ed.date || new Date();
@@ -394,11 +463,20 @@ export function editionMetrics(ed, attendance) {
     ages[b === 0 ? 0 : b <= 2 ? 1 : 2]++;
   }
   const genders = rows.filter((r) => r.gender === 'M' || r.gender === 'F');
-  let returning = 0;
+  let returning = 0, entered = 0, back = 0;
   if (ed.date) {
+    const t0 = ed.date.getTime();
     for (const k of people) {
       const dates = attendance.get(k);
-      if (dates && dates.some((t) => t < ed.date.getTime())) returning++;
+      if (dates && dates.some((t) => t < t0)) returning++;
+    }
+    // Came in, then came back to another night within 30 days (once 30 days have passed)
+    if (ed.over && now.getTime() - t0 >= 31 * DAY) {
+      for (const k of new Set(rows.filter((r) => r.attended).map(personKey).filter(Boolean))) {
+        entered++;
+        const dates = attendance.get(k);
+        if (dates && dates.some((t) => t > t0 && t <= t0 + 30 * DAY)) back++;
+      }
     }
   }
   const days = rows.map((r) => r.daysBefore).filter((d) => d != null);
@@ -406,8 +484,9 @@ export function editionMetrics(ed, attendance) {
     reg: ed.reg,
     ent: ed.hasScans ? ed.ent : null,
     conv: ed.conv,
-    dayOf: rows.length ? round1((100 * days.filter((d) => d === 0).length) / rows.length) : null,
-    medianDays: median(days),
+    // On a night still on sale the day-of registrations haven't happened yet
+    dayOf: ed.over && rows.length ? round1((100 * days.filter((d) => d === 0).length) / rows.length) : null,
+    medianDays: ed.over ? median(days) : null,
     peakReg: mode(rows.map((r) => r.purchaseDate?.getHours()).filter((h) => h != null)),
     peakEnt: ed.hasScans ? mode(rows.filter((r) => r.scanDate).map((r) => r.scanDate.getHours())) : null,
     female: genders.length ? round1((100 * genders.filter((r) => r.gender === 'F').length) / genders.length) : null,
@@ -415,13 +494,17 @@ export function editionMetrics(ed, attendance) {
     age18to24: withAge ? round1((100 * ages[1]) / withAge) : null,
     over25: withAge ? round1((100 * ages[2]) / withAge) : null,
     returning: people.size ? round1((100 * returning) / people.size) : null,
+    newcomers: ed.date ? people.size - returning : null,
+    back30: entered ? round1((100 * back) / entered) : null,
+    openLead: ed.openLead ?? null,
+    seasonNo: ed.seasonNo ?? null,
   };
 }
 
-/** People in common between every pair of nights. */
-export function audienceOverlap(eds) {
-  const sets = eds.map((e) => new Set(e.rows.map(personKey).filter(Boolean)));
-  return eds.map((_, i) => eds.map((__, j) => {
+/** People in common between every pair of row lists (a night, or a group of nights). */
+export function audienceOverlap(rowLists) {
+  const sets = rowLists.map((rows) => new Set(rows.map(personKey).filter(Boolean)));
+  return sets.map((_, i) => sets.map((__, j) => {
     if (i === j) return { n: sets[i].size, pct: 100 };
     let n = 0;
     for (const k of sets[i]) if (sets[j].has(k)) n++;

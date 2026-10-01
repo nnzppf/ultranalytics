@@ -9,6 +9,15 @@ const DAY_RE = `(?:luned[iì${BAD}]|marted[iì${BAD}]|mercoled[iì${BAD}]|gioved
  * Lowercase, strip accents and apostrophes, unify dashes. Keeps "�" so that
  * fuzzyIncludes can treat it as a wildcard.
  */
+/**
+ * Event name reduced to letters and digits, accented letters dropped whole, so
+ * "VENERDÌ" and the export's "VENERD�" give the same key. Identifies a night in
+ * the catalog (dates, notes, series) across exports and brand renames.
+ */
+export function nightNameKey(raw) {
+  return String(raw || '').toLowerCase().normalize('NFD').replace(/[a-z][\u0300-\u036f]+/g, '').replace(/[^a-z0-9]/g, '');
+}
+
 export function normalizeName(raw) {
   return String(raw || '')
     .toLowerCase()

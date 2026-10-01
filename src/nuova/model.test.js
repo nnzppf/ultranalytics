@@ -63,7 +63,7 @@ describe('model', () => {
   it('compares numbers, returning people and audience in common', () => {
     const m = editionMetrics(eds[1], attendanceIndex(records));
     expect(m).toMatchObject({ reg: 5, ent: 4, conv: 80, returning: 40 }); // phones 1 and 2 came on 27/8
-    const o = audienceOverlap([eds[0], eds[1]]);
+    const o = audienceOverlap([eds[0].rows, eds[1].rows]);
     expect(o[0][1]).toEqual({ n: 2, pct: 50 });
   });
 

@@ -1,5 +1,6 @@
 import { venueKey } from './model';
-import { fmt, pct, dshort, signed, deltaClass, pctChange } from './format';
+import { useState } from 'react';
+import { fmt, pct, dshort, dmy, hm, signed, deltaClass, pctChange } from './format';
 import { LineChart, RangeBar } from './charts';
 
 export const venueColor = (v) => `var(--nx-v-${venueKey(v)})`;
@@ -64,14 +65,14 @@ export function UpcomingTable({ upcoming, selectedKey, onSelect }) {
             </tr>
           </thead>
           <tbody>
-            {upcoming.map(({ ed, series, tracker: t, range, retarget }) => {
+            {upcoming.map(({ ed, series, manual, tracker: t, range, retarget }) => {
               const compared = t.comparisons.length;
               return (
                 <tr key={ed.key} className={`nx-click ${selectedKey === ed.key ? 'nx-sel' : ''}`} onClick={() => onSelect(ed.key)}>
                   <td className="n">{dshort(ed.date)}</td>
                   <td className="nx-name"><VenueDot venue={ed.venue} /> {ed.title}<span className="nx-subline">{ed.venue}{series && <> · serie <b>{series}</b></>}</span></td>
                   <td className="n">{t.currentDaysBefore} g</td>
-                  <td className="n"><b>{fmt(t.currentRegistrations)}</b></td>
+                  <td className="n"><b>{fmt(t.currentRegistrations)}</b>{manual && <span className="nx-flat" title="inserito a mano dal portale"> ✎</span>}</td>
                   <td className="n">{compared ? fmt(t.avgAtSamePoint) : '–'}</td>
                   <td className="n">{compared && t.avgAtSamePoint ? <Delta value={pctChange(t.currentRegistrations, t.avgAtSamePoint)} /> : '–'}</td>
                   <td>{range && range[2] > 0
@@ -97,47 +98,135 @@ export function UpcomingTable({ upcoming, selectedKey, onSelect }) {
   );
 }
 
+const NOTE_TAGS = ['pioggia', 'ponte o festivo', 'ospite', 'serata concorrente', 'prezzo', 'esami', 'evento in città'];
+
+/** A night's note (why it went the way it went): shown as text, edited in place, saved online. */
+export function NoteEditor({ note, onSave, compact = false }) {
+  const [editing, setEditing] = useState(false);
+  const [text, setText] = useState('');
+  const [saving, setSaving] = useState(false);
+  const save = async (value) => {
+    setSaving(true);
+    await onSave(value);
+    setSaving(false);
+    setEditing(false);
+  };
+  if (!editing) {
+    return (
+      <span className="nx-noteline">
+        {note && <span className="nx-notetext" title={[note.by, note.at && dmy(new Date(note.at))].filter(Boolean).join(' · ')}>✎ {note.text}</span>}
+        {onSave && <button className="nx-link" onClick={() => { setText(note?.text || ''); setEditing(true); }}>{note ? 'modifica' : compact ? '+ nota' : 'aggiungi una nota'}</button>}
+      </span>
+    );
+  }
+  return (
+    <form className="nx-noteform" onSubmit={(e) => { e.preventDefault(); save(text); }}>
+      <input className="nx-input" value={text} onChange={(e) => setText(e.target.value)} maxLength={140} autoFocus
+        aria-label="Nota sulla serata" placeholder="es. pioggia, ospite, serata concorrente in zona" />
+      <span className="nx-tagpick">
+        {NOTE_TAGS.map((t) => <button type="button" key={t} onClick={() => setText((x) => (x.trim() ? `${x.trim()}, ${t}` : t))}>{t}</button>)}
+      </span>
+      <span className="nx-formacts">
+        <button className="nx-btn primary" type="submit" disabled={saving}>{saving ? 'Salvo…' : 'Salva'}</button>
+        {note && <button className="nx-link" type="button" disabled={saving} onClick={() => save('')}>elimina nota</button>}
+        <button className="nx-link" type="button" onClick={() => setEditing(false)}>annulla</button>
+      </span>
+    </form>
+  );
+}
+
+/** The count read on the ticketing portal, when it is ahead of the last export. */
+function CountEditor({ item, onSave }) {
+  const [open, setOpen] = useState(false);
+  const [value, setValue] = useState('');
+  const [saving, setSaving] = useState(false);
+  const m = item.manual;
+  const save = async (v) => {
+    setSaving(true);
+    await onSave(item.ed, v);
+    setSaving(false);
+    setOpen(false);
+  };
+  if (!open) {
+    return (
+      <p className="nx-note">
+        {m
+          ? <>Numero inserito a mano: <b>{fmt(m.value)}</b> alle {hm(m.at)} del {dmy(m.at)}{m.by ? ` (${m.by})` : ''}. Vale finché non carichi un export più recente. <button className="nx-link" disabled={saving} onClick={() => save(0)}>torna all'export</button></>
+          : <>Sul portale sono di più? <button className="nx-link" onClick={() => { setValue(''); setOpen(true); }}>inserisci il numero di adesso</button></>}
+      </p>
+    );
+  }
+  return (
+    <form className="nx-noteform" onSubmit={(e) => { e.preventDefault(); const v = parseInt(value, 10); if (v > 0) save(v); }}>
+      <label className="nx-hint" htmlFor={`nx-count-${item.ed.key}`}>Registrati di adesso sul portale (lo vedono tutti, finché non arriva un export più recente)</label>
+      <input id={`nx-count-${item.ed.key}`} className="nx-input" type="number" inputMode="numeric" min="1" value={value} onChange={(e) => setValue(e.target.value)} autoFocus style={{ maxWidth: 160 }} />
+      <span className="nx-formacts">
+        <button className="nx-btn primary" type="submit" disabled={saving || !(parseInt(value, 10) > 0)}>{saving ? 'Salvo…' : 'Salva'}</button>
+        <button className="nx-link" type="button" onClick={() => setOpen(false)}>annulla</button>
+      </span>
+    </form>
+  );
+}
+
+/** "Di solito a 7 giorni la stima sbaglia del ±18% (12 serate di questo brand)". */
+export function AccuracyNote({ accuracy, series }) {
+  if (!accuracy) return null;
+  const scope = accuracy.scope === 'group' ? (series ? 'della serie' : 'di questo brand') : 'di tutti i brand';
+  return <>Di solito a {accuracy.d} {accuracy.d === 1 ? 'giorno' : 'giorni'} la stima sbaglia del <b>±{accuracy.typical}%</b> ({accuracy.n} serate {scope}; entro ±20% nel {accuracy.within20}% dei casi). </>;
+}
+
 /** Tracker of one upcoming night: numbers + cumulative curve against past editions. */
-export function TrackerView({ item, onCompare, windowDays = 30 }) {
+export function TrackerView({ item, onCompare, windowDays = 30, onSaveCount, note, onSaveNote }) {
   if (!item) return null;
-  const { ed, series, tracker: t, retarget } = item;
+  const { ed, series, tracker: t, retarget, entries, accuracy } = item;
   const band = item.band.filter((p) => p.d <= windowDays);
   const compared = t.comparisons.length;
   const delta = compared && t.avgAtSamePoint ? pctChange(t.currentRegistrations, t.avgAtSamePoint) : null;
   const xs = daysAxis(windowDays);
   const outside = t.pointDaysBefore > windowDays;
   const prev = [...t.comparisons].sort((a, b) => b.eventDate - a.eventDate)[0];
+  const prevLabel = (x) => (x === 0 ? 'giorno dell\'evento' : `${-x} ${x === -1 ? 'giorno' : 'giorni'} prima`);
   return (
     <>
       <div className="nx-stats">
-        <div className="nx-stat"><div className="v">{fmt(t.currentRegistrations)}</div><div className="l">registrati a {t.pointDaysBefore} giorni</div></div>
+        <div className="nx-stat"><div className="v">{fmt(t.currentRegistrations)}</div><div className="l">registrati a {t.pointDaysBefore} giorni{item.manual ? ' · a mano' : ''}</div></div>
         <div className="nx-stat"><div className="v">{compared ? fmt(t.avgAtSamePoint) : '–'}</div><div className="l">media allo stesso punto{compared ? ` · ${compared} ${series ? (compared > 1 ? 'serate della serie' : 'serata della serie') : 'ed.'}` : ''}</div></div>
         <div className="nx-stat"><div className="v">{delta != null ? <Delta value={delta} /> : '–'}</div><div className="l">rispetto alla media</div></div>
         <div className="nx-stat"><div className="v" style={{ color: 'var(--nx-proj)' }}>{t.projection ? `~${fmt(t.projection.value)}` : '–'}</div>
-          <div className="l">{t.projection ? `proiezione · ${projRange(t.projection)}${t.projection.reliable ? '' : ' · incerta'}` : compared ? 'presto per stimare' : series ? 'nessuna serata conclusa nella serie' : 'nessuna edizione da confrontare'}</div></div>
+          <div className="l">{t.projection ? `registrati a fine serata · ${projRange(t.projection)}${t.projection.reliable ? '' : ' · incerta'}` : compared ? 'presto per stimare' : series ? 'nessuna serata conclusa nella serie' : 'nessuna edizione da confrontare'}</div></div>
+        {entries && (
+          <div className="nx-stat"><div className="v">{entries.value != null ? `~${fmt(entries.value)}` : `~${fmt(entries.sofar)}`}</div>
+            <div className="l">{entries.value != null ? `ingressi stimati${entries.low !== entries.high ? ` · ${fmt(entries.low)}–${fmt(entries.high)}` : ''}` : 'ingressi dai registrati di oggi'}</div></div>
+        )}
       </div>
       <LineChart
         xs={xs}
         xLabel={dayTick(windowDays)}
+        xTitle={prevLabel}
         band={compared ? band.map((p) => ({ x: p.d === 0 ? 0 : -p.d, min: p.min, med: p.med, max: p.max })) : null}
-        series={[{ key: 'cur', label: 'questa edizione', color: 'var(--nx-now)', width: 2.4, points: band.map((p) => ({ x: p.d === 0 ? 0 : -p.d, y: p.cur })) }]}
+        series={[{ key: 'cur', label: `questa ${series ? 'serata' : 'edizione'}`, color: 'var(--nx-now)', width: 2.4, points: band.map((p) => ({ x: p.d === 0 ? 0 : -p.d, y: p.cur })) }]}
         projection={t.projection && !outside ? { x0: -t.pointDaysBefore, y0: t.currentRegistrations, x1: 0, y1: t.projection.value } : null}
         now={outside ? null : -t.pointDaysBefore}
-        nowLabel="dati"
+        nowLabel={item.manual ? 'a mano' : 'dati'}
         yLabel="Registrazioni cumulative"
       />
       <div className="nx-legend">
         <span><i style={{ background: 'var(--nx-now)' }} />questa {series ? 'serata' : 'edizione'}</span>
         {compared > 0 && <><span><i style={{ background: 'var(--nx-band)', height: 8 }} />{series ? `serie ${series}` : 'edizioni passate'} (min–max)</span><span><i style={{ borderTop: '1.5px dashed var(--nx-muted)', height: 0 }} />mediana</span></>}
         {t.projection && <span><i style={{ borderTop: '2px dashed var(--nx-proj)', height: 0 }} />proiezione</span>}
+        <span>Tocca il grafico per i numeri di ogni giorno</span>
       </div>
       <p className="nx-note">
         {series && <>Confronto con la serie <b>{series}</b> invece che con il brand. </>}
         {outside && <>Mancano <b>{t.pointDaysBefore} giorni</b>: il punto di oggi è prima della finestra, allargala a 60 giorni per vederlo. </>}
         {prev && <>{series ? 'Serata precedente della serie' : 'Edizione precedente'} ({dshort(prev.eventDate)}): <b>{fmt(prev.atSamePointAdjusted)}</b> a questo punto, <b>{fmt(prev.totalFinal)}</b> a fine serata, conversione {pct(prev.finalConversion)}. </>}
+        {t.projection && <AccuracyNote accuracy={accuracy} series={series} />}
+        {entries && <>Ingressi: chi si è registrato finora entra di solito al {fmt(entries.early, 0)}%, chi si registra da qui in poi al {fmt(entries.late, 0)}% ({entries.basedOn} {entries.basedOn === 1 ? 'serata' : 'serate'} con ingressi). </>}
         {retarget > 0 && <><b>{fmt(retarget)}</b> persone già venute non sono ancora registrate. </>}
         {onCompare && <button className="nx-link" onClick={() => onCompare(ed.key)}>Apri nel confronto con {series ? 'le altre serate della serie' : 'le edizioni passate'}</button>}
       </p>
+      {onSaveCount && <CountEditor item={item} onSave={onSaveCount} />}
+      {onSaveNote && <p className="nx-note" style={{ marginTop: 0 }}><NoteEditor note={note} onSave={(text) => onSaveNote(ed, text)} /></p>}
     </>
   );
 }

@@ -83,6 +83,10 @@ Document Firestore `appConfig/eventConfig`:
   series: { "Opening Too Late": [{ name: "<nome evento nell'export>", date: "YYYY-MM-DD" }] } }
 ```
 `series` (solo nuova interfaccia, `nuova/model.js`: `indexSeries`, `withSeries`, `peersOf`): serate raggruppate a mano tra brand diversi; una serata in vendita in una serie si confronta con la serie invece che col brand. Chi salva il catalogo deve conservare i campi che non gestisce.
+Altri campi del catalogo (nuova interfaccia, salvati campo per campo con `patchEventConfig` in `eventConfigService.js`):
+- `dates: { nightNameKey: { name, date: "YYYY-MM-DD" } }` — data evento impostata a mano, applicata da `applyDates` (in `applyEventConfig`, vale per entrambe le viste) e vince su quella trovata all'import
+- `notes: { nightId: { text, by, at } }` e `counts: { nightId: { value, by, at } }` — note sulle serate e numero letto sul portale (usato dal tracker finché non arriva un export più recente). `nightId` = giorno + `nightNameKey` del nome nell'export (`model.js`)
+I calcoli del confronto (curve per asse, gruppi, suggerimenti, ingressi stimati, affidabilità della proiezione, flussi del pubblico, link del tavolo) sono in `nuova/compare.js`, con test.
 Caricato al boot con `Promise.all([loadEventConfig(), hasStoredData()])`, applicato ai record tramite `applyEventConfig()` in App.js.
 
 ### Live Tracker (comparisonEngine.js)

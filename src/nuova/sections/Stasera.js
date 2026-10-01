@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { Panel, UpcomingTable, TrackerView, VenueDot, Seg, Delta, WindowSeg } from '../ui';
+import { Panel, UpcomingTable, TrackerView, VenueDot, Seg, Delta, WindowSeg, NoteEditor } from '../ui';
+import { lookupNight } from '../model';
 import { LineChart, BarList } from '../charts';
 import { fmt, pct, dshort, hm, pctChange } from '../format';
 
@@ -46,7 +47,7 @@ function LiveNight({ ed, live }) {
 }
 
 export default function Stasera({ ctx }) {
-  const { kpis, birthdays, upcoming, tonight, live, eds, brandRows, goTo, windowDays, setWindowDays } = ctx;
+  const { kpis, birthdays, upcoming, tonight, live, eds, brandRows, goTo, windowDays, setWindowDays, notes, saveNote, saveCount } = ctx;
   // The chart under the list shows the event picked in the list (the next one by default,
   // or tonight's night in progress)
   const [selectedKey, setSelectedKey] = useState(null);
@@ -67,7 +68,8 @@ export default function Stasera({ ctx }) {
             <WindowSeg value={windowDays} onChange={setWindowDays} />
             {selected && tonight && <button className="nx-link" onClick={() => setSelectedKey(null)}>torna a stasera</button>}
           </>}>
-          <TrackerView item={item} windowDays={windowDays} onCompare={(key) => goTo('confronta', key)} />
+          <TrackerView item={item} windowDays={windowDays} onCompare={(key) => goTo('confronta', key)}
+            onSaveCount={saveCount} note={lookupNight(notes, item.ed)} onSaveNote={saveNote} />
         </Panel>
       ) : (
         <Panel span={8} title="Prossimo evento"><p className="nx-empty">Nessun evento in programma.</p></Panel>
@@ -86,7 +88,8 @@ export default function Stasera({ ctx }) {
                 return (
                   <tr key={e.key}>
                     <td className="n">{dshort(e.date)}</td>
-                    <td className="nx-name"><VenueDot venue={e.venue} /> {e.title}<span className="nx-subline">{e.venue}</span></td>
+                    <td className="nx-name"><VenueDot venue={e.venue} /> {e.title}<span className="nx-subline">{e.venue}{e.seasonNo ? ` · ${e.seasonNo}ª della stagione` : ''}</span>
+                      <span className="nx-subline"><NoteEditor compact note={lookupNight(notes, e)} onSave={(text) => saveNote(e, text)} /></span></td>
                     <td className="n">{fmt(e.reg)}</td>
                     <td className="n">{e.hasScans ? fmt(e.ent) : <span className="nx-flat">n.d.</span>}</td>
                     <td className="n">{pct(e.conv)}</td>

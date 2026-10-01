@@ -1,5 +1,32 @@
 # Changelog - Ultranalytics
 
+## 2 Ottobre 2026 (v7) — Confronto rivisto
+
+**Confronta**
+- Grafici leggibili al tocco: un dito (o il mouse) sul grafico mostra il valore di ogni curva in quel punto e la differenza dalla prima; vale anche per il tracker
+- Tabella "tappe" sotto le curve (−30, −14, −7, −3, −1 giorni, evento, finale) con la differenza dalla prima riga
+- Nuovo asse **dall'apertura**: le curve partono dal giorno in cui si sono aperte le registrazioni; in Numeri "Registrazioni aperte X g prima"
+- **Gruppi** sul tavolo come una linea (mediana tratteggiata con fascia min–max): brand per stagione, locale per stagione, locale e giorno della settimana, genere per stagione, serie. Valgono in curve, numeri, pubblico e come riferimento nella previsione
+- **Stagioni** (settembre–agosto) e posizione della serata nella stagione ("1ª della stagione"), anche nella lista serate
+- **Suggerimenti** da affiancare alla serata in vendita: serie, stessa serata un anno fa, prime serate di stagione nello stesso locale, ultime del brand, stesso locale e giorno
+- Numeri: nuovi (mai entrati prima), tornati entro 30 giorni, note; "giorno stesso" e "anticipo" solo a serata conclusa
+- Pubblico: in comune tra registrati o tra entrati; "dove va il pubblico dopo la serata" (rientri entro 60 giorni e brand)
+- Previsione: **ingressi stimati** (conversione di chi si registra presto e di chi si registra dopo, dalle serate di riferimento) e affidabilità della stima
+- **Copia link** del tavolo da mandare (apre le stesse serate e la stessa vista)
+
+**Stime**
+- "Quanto ci azzecca la proiezione": la proiezione rifatta sulle serate passate con i dati di allora. Oggi: errore tipico ±46% a 7 giorni, ±24% il giorno prima, con tendenza a sottostimare. Provati altri metodi (ultime 3 edizioni, media, totali, correzione della tendenza): nessuno più preciso, il metodo resta quello
+- Nel tracker: ingressi stimati, errore tipico della stima a quella distanza
+
+**Dati e catalogo**
+- Numero del portale inserito a mano dal telefono (vale finché non arriva un export più recente), salvato online
+- **Note sulle serate** (pioggia, ospite, serata concorrente…) in Stasera, Numeri e lista serate
+- **Date degli eventi** dal sito (Dati): serate senza data, eventi in programma, correzione di serate passate; valgono anche nella vista classica (`catalog.dates`)
+- **Catalogo nella nuova grafica**: nome del brand, locale, categoria, generi, esclusione, titoli delle serate; ogni modifica salva un solo campo (`patchEventConfig`)
+- Tabella **per promoter** (oggi il link promoter è sul 3,7% delle registrazioni)
+
+---
+
 ## 1 Ottobre 2026 (v6) — Serie di serate
 
 - **Serie**: gruppi di serate scelti a mano anche tra brand diversi (es. "Opening Too Late": l'opening Atipico del 18.10.25 e l'Opening Party del 9.10.26). Si creano da Confronta: serate sul tavolo → "Salva come serie"; l'elenco "Serie salvate" le rimette sul tavolo o le elimina

@@ -1,5 +1,5 @@
 import { db } from '../config/firebase';
-import { doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore/lite';
+import { doc, getDoc, setDoc, deleteField, serverTimestamp } from 'firebase/firestore/lite';
 
 const CONFIG_DOC = doc(db, 'appConfig', 'eventConfig');
 
@@ -46,6 +46,22 @@ export async function saveEventConfig(config) {
     return true;
   } catch (e) {
     console.error('Failed to save event config:', e);
+    return false;
+  }
+}
+
+/**
+ * Set one value inside the catalog without rewriting the rest (notes, typed-in
+ * counts, dates), so two people editing different things don't overwrite each
+ * other. path: ['notes', id]; value null removes it.
+ */
+export async function patchEventConfig(path, value) {
+  try {
+    const nested = path.reduceRight((acc, k) => ({ [k]: acc }), value == null ? deleteField() : value);
+    await setDoc(CONFIG_DOC, { ...nested, lastUpdated: serverTimestamp() }, { merge: true });
+    return true;
+  } catch (e) {
+    console.error('Failed to update event config:', e);
     return false;
   }
 }

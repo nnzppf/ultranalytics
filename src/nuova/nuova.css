@@ -105,6 +105,13 @@ html.light .nx {
 .nx-note { font-size: 12px; color: var(--nx-muted); margin: 8px 0 0; }
 .nx-note b { color: var(--nx-fg); font-weight: 500; }
 .nx svg { display: block; max-width: 100%; }
+.nx-chart { position: relative; }
+.nx-chart > svg { touch-action: pan-y; cursor: crosshair; }
+.nx-tip { position: absolute; top: 4px; z-index: 5; min-width: 170px; max-width: min(360px, 94%); background: var(--nx-panel); border: 1px solid var(--nx-line); border-radius: 4px; padding: 6px 8px; font-size: 12px; box-shadow: 0 4px 14px rgba(0, 0, 0, .25); pointer-events: none; }
+.nx-tip-h { font-family: var(--nx-mono); color: var(--nx-muted); margin-bottom: 4px; }
+.nx-tip-r { display: grid; grid-template-columns: 10px minmax(0, 1fr) auto auto auto; gap: 6px; align-items: center; line-height: 1.6; }
+.nx-tip-r b { font-variant-numeric: tabular-nums; }
+.nx-tip-l { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .nx-seg { display: inline-flex; border: 1px solid var(--nx-line); border-radius: 3px; overflow: hidden; flex-wrap: wrap; }
 .nx-seg button { background: none; border: 0; padding: 4px 10px; font-size: 12px; color: var(--nx-muted); cursor: pointer; min-height: 28px; }
 .nx-seg button + button { border-left: 1px solid var(--nx-line); }
@@ -139,6 +146,28 @@ html.light .nx {
 .nx-saveseries { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-top: 10px; }
 .nx-saveseries .nx-input { flex: 1 1 200px; width: auto; }
 .nx-saveseries label { flex-basis: 100%; }
+.nx-noteline { display: inline-flex; flex-wrap: wrap; gap: 8px; align-items: baseline; }
+.nx-notetext { color: var(--nx-fg); }
+.nx-noteform { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 8px 0; }
+.nx-noteform .nx-input { flex: 1 1 220px; width: auto; }
+.nx-noteform label { flex-basis: 100%; }
+.nx-tagpick { display: flex; flex-wrap: wrap; gap: 4px; flex-basis: 100%; }
+.nx-tagpick button, .nx-sugg button { border: 1px solid var(--nx-line); background: var(--nx-panel-2); color: var(--nx-muted); border-radius: 3px; padding: 3px 8px; font-size: 12px; cursor: pointer; }
+.nx-tagpick button:hover, .nx-sugg button:hover { color: var(--nx-fg); border-color: var(--nx-muted); }
+.nx-formacts { display: inline-flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+.nx-tagpick button[aria-pressed="true"] { color: var(--nx-fg); border-color: var(--nx-now); background: var(--nx-panel); }
+.nx-subrow td { background: var(--nx-panel-2); }
+select.nx-input { padding: 6px 8px; }
+.nx-catalog td { vertical-align: middle; }
+.nx-libgroups > summary { color: var(--nx-fg); }
+.nx-libkind { display: grid; gap: 2px; margin: 6px 0 8px; }
+.nx-libkind > .nx-hint { padding-left: 6px; }
+.nx-pill.group { border-style: dashed; }
+.nx-sugg { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-top: 10px; }
+.nx-flowtag { display: inline-flex; align-items: center; gap: 4px; margin: 0 10px 2px 0; white-space: nowrap; font-size: 12.5px; }
+.nx-h3 { font-size: 13px; font-weight: 600; margin: 16px 0 6px; }
+.nx-notecell { min-width: 110px; font-size: 12px; }
+.nx-tappe td .nx-subline { font-size: 11px; }
 .nx-drop { border: 1.5px dashed var(--nx-line); border-radius: 4px; padding: 10px; min-height: 64px; display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
 .nx-drop.over { border-color: var(--nx-now); background: var(--nx-panel-2); }
 .nx-pill { display: inline-flex; align-items: center; gap: 6px; border: 1px solid var(--nx-line); border-radius: 3px; padding: 4px 4px 4px 8px; font-size: 12.5px; background: var(--nx-panel-2); }

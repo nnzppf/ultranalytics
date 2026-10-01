@@ -2,7 +2,8 @@
  * Lightweight SVG charts for the new interface. Colors come from CSS variables
  * (nuova.css), so they follow the light/dark theme.
  */
-import { fmt } from './format';
+import { useState } from 'react';
+import { fmt, deltaClass, signed, pctChange } from './format';
 
 const niceTop = (v) => {
   const s = Math.pow(10, Math.floor(Math.log10(Math.max(1, v))));
@@ -21,12 +22,15 @@ function Grid({ top, W, h, L, R, T, B }) {
 
 /**
  * Lines over a shared x axis, with an optional band (min–max + median) and a
- * dashed projection segment. series: [{ key, color, width, points: [{x, y}] }]
+ * dashed projection segment. series: [{ key, color, width, label, dashed, points: [{x, y, min?, max?}] }]
+ * Pointing (mouse or finger) at the chart shows every series at that x; with
+ * `compare` each value also shows its difference from the first series.
  */
-export function LineChart({ series, band, projection, xs, xLabel, now, nowLabel, height = 200, width = 640, yLabel }) {
+export function LineChart({ series, band, projection, xs, xLabel, xTitle, yFormat = (v) => fmt(v), compare = false, now, nowLabel, height = 200, width = 640, yLabel }) {
+  const [hover, setHover] = useState(null);
   const W = width, h = height, L = 40, R = 12, T = 12, B = 22;
   const vals = [
-    ...series.flatMap((s) => s.points.map((p) => p.y)),
+    ...series.flatMap((s) => s.points.flatMap((p) => [p.y, p.max])),
     ...(band || []).flatMap((p) => [p.max, p.med]),
     projection ? projection.y1 : 0,
   ].filter((v) => v != null);
@@ -35,44 +39,89 @@ export function LineChart({ series, band, projection, xs, xLabel, now, nowLabel,
   const X = (x) => L + ((x - x0) / (x1 - x0 || 1)) * (W - L - R);
   const Y = (y) => T + (1 - y / top) * (h - T - B);
   const bandPts = (band || []).filter((p) => p.min != null);
+  const pick = (ev) => {
+    const r = ev.currentTarget.getBoundingClientRect();
+    const px = ((ev.clientX - r.left) / r.width) * W;
+    let best = xs[0];
+    for (const x of xs) if (Math.abs(X(x) - px) < Math.abs(X(best) - px)) best = x;
+    setHover(best);
+  };
+  const rows = hover == null ? [] : series.map((s) => ({ s, p: s.points.find((p) => p.x === hover) })).filter((r) => r.p && r.p.y != null);
+  const first = rows.length && rows[0].s === series[0] ? rows[0].p.y : null;
+  const bandAt = hover == null ? null : bandPts.find((p) => p.x === hover);
+  const left = hover == null ? 0 : (X(hover) / W) * 100;
   return (
-    <svg viewBox={`0 0 ${W} ${h}`} role="img" aria-label={yLabel || 'Grafico'}>
-      <Grid top={top} W={W} h={h} L={L} R={R} T={T} B={B} />
-      {xs.map((x) => {
-        const lab = xLabel(x);
-        if (!lab) return null;
-        return <text key={x} x={X(x)} y={h - 6} textAnchor={x === x0 ? 'start' : x === x1 ? 'end' : 'middle'} fontSize="10" fill="var(--nx-faint)" fontFamily="var(--nx-mono)">{lab}</text>;
-      })}
-      {bandPts.length > 1 && (
-        <>
-          <polygon fill="var(--nx-band)" points={`${bandPts.map((p) => `${X(p.x)},${Y(p.max)}`).join(' ')} ${[...bandPts].reverse().map((p) => `${X(p.x)},${Y(p.min)}`).join(' ')}`} />
-          <polyline fill="none" stroke="var(--nx-muted)" strokeWidth="1.2" strokeDasharray="3 3" points={bandPts.map((p) => `${X(p.x)},${Y(p.med)}`).join(' ')} />
-        </>
-      )}
-      {now != null && (
-        <g>
-          <line x1={X(now)} x2={X(now)} y1={T} y2={h - B} stroke="var(--nx-now)" strokeDasharray="2 3" opacity=".8" />
-          <text x={Math.min(X(now) + 4, W - R - 30)} y={T + 9} fontSize="10" fill="var(--nx-now)" fontFamily="var(--nx-mono)">{nowLabel}</text>
-        </g>
-      )}
-      {projection && (
-        <g>
-          <line x1={X(projection.x0)} y1={Y(projection.y0)} x2={X(projection.x1)} y2={Y(projection.y1)} stroke="var(--nx-proj)" strokeWidth="1.8" strokeDasharray="5 3" />
-          <circle cx={X(projection.x1)} cy={Y(projection.y1)} r="3" fill="var(--nx-proj)" />
-        </g>
-      )}
-      {series.map((s) => {
-        const pts = s.points.filter((p) => p.y != null);
-        if (!pts.length) return null;
-        const last = pts[pts.length - 1];
-        return (
-          <g key={s.key}>
-            {pts.length > 1 && <polyline fill="none" stroke={s.color} strokeWidth={s.width || 2} strokeLinejoin="round" strokeDasharray={s.dashed ? '4 3' : undefined} points={pts.map((p) => `${X(p.x)},${Y(p.y)}`).join(' ')} />}
-            <circle cx={X(last.x)} cy={Y(last.y)} r={s.width > 2 ? 3.5 : 2.5} fill={s.color}><title>{`${s.label || ''}: ${fmt(last.y)}`}</title></circle>
+    <div className="nx-chart">
+      <svg viewBox={`0 0 ${W} ${h}`} role="img" aria-label={yLabel || 'Grafico'}
+        onPointerMove={pick} onPointerDown={pick} onPointerLeave={(ev) => { if (ev.pointerType === 'mouse') setHover(null); }}>
+        <Grid top={top} W={W} h={h} L={L} R={R} T={T} B={B} />
+        {xs.map((x) => {
+          const lab = xLabel(x);
+          if (!lab) return null;
+          return <text key={x} x={X(x)} y={h - 6} textAnchor={x === x0 ? 'start' : x === x1 ? 'end' : 'middle'} fontSize="10" fill="var(--nx-faint)" fontFamily="var(--nx-mono)">{lab}</text>;
+        })}
+        {bandPts.length > 1 && (
+          <>
+            <polygon fill="var(--nx-band)" points={`${bandPts.map((p) => `${X(p.x)},${Y(p.max)}`).join(' ')} ${[...bandPts].reverse().map((p) => `${X(p.x)},${Y(p.min)}`).join(' ')}`} />
+            <polyline fill="none" stroke="var(--nx-muted)" strokeWidth="1.2" strokeDasharray="3 3" points={bandPts.map((p) => `${X(p.x)},${Y(p.med)}`).join(' ')} />
+          </>
+        )}
+        {now != null && (
+          <g>
+            <line x1={X(now)} x2={X(now)} y1={T} y2={h - B} stroke="var(--nx-now)" strokeDasharray="2 3" opacity=".8" />
+            <text x={Math.min(X(now) + 4, W - R - 30)} y={T + 9} fontSize="10" fill="var(--nx-now)" fontFamily="var(--nx-mono)">{nowLabel}</text>
           </g>
-        );
-      })}
-    </svg>
+        )}
+        {projection && (
+          <g>
+            <line x1={X(projection.x0)} y1={Y(projection.y0)} x2={X(projection.x1)} y2={Y(projection.y1)} stroke="var(--nx-proj)" strokeWidth="1.8" strokeDasharray="5 3" />
+            <circle cx={X(projection.x1)} cy={Y(projection.y1)} r="3" fill="var(--nx-proj)" />
+          </g>
+        )}
+        {series.map((s) => {
+          const pts = s.points.filter((p) => p.y != null);
+          if (!pts.length) return null;
+          const last = pts[pts.length - 1];
+          const range = pts.filter((p) => p.min != null);
+          return (
+            <g key={s.key}>
+              {range.length > 1 && <polygon fill={s.color} opacity=".12" points={`${range.map((p) => `${X(p.x)},${Y(p.max)}`).join(' ')} ${[...range].reverse().map((p) => `${X(p.x)},${Y(p.min)}`).join(' ')}`} />}
+              {pts.length > 1 && <polyline fill="none" stroke={s.color} strokeWidth={s.width || 2} strokeLinejoin="round" strokeDasharray={s.dashed ? '6 3' : undefined} points={pts.map((p) => `${X(p.x)},${Y(p.y)}`).join(' ')} />}
+              <circle cx={X(last.x)} cy={Y(last.y)} r={s.width > 2 ? 3.5 : 2.5} fill={s.color} />
+            </g>
+          );
+        })}
+        {hover != null && (
+          <g pointerEvents="none">
+            <line x1={X(hover)} x2={X(hover)} y1={T} y2={h - B} stroke="var(--nx-fg)" opacity=".35" />
+            {rows.map(({ s, p }) => <circle key={s.key} cx={X(hover)} cy={Y(p.y)} r="3.5" fill={s.color} stroke="var(--nx-panel)" strokeWidth="1.5" />)}
+          </g>
+        )}
+      </svg>
+      {hover != null && (rows.length > 0 || bandAt) && (
+        <div className="nx-tip" style={left > 55 ? { right: `${100 - left + 1}%` } : { left: `${left + 1}%` }}>
+          <div className="nx-tip-h">{(xTitle || xLabel)(hover) || hover}</div>
+          {rows.map(({ s, p }, i) => (
+            <div key={s.key} className="nx-tip-r">
+              <span className="nx-swatch" style={{ background: s.color }} />
+              <span className="nx-tip-l">{s.label}</span>
+              <b>{yFormat(p.y)}</b>
+              <span className="nx-flat">{p.min != null ? `${yFormat(p.min)}–${yFormat(p.max)}` : ''}</span>
+              {compare && i > 0 && first ? <span className={deltaClass(pctChange(p.y, first))}>{signed(pctChange(p.y, first))}</span> : <span />}
+            </div>
+          ))}
+          {bandAt && (
+            <div className="nx-tip-r">
+              <span className="nx-swatch" style={{ background: 'var(--nx-muted)' }} />
+              <span className="nx-tip-l">passate, mediana</span>
+              <b>{yFormat(bandAt.med)}</b>
+              <span className="nx-flat">{yFormat(bandAt.min)}–{yFormat(bandAt.max)}</span>
+              <span />
+            </div>
+          )}
+        </div>
+      )}
+    </div>
   );
 }
 

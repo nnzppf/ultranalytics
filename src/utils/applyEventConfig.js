@@ -1,3 +1,28 @@
+import { nightNameKey, editionLabelFromDate } from './eventNameCleaner';
+import { daysBeforeEvent } from './eventTime';
+
+/**
+ * Event dates set in the catalog ({ nameKey: { name, date: "YYYY-MM-DD" } }) for
+ * events with no date in their name, or a wrong one: they win over the date found
+ * at import, and the edition label and days-before follow.
+ */
+export function applyDates(records, dates) {
+  if (!dates || !Object.keys(dates).length) return records;
+  const byName = new Map();
+  return records.map(r => {
+    const name = r.rawEventName;
+    if (!name) return r;
+    if (!byName.has(name)) {
+      const iso = dates[nightNameKey(name)]?.date;
+      const [y, m, d] = (iso || '').split('-').map(Number);
+      byName.set(name, iso ? new Date(y, m - 1, d) : null);
+    }
+    const date = byName.get(name);
+    if (!date || (r.eventDate && r.eventDate.getTime() === date.getTime())) return r;
+    return { ...r, eventDate: date, editionLabel: editionLabelFromDate(date), daysBefore: daysBeforeEvent(r.purchaseDate, date) };
+  });
+}
+
 /**
  * Apply event config (renames, edition renames, exclusions, overrides) to data records.
  *
@@ -6,7 +31,7 @@
  * on the record's rawEventName too, so the names given in the catalog still apply.
  */
 export function applyEventConfig(records, config) {
-  return records.map(d => {
+  return applyDates(records, config.dates).map(d => {
     let brand = d.brand;
     let editionLabel = d.editionLabel;
     // Apply brand renames
