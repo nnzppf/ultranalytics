@@ -194,8 +194,11 @@ const cumAt = (cumulative, d) => {
   return d > Math.max(...keys) ? 0 : (cumulative[d] ?? 0);
 };
 
+// The tracker curves cover up to 60 days before the event (the screen shows 14, 30 or 60)
+export const TRACKER_MAX_DAYS = 60;
+
 /** Tracker for the upcoming nights within `horizonDays`, nearest first. */
-export function upcomingEvents(records, eds, now = new Date(), horizonDays = 45) {
+export function upcomingEvents(records, eds, now = new Date(), horizonDays = 60) {
   return eds
     .filter((e) => e.date && !e.over && dayDiff(now, e.date) <= horizonDays)
     .map((e) => {
@@ -203,7 +206,7 @@ export function upcomingEvents(records, eds, now = new Date(), horizonDays = 45)
       if (!t) return null;
       const at = t.comparisons.map((c) => c.atSamePointAdjusted);
       const lists = computeEditionUserLists(records, e.brand, e.edition);
-      const maxD = Math.min(30, Math.max(14, t.pointDaysBefore));
+      const maxD = TRACKER_MAX_DAYS;
       const band = [];
       for (let d = maxD; d >= 0; d--) {
         const vals = t.comparisons.map((c) => cumAt(c.cumulative, d));

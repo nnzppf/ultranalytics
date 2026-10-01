@@ -34,11 +34,13 @@ function readRoute() {
 }
 
 const readVenue = () => { try { return localStorage.getItem('nx_venue') || 'tutti'; } catch { return 'tutti'; } };
+const readWindow = () => { try { return Number(localStorage.getItem('nx_window')) || 30; } catch { return 30; } };
 
 export default function NewApp({ user, logout, onOpenClassic }) {
   const data = useUltraData();
   const [route, setRoute] = useState(readRoute);
   const [venue, setVenue] = useState(readVenue);
+  const [windowDays, setWindowDays] = useState(readWindow);
   const [tick, setTick] = useState(() => Math.floor(Date.now() / 600000));
   const [theme, setTheme] = useState(() => { try { return localStorage.getItem('ua_theme') || 'dark'; } catch { return 'dark'; } });
 
@@ -53,6 +55,7 @@ export default function NewApp({ user, logout, onOpenClassic }) {
     try { localStorage.setItem('ua_theme', theme); } catch { /* no storage */ }
   }, [theme]);
   useEffect(() => { try { localStorage.setItem('nx_venue', venue); } catch { /* no storage */ } }, [venue]);
+  useEffect(() => { try { localStorage.setItem('nx_window', String(windowDays)); } catch { /* no storage */ } }, [windowDays]);
 
   const goTo = useCallback((section, param) => {
     window.location.hash = param ? `${section}/${encodeURIComponent(param)}` : section;
@@ -91,7 +94,7 @@ export default function NewApp({ user, logout, onOpenClassic }) {
     data, records, eds, people, kpis, brandRows, hours, upcoming, tonight, live, birthdays, attendance, now, venueLabel,
     selectedEvent: section === 'eventi' ? route.param : null,
     seedKey: section === 'confronta' ? route.param : null,
-    clearSeed, goTo, openClassic: onOpenClassic,
+    clearSeed, goTo, openClassic: onOpenClassic, windowDays, setWindowDays,
   };
   const nav = (cls) => Object.entries(SECTIONS).map(([k, s]) => (
     <button key={k} className={cls} aria-current={section === k ? 'page' : undefined} onClick={() => goTo(k)}>

@@ -32,13 +32,24 @@ export function Seg({ value, options, onChange, label }) {
   );
 }
 
+/** How many days before the event the curves show. */
+export const WINDOWS = [[14, '14 g'], [30, '30 g'], [60, '60 g']];
+export function WindowSeg({ value, onChange }) {
+  return <Seg value={value} onChange={onChange} label="Giorni prima dell'evento" options={WINDOWS} />;
+}
+export const daysAxis = (windowDays) => Array.from({ length: windowDays + 1 }, (_, i) => i - windowDays);
+export const dayTick = (windowDays) => (x) => {
+  if (x === 0) return 'evento';
+  return x % (windowDays > 30 ? 14 : 7) === 0 ? `${x} g` : '';
+};
+
 export function Delta({ value }) {
   return <span className={deltaClass(value)}>{signed(value)}</span>;
 }
 
 /** Upcoming nights: registered now against past editions at the same distance. */
 export function UpcomingTable({ upcoming, selectedKey, onSelect }) {
-  if (!upcoming.length) return <p className="nx-empty">Nessun evento in programma nei prossimi 45 giorni.</p>;
+  if (!upcoming.length) return <p className="nx-empty">Nessun evento in programma nei prossimi 60 giorni.</p>;
   return (
     <>
       <div className="nx-tw">
@@ -84,13 +95,14 @@ export function UpcomingTable({ upcoming, selectedKey, onSelect }) {
 }
 
 /** Tracker of one upcoming night: numbers + cumulative curve against past editions. */
-export function TrackerView({ item, onCompare }) {
+export function TrackerView({ item, onCompare, windowDays = 30 }) {
   if (!item) return null;
-  const { ed, tracker: t, band, retarget } = item;
+  const { ed, tracker: t, retarget } = item;
+  const band = item.band.filter((p) => p.d <= windowDays);
   const compared = t.comparisons.length;
   const delta = compared && t.avgAtSamePoint ? pctChange(t.currentRegistrations, t.avgAtSamePoint) : null;
-  const maxD = band.length - 1;
-  const xs = Array.from({ length: maxD + 1 }, (_, i) => i - maxD);
+  const xs = daysAxis(windowDays);
+  const outside = t.pointDaysBefore > windowDays;
   const prev = [...t.comparisons].sort((a, b) => b.eventDate - a.eventDate)[0];
   return (
     <>
@@ -103,11 +115,11 @@ export function TrackerView({ item, onCompare }) {
       </div>
       <LineChart
         xs={xs}
-        xLabel={(x) => (x === 0 ? 'evento' : x % 7 === 0 ? `${x} g` : '')}
+        xLabel={dayTick(windowDays)}
         band={compared ? band.map((p) => ({ x: p.d === 0 ? 0 : -p.d, min: p.min, med: p.med, max: p.max })) : null}
         series={[{ key: 'cur', label: 'questa edizione', color: 'var(--nx-now)', width: 2.4, points: band.map((p) => ({ x: p.d === 0 ? 0 : -p.d, y: p.cur })) }]}
-        projection={t.projection ? { x0: -t.pointDaysBefore, y0: t.currentRegistrations, x1: 0, y1: t.projection.value } : null}
-        now={-t.pointDaysBefore}
+        projection={t.projection && !outside ? { x0: -t.pointDaysBefore, y0: t.currentRegistrations, x1: 0, y1: t.projection.value } : null}
+        now={outside ? null : -t.pointDaysBefore}
         nowLabel="dati"
         yLabel="Registrazioni cumulative"
       />
@@ -117,6 +129,7 @@ export function TrackerView({ item, onCompare }) {
         {t.projection && <span><i style={{ borderTop: '2px dashed var(--nx-proj)', height: 0 }} />proiezione</span>}
       </div>
       <p className="nx-note">
+        {outside && <>Mancano <b>{t.pointDaysBefore} giorni</b>: il punto di oggi è prima della finestra, allargala a 60 giorni per vederlo. </>}
         {prev && <>Edizione precedente ({dshort(prev.eventDate)}): <b>{fmt(prev.atSamePointAdjusted)}</b> a questo punto, <b>{fmt(prev.totalFinal)}</b> a fine serata, conversione {pct(prev.finalConversion)}. </>}
         {retarget > 0 && <><b>{fmt(retarget)}</b> persone già venute non sono ancora registrate. </>}
         {onCompare && <button className="nx-link" onClick={() => onCompare(ed.key)}>Apri nel confronto con le edizioni passate</button>}

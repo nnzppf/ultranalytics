@@ -1,5 +1,14 @@
 # Changelog - Ultranalytics
 
+## 1 Ottobre 2026 (v5) — Finestra 14 / 30 / 60 giorni
+
+- Tracker e curve con selettore **14 g · 30 g · 60 g** (giorni prima dell'evento): in Stasera, Eventi e nelle viste Curve e Previsione di Confronta. La scelta si ricorda (`nx_window`, predefinito 30)
+- "Prossimi eventi" ora copre i prossimi 60 giorni (prima 45); le curve delle edizioni passate si calcolano fino a 60 giorni prima
+- Stasera: toccando una riga di "Prossimi eventi" il grafico sotto mostra quell'evento (senza cambiare pagina); "torna a stasera" riporta alla serata in corso
+- Se il punto di oggi è prima della finestra scelta, il grafico lo dice e suggerisce di allargarla
+
+---
+
 ## 1 Ottobre 2026 (v4) — Nuova interfaccia
 
 La dashboard classica resta (tag `v3.0-dashboard-classica` e tasto "Vista classica"); la nuova interfaccia è quella predefinita.

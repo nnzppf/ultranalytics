@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
-import { Panel, Seg, VenueDot, compareColor, Delta } from '../ui';
+import { Panel, Seg, VenueDot, compareColor, Delta, WindowSeg, daysAxis, dayTick } from '../ui';
 import { LineChart } from '../charts';
 import { curveByDays, curveByHours, editionMetrics, audienceOverlap, projectFromSet } from '../model';
 import { fmt, pct, dshort, dmy, pctChange } from '../format';
@@ -9,7 +9,6 @@ const STORE = 'nx_confronta_v1';
 const readSaved = () => { try { return JSON.parse(localStorage.getItem(STORE)) || []; } catch { return []; } };
 const save = (keys) => { try { localStorage.setItem(STORE, JSON.stringify(keys)); } catch { /* no storage */ } };
 const HOUR_LABEL = { 12: '12', 15: '15', 18: '18', 21: '21', 24: '00', 27: '03' };
-const DAYS = Array.from({ length: 31 }, (_, i) => i - 30);
 
 /** Nights to put next to `ed` by default: the latest concluded nights of the same brand, else of the same venue. */
 function suggestFor(ed, eds) {
@@ -61,7 +60,7 @@ function Library({ eds, selected, onAdd, venueFilter }) {
   );
 }
 
-function Curves({ sel, now }) {
+function Curves({ sel, now, windowDays, setWindowDays }) {
   const [mode, setMode] = useState('giorni');
   let xs, xLabel, series, note;
   if (mode === 'ore') {
@@ -70,20 +69,23 @@ function Curves({ sel, now }) {
     series = sel.map(({ ed, color }) => ({ key: ed.key, color, label: ed.title, points: curveByHours(ed, now) }));
     note = 'Registrazioni accumulate fino a ogni ora del giorno della serata (le 12 includono i giorni prima).';
   } else {
-    xs = DAYS;
-    xLabel = (x) => (x === 0 ? 'evento' : x % 7 === 0 ? `${x} g` : '');
+    xs = daysAxis(windowDays);
+    xLabel = dayTick(windowDays);
     const rows = mode === 'percentuale' ? sel.filter(({ ed }) => ed.over) : sel;
     series = rows.map(({ ed, color }) => {
-      const pts = curveByDays(ed, 30, now);
+      const pts = curveByDays(ed, windowDays, now);
       return { key: ed.key, color, label: ed.title, width: ed.over ? 2 : 2.6, points: mode === 'percentuale' ? pts.map((p) => ({ x: p.x, y: p.y == null ? null : (100 * p.y) / ed.reg })) : pts };
     });
     note = mode === 'percentuale'
       ? 'Ogni curva in percentuale del suo totale finale: mostra la forma, non la dimensione. Le serate in vendita non hanno ancora un finale.'
-      : 'Registrazioni accumulate negli ultimi 30 giorni prima dell\'evento.';
+      : `Registrazioni accumulate negli ultimi ${windowDays} giorni prima dell'evento.`;
   }
   return (
     <>
-      <div style={{ marginBottom: 8 }}><Seg value={mode} onChange={setMode} label="Asse" options={[['giorni', 'giorni all\'evento'], ['percentuale', '% del finale'], ['ore', 'ore della serata']]} /></div>
+      <div style={{ marginBottom: 8, display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+        <Seg value={mode} onChange={setMode} label="Asse" options={[['giorni', 'giorni all\'evento'], ['percentuale', '% del finale'], ['ore', 'ore della serata']]} />
+        {mode !== 'ore' && <WindowSeg value={windowDays} onChange={setWindowDays} />}
+      </div>
       <LineChart xs={xs} xLabel={xLabel} series={series} yLabel="Confronto curve" height={240} width={760} />
       <p className="nx-note">{note}</p>
     </>
@@ -158,7 +160,7 @@ function Overlap({ sel }) {
   );
 }
 
-function Forecast({ sel, records, now, upcoming }) {
+function Forecast({ sel, records, now, upcoming, windowDays, setWindowDays }) {
   const targets = sel.filter(({ ed }) => !ed.over && ed.date);
   const [targetKey, setTargetKey] = useState(null);
   const target = targets.find((t) => t.ed.key === targetKey) || targets[0];
@@ -179,15 +181,17 @@ function Forecast({ sel, records, now, upcoming }) {
           <div className="l">{proj ? `stima finale · ${fmt(proj.low)}–${fmt(proj.high)} · su ${proj.basedOn}${proj.reliable ? '' : ' · incerta'}` : 'a questo punto le serate scelte erano a zero'}</div></div>
         {brandView && <div className="nx-stat"><div className="v nx-flat">~{fmt(brandView.value)}</div><div className="l">stima con le sole edizioni del brand</div></div>}
       </div>
+      <div style={{ marginBottom: 6 }}><WindowSeg value={windowDays} onChange={setWindowDays} /></div>
       <LineChart
-        xs={DAYS} xLabel={(x) => (x === 0 ? 'evento' : x % 7 === 0 ? `${x} g` : '')}
+        xs={daysAxis(windowDays)} xLabel={dayTick(windowDays)}
         series={[
-          ...refs.map(({ ed, color }) => ({ key: ed.key, color, label: ed.title, width: 1.4, points: curveByDays(ed, 30, now) })),
-          { key: target.ed.key, color: target.color, label: target.ed.title, width: 2.8, points: curveByDays(target.ed, 30, now) },
+          ...refs.map(({ ed, color }) => ({ key: ed.key, color, label: ed.title, width: 1.4, points: curveByDays(ed, windowDays, now) })),
+          { key: target.ed.key, color: target.color, label: target.ed.title, width: 2.8, points: curveByDays(target.ed, windowDays, now) },
         ]}
-        projection={proj ? { x0: -p.pointDaysBefore, y0: target.ed.reg, x1: 0, y1: proj.value } : null}
-        now={-p.pointDaysBefore} nowLabel="dati" height={240} width={760} yLabel="Previsione"
+        projection={proj && p.pointDaysBefore <= windowDays ? { x0: -p.pointDaysBefore, y0: target.ed.reg, x1: 0, y1: proj.value } : null}
+        now={p.pointDaysBefore <= windowDays ? -p.pointDaysBefore : null} nowLabel="dati" height={240} width={760} yLabel="Previsione"
       />
+      {p.pointDaysBefore > windowDays && <p className="nx-note">Mancano <b>{p.pointDaysBefore} giorni</b>: allarga la finestra a 60 giorni per vedere il punto di oggi.</p>}
       <div className="nx-tw" style={{ marginTop: 8 }}>
         <table>
           <thead><tr><th>serata di riferimento</th><th className="n">allo stesso punto</th><th className="n">finale</th><th className="n">moltiplicatore</th></tr></thead>
@@ -212,7 +216,7 @@ function Forecast({ sel, records, now, upcoming }) {
 }
 
 function Tavolo({ ctx }) {
-  const { eds, records, now, attendance, upcoming, seedKey, clearSeed, venueLabel } = ctx;
+  const { eds, records, now, attendance, upcoming, seedKey, clearSeed, venueLabel, windowDays, setWindowDays } = ctx;
   const [keys, setKeys] = useState(readSaved);
   const [view, setView] = useState('curve');
   const [over, setOver] = useState(false);
@@ -259,10 +263,10 @@ function Tavolo({ ctx }) {
         </Panel>
         {sel.length > 0 && (
           <Panel title="Risultato" actions={<Seg value={view} onChange={setView} label="Vista" options={[['curve', 'Curve'], ['numeri', 'Numeri'], ['pubblico', 'Pubblico in comune'], ['previsione', 'Previsione']]} />}>
-            {view === 'curve' && <Curves sel={sel} now={now} />}
+            {view === 'curve' && <Curves sel={sel} now={now} windowDays={windowDays} setWindowDays={setWindowDays} />}
             {view === 'numeri' && <Numbers sel={sel} attendance={attendance} />}
             {view === 'pubblico' && <Overlap sel={sel} />}
-            {view === 'previsione' && <Forecast sel={sel} records={records} now={now} upcoming={upcoming} />}
+            {view === 'previsione' && <Forecast sel={sel} records={records} now={now} upcoming={upcoming} windowDays={windowDays} setWindowDays={setWindowDays} />}
           </Panel>
         )}
       </div>

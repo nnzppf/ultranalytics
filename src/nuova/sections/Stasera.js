@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Panel, UpcomingTable, TrackerView, VenueDot, Seg, Delta } from '../ui';
+import { Panel, UpcomingTable, TrackerView, VenueDot, Seg, Delta, WindowSeg } from '../ui';
 import { LineChart, BarList } from '../charts';
 import { fmt, pct, dshort, hm, pctChange } from '../format';
 
@@ -46,19 +46,28 @@ function LiveNight({ ed, live }) {
 }
 
 export default function Stasera({ ctx }) {
-  const { kpis, birthdays, upcoming, tonight, live, eds, brandRows, goTo } = ctx;
-  const next = upcoming[0];
+  const { kpis, birthdays, upcoming, tonight, live, eds, brandRows, goTo, windowDays, setWindowDays } = ctx;
+  // The chart under the list shows the event picked in the list (the next one by default,
+  // or tonight's night in progress)
+  const [selectedKey, setSelectedKey] = useState(null);
+  const selected = upcoming.find((u) => u.ed.key === selectedKey) || null;
+  const showLive = !!(tonight && live && !selected);
+  const item = selected || (showLive ? null : upcoming[0]);
   const lastNights = eds.filter((e) => e.over).slice(-8).reverse();
   const brandAvg = Object.fromEntries(brandRows.map((b) => [b.brand, b]));
   return (
     <div className="nx-grid">
       <Kpis kpis={kpis} birthdays={birthdays} />
-      <Panel span={12} title="Prossimi eventi" hint="registrati ora contro le edizioni passate alla stessa distanza dall'evento">
-        <UpcomingTable upcoming={upcoming} onSelect={(key) => goTo('eventi', key)} />
+      <Panel span={12} title="Prossimi eventi" hint="entro 60 giorni · tocca una riga per il suo grafico qui sotto">
+        <UpcomingTable upcoming={upcoming} selectedKey={item?.ed.key} onSelect={setSelectedKey} />
       </Panel>
-      {tonight && live ? <LiveNight ed={tonight} live={live} /> : next ? (
-        <Panel span={8} title={`Prossimo · ${next.ed.title}`} hint={`${dshort(next.ed.date)} · ${next.ed.venue}`}>
-          <TrackerView item={next} onCompare={(key) => goTo('confronta', key)} />
+      {showLive ? <LiveNight ed={tonight} live={live} /> : item ? (
+        <Panel span={8} title={`${selected ? 'Tracker' : 'Prossimo'} · ${item.ed.title}`} hint={`${dshort(item.ed.date)} · ${item.ed.venue}`}
+          actions={<>
+            <WindowSeg value={windowDays} onChange={setWindowDays} />
+            {selected && tonight && <button className="nx-link" onClick={() => setSelectedKey(null)}>torna a stasera</button>}
+          </>}>
+          <TrackerView item={item} windowDays={windowDays} onCompare={(key) => goTo('confronta', key)} />
         </Panel>
       ) : (
         <Panel span={8} title="Prossimo evento"><p className="nx-empty">Nessun evento in programma.</p></Panel>
