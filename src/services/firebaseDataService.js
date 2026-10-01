@@ -8,7 +8,7 @@ import {
 } from 'firebase/storage';
 import { BRAND_REGISTRY } from '../config/eventConfig';
 import { mergeRecordLists, mergeUserLists, isSuperseded, linkPeopleByPhone } from '../utils/datasetMerge';
-import { matchBrand } from '../utils/eventNameCleaner';
+import { matchBrand, editionLabelFromDate } from '../utils/eventNameCleaner';
 
 // Collection names
 const DATASETS_COL = 'datasets';      // metadata per dataset caricato
@@ -81,6 +81,12 @@ async function loadAllRaw() {
 
 const isUtentiDataset = ds => ds.fileType === 'utenti';
 
+// Older uploads (Getfy, Feb 2026) used the event name as edition: key every edition by
+// its date like new uploads; names given in the catalog are re-applied by applyEventConfig
+function withDateEdition(record) {
+  return record.eventDate ? { ...record, editionLabel: editionLabelFromDate(record.eventDate) } : record;
+}
+
 // Older uploads may hold events excluded since (tests, senior): apply today's rules
 function isStillIncluded(record) {
   if (!record.rawEventName) return true;
@@ -104,7 +110,7 @@ export async function loadAllData() {
   const datasets = raw.map(({ items, ...meta }) => meta);
 
   return {
-    records: recordItems.map(deserializeRecord),
+    records: recordItems.map(deserializeRecord).map(withDateEdition),
     utenti: utentiItems.map(deserializeUser),
     datasets,
   };

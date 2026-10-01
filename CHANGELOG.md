@@ -13,6 +13,7 @@
 - I biglietti della vecchia piattaforma (senza email) sono collegati alle persone per telefono
 - Dopo un upload vengono eliminati solo i dataset interamente contenuti nei successivi
 - Eventi esclusi (test, senior, Decò 90) filtrati anche dai dataset già caricati
+- Le edizioni Getfy (vecchia piattaforma, 4 Atipico 2024/25) usano l'etichetta per data come le nuove; i nomi dati alle edizioni nel catalogo (`editionRenames`, salvati col nome evento originale) si applicano anche ai dati nuovi (`utils/applyEventConfig.js`)
 
 ### Sicurezza
 - Regole Firestore in `firestore.rules`: solo gli account autorizzati (le regole di test erano scadute il 20/03/2026)

@@ -7,6 +7,7 @@ import { Users, Check, TrendingUp, X, Calendar, Gift, Cloud, CloudOff, Loader, D
 import { useAuth } from "./contexts/AuthContext";
 import LoginScreen from "./components/screens/LoginScreen";
 import { processRawRows, isUtentiFormat, processUtentiRows } from "./utils/csvProcessor";
+import { applyEventConfig } from "./utils/applyEventConfig";
 import { getHourlyData, getHourlyDataByGroup, getDowData, getFasciaData, getDaysBeforeData, getTrendData, getTrendDataByGroup, getConversionByFascia, getHeatmapData, getUserStats, getEventStats } from "./utils/dataTransformers";
 import { saveDataset, loadAllData, deleteDataset, hasStoredData, pruneSupersededDatasets } from "./services/firebaseDataService";
 import { loadEventConfig, saveEventConfig } from "./services/eventConfigService";
@@ -31,36 +32,6 @@ import Dropdown from "./components/shared/Dropdown";
 
 function eventNameFromFile(filename) {
   return filename.replace(/\.(csv|xlsx|xls|tsv)$/i, "").replace(/registrazioni[_\s]*/i, "").replace(/_/g, " ").trim();
-}
-
-/**
- * Apply event config (renames, edition renames, exclusions, overrides) to data records.
- */
-function applyEventConfig(records, config) {
-  return records.map(d => {
-    let brand = d.brand;
-    let editionLabel = d.editionLabel;
-    // Apply brand renames
-    if (config.renames?.[brand]) {
-      brand = config.renames[brand];
-    }
-    // Apply edition renames (check both original and renamed brand)
-    if (config.editionRenames?.[d.brand]?.[editionLabel]) {
-      editionLabel = config.editionRenames[d.brand][editionLabel];
-    } else if (config.editionRenames?.[brand]?.[editionLabel]) {
-      editionLabel = config.editionRenames[brand][editionLabel];
-    }
-    // Apply custom config (category, genres, venue)
-    const brandConfig = config.brands?.[d.brand] || config.brands?.[brand];
-    return {
-      ...d,
-      brand,
-      editionLabel,
-      category: brandConfig?.category || d.category,
-      genres: brandConfig?.genres?.length ? brandConfig.genres : d.genres,
-      location: brandConfig?.venue || d.location,
-    };
-  }).filter(d => !config.excludedBrands?.includes(d.brand));
 }
 
 export default function ClubAnalytics() {
