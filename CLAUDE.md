@@ -1,12 +1,13 @@
 # Ultranalytics — Club Analytics Dashboard
 
 ## Progetto
-Web app React per analisi dati eventi/serate di club (Studios Club & Co). Deployata su Vercel da `nnzppf/ultranalytics`, branch `main`. Ogni push su main triggera deploy automatico.
+Web app React per analisi dati eventi/serate di club (Studios Club & Co). Pubblicata su Cloudflare Workers (static assets, `wrangler.jsonc`) da `nnzppf/ultranalytics`, branch `main`: https://ultranalytics.filzantrade.workers.dev. Ogni push su main triggera il deploy automatico (Workers Builds). Il vecchio deploy Vercel (ultranalytics.vercel.app) è da dismettere: il piano Hobby non consente uso commerciale.
 
 ## Stack
 - React 18 (CRA), Recharts per grafici, Lucide React per icone
 - Firebase: Firestore (config eventi, dati) + Auth (Google login). Database in `europe-west1` (Belgio). Storage non usato
-- Vercel: hosting + deploy automatico
+- Cloudflare Workers: hosting + deploy automatico. `REACT_APP_GEMINI_API_KEY` va impostata come *build variable* nel progetto Cloudflare
+- Il dominio del sito deve essere tra i domini autorizzati di Firebase Auth, altrimenti il login Google fallisce
 - Nessun CSS framework — tutto inline styles con design tokens centralizzati
 
 ## Struttura Chiave
@@ -99,8 +100,8 @@ In `whatsapp.js` (retarget) e `BirthdaysTab.js` (compleanni). Tutti includono di
 
 ## Convenzioni
 - UI tutta in italiano
-- `npm run build` deve passare a zero errori/warning prima di push (Vercel builda con CI=true: i warning bloccano il deploy)
+- `npm run build` deve passare a zero errori/warning prima di push (la build in CI tratta i warning come errori)
 - Test: `npx react-scripts test --watchAll=false`
-- Test su Vercel deploy (PC + iPhone)
+- Test sul deploy Cloudflare (PC + iPhone)
 - Git tag per stati stabili (es. `v2.1-stable`)
 - Commit message in inglese, UI in italiano
