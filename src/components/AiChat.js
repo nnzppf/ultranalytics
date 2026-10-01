@@ -2,6 +2,7 @@ import { useState, useRef, useEffect, useCallback } from 'react';
 import { Send, X, Sparkles, Loader, Trash2 } from 'lucide-react';
 import { askGemini, isGeminiConfigured } from '../services/geminiService';
 import { buildDataSummary } from '../utils/dataSummarizer';
+import { escapeHtml } from '../utils/escapeHtml';
 import { colors, font, radius, gradients, shadows, transition as tr, alpha } from '../config/designTokens';
 
 const SUGGESTED_QUESTIONS = [
@@ -68,8 +69,8 @@ export default function AiChat({ data, analytics, userStats }) {
     return text
       .split('\n')
       .map((line, i) => {
-        // Bold
-        let formatted = line.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+        // Bold (escape first: the text may contain names typed by anyone)
+        let formatted = escapeHtml(line).replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
         // Bullet points
         if (formatted.startsWith('- ') || formatted.startsWith('* ')) {
           formatted = `<span style="color:${colors.brand.purple};margin-right:6px">•</span>${formatted.slice(2)}`;

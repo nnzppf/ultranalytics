@@ -16,6 +16,10 @@
 - Le edizioni Getfy (vecchia piattaforma, 4 Atipico 2024/25) usano l'etichetta per data come le nuove; i nomi dati alle edizioni nel catalogo (`editionRenames`, salvati col nome evento originale) si applicano anche ai dati nuovi (`utils/applyEventConfig.js`)
 
 ### Sicurezza
+- Chat AI e report: il testo viene trattato come testo (escape) prima della formattazione, così un nome inserito sul portale non può eseguire codice nella sessione
+- Eliminazione di un dataset: bisogna scrivere il nome del file per confermare; `ds_biglietti_21_02` (Getfy + ingressi Atipico 21.02) è protetto e non si elimina né dall'app né dalla pulizia automatica
+- Header di sicurezza su Cloudflare (`public/_headers`)
+- Rimossi `scripts/` (vecchi upload con percorsi del vecchio PC e scritture senza login) e `start-server.bat`; tolte le dipendenze inutilizzate lodash e csv-parse
 - Regole Firestore in `firestore.rules`: solo gli account autorizzati (le regole di test erano scadute il 20/03/2026)
 - Il file originale non viene più caricato su Storage
 - CSV ed Excel esclusi da git

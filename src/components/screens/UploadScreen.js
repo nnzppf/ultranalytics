@@ -1,6 +1,7 @@
-import { Upload, Plus, X, Cloud, Trash2, RefreshCw } from 'lucide-react';
+import { Upload, Plus, X, Cloud, Trash2, RefreshCw, Lock } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { colors, font, radius, gradients, transition as tr, alpha, glass, shadows } from '../../config/designTokens';
+import { isProtectedDataset } from '../../services/firebaseDataService';
 
 export default function UploadScreen({
   files, isDragging, onFilesAdded, onRemoveFile, onUpdateEventName, onAnalyze, onDragState,
@@ -99,13 +100,20 @@ export default function UploadScreen({
                     {ds.uploadedAt && ` — ${new Date(ds.uploadedAt.seconds * 1000).toLocaleDateString('it')}`}
                   </div>
                 </div>
-                <button
-                  onClick={() => onDeleteDataset(ds.id)}
-                  style={{ background: "none", border: "none", cursor: "pointer", padding: 4 }}
-                  title="Elimina dataset"
-                >
-                  <Trash2 size={14} color={colors.status.error} />
-                </button>
+                {isProtectedDataset(ds.id) ? (
+                  <span title="Protetto: contiene dati che non esistono altrove (vecchia piattaforma, ingressi persi dal portale)" style={{ padding: 4 }}>
+                    <Lock size={14} color={colors.text.disabled} />
+                  </span>
+                ) : (
+                  <button
+                    onClick={() => onDeleteDataset(ds.id)}
+                    style={{ background: "none", border: "none", cursor: "pointer", padding: 4 }}
+                    title="Elimina dataset"
+                    aria-label={`Elimina ${ds.fileName}`}
+                  >
+                    <Trash2 size={14} color={colors.status.error} />
+                  </button>
+                )}
               </motion.div>
             ))}
 

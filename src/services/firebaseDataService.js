@@ -81,6 +81,11 @@ async function loadAllRaw() {
 
 const isUtentiDataset = ds => ds.fileType === 'utenti';
 
+// Datasets holding data that exists nowhere else: never deleted from the app
+// (Getfy tickets 2024/25 and the scans of Atipico 21.02.26 the portal lost)
+export const PROTECTED_DATASETS = ['ds_biglietti_21_02'];
+export const isProtectedDataset = id => PROTECTED_DATASETS.includes(id);
+
 // Older uploads (Getfy, Feb 2026) used the event name as edition: key every edition by
 // its date like new uploads; names given in the catalog are re-applied by applyEventConfig
 function withDateEdition(record) {
@@ -126,6 +131,7 @@ export async function pruneSupersededDatasets() {
 
   for (let i = 0; i < raw.length; i++) {
     const ds = raw[i];
+    if (isProtectedDataset(ds.id)) continue;
     const fileType = isUtentiDataset(ds) ? 'utenti' : 'biglietti';
     const later = raw.slice(i + 1).filter(l => isUtentiDataset(l) === isUtentiDataset(ds)).map(l => l.items);
     if (later.length === 0) continue;
@@ -143,6 +149,7 @@ export async function pruneSupersededDatasets() {
  * Delete a dataset and its sub-collections from Firebase.
  */
 export async function deleteDataset(datasetId) {
+  if (isProtectedDataset(datasetId)) throw new Error(`Dataset protetto: ${datasetId}`);
   // Delete record chunks
   const recordsSnap = await getDocs(
     collection(db, DATASETS_COL, datasetId, RECORDS_COL)

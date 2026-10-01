@@ -9,7 +9,7 @@ import LoginScreen from "./components/screens/LoginScreen";
 import { processRawRows, isUtentiFormat, processUtentiRows } from "./utils/csvProcessor";
 import { applyEventConfig } from "./utils/applyEventConfig";
 import { getHourlyData, getHourlyDataByGroup, getDowData, getFasciaData, getDaysBeforeData, getTrendData, getTrendDataByGroup, getConversionByFascia, getHeatmapData, getUserStats, getEventStats } from "./utils/dataTransformers";
-import { saveDataset, loadAllData, deleteDataset, hasStoredData, pruneSupersededDatasets } from "./services/firebaseDataService";
+import { saveDataset, loadAllData, deleteDataset, hasStoredData, pruneSupersededDatasets, isProtectedDataset } from "./services/firebaseDataService";
 import { loadEventConfig, saveEventConfig } from "./services/eventConfigService";
 import EventManagerModal from "./components/screens/EventManagerModal";
 
@@ -269,14 +269,29 @@ function AuthenticatedApp({ user, logout }) {
   }, [toast, eventConfig]);
 
   // Delete a dataset from Firebase
+  // Deleting is permanent (no backups): the file name must be typed to confirm
   const handleDeleteDataset = useCallback(async (datasetId) => {
+    const ds = savedDatasets.find(d => d.id === datasetId);
+    if (isProtectedDataset(datasetId)) {
+      toast("Questo dataset contiene dati che non esistono altrove e non si può eliminare dall'app", "error");
+      return;
+    }
+    const typed = window.prompt(
+      `Eliminare definitivamente "${ds?.fileName}" (${ds?.recordCount} record)? Non si può annullare.\n\nScrivi il nome del file per confermare:`
+    );
+    if (typed === null) return;
+    if (typed.trim() !== ds?.fileName) {
+      toast("Nome non corrispondente: niente eliminato", "error");
+      return;
+    }
     try {
       await deleteDataset(datasetId);
       await reloadFromCloud();
     } catch (e) {
       console.error("Delete failed:", e);
+      toast("Eliminazione non riuscita", "error");
     }
-  }, [reloadFromCloud]);
+  }, [reloadFromCloud, savedDatasets, toast]);
 
   // Save event config and apply to data
   const handleSaveEventConfig = useCallback(async (config) => {

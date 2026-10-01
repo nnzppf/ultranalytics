@@ -8,6 +8,7 @@ import DataCards from '../shared/DataCards';
 import { TOOLTIP_STYLE } from '../../config/constants';
 import { linReg } from '../../utils/comparisonEngine';
 import { buildTrackerSummary } from '../../utils/dataSummarizer';
+import { escapeHtml } from '../../utils/escapeHtml';
 import { generateTrackerReport, isGeminiConfigured } from '../../services/geminiService';
 import { colors, font, radius, gradients, presets, alpha, shadows } from '../../config/designTokens';
 
@@ -1439,7 +1440,7 @@ function formatReportMarkdown(text) {
   return text
     .split('\n')
     .map((line) => {
-      let formatted = line.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+      let formatted = escapeHtml(line).replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
       if (formatted.startsWith('- ') || formatted.startsWith('* ')) {
         formatted = `<span style="color:${colors.brand.purple};margin-right:6px">•</span>${formatted.slice(2)}`;
         return `<div style="padding-left:12px;margin:2px 0">${formatted}</div>`;
