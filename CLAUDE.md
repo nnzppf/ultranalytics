@@ -79,8 +79,10 @@ Document Firestore `appConfig/eventConfig`:
 ```js
 { brands: { "BRAND": { displayName, category, genres, venue, aliases } },
   excludedBrands: [...], renames: { "OLD": "NEW" },
-  editionRenames: { "BRAND": { "old_edition": "new_edition" } } }
+  editionRenames: { "BRAND": { "old_edition": "new_edition" } },
+  series: { "Opening Too Late": [{ name: "<nome evento nell'export>", date: "YYYY-MM-DD" }] } }
 ```
+`series` (solo nuova interfaccia, `nuova/model.js`: `indexSeries`, `withSeries`, `peersOf`): serate raggruppate a mano tra brand diversi; una serata in vendita in una serie si confronta con la serie invece che col brand. Chi salva il catalogo deve conservare i campi che non gestisce.
 Caricato al boot con `Promise.all([loadEventConfig(), hasStoredData()])`, applicato ai record tramite `applyEventConfig()` in App.js.
 
 ### Live Tracker (comparisonEngine.js)

@@ -39,10 +39,11 @@ export function indexEditions(records, now = new Date()) {
     const key = `${r.brand}|${r.editionLabel}`;
     let e = map.get(key);
     if (!e) {
-      e = { key, brand: r.brand, edition: r.editionLabel, date: r.eventDate || null, genres: r.genres || [], category: r.category, rawName: r.rawEventName, venueCount: {}, rows: [], reg: 0, ent: 0 };
+      e = { key, brand: r.brand, edition: r.editionLabel, date: r.eventDate || null, genres: r.genres || [], category: r.category, rawName: r.rawEventName, rawNames: new Set(), venueCount: {}, rows: [], reg: 0, ent: 0 };
       map.set(key, e);
     }
     e.rows.push(r);
+    if (r.rawEventName) e.rawNames.add(r.rawEventName);
     e.reg++;
     if (r.attended) e.ent++;
     if (!e.date && r.eventDate) e.date = r.eventDate;
@@ -52,6 +53,7 @@ export function indexEditions(records, now = new Date()) {
   for (const e of map.values()) {
     e.venue = Object.entries(e.venueCount).sort((a, b) => b[1] - a[1])[0]?.[0] || '';
     delete e.venueCount;
+    e.rawNames = [...e.rawNames];
     e.over = !!e.date && isEditionOver(e.date, now);
     e.hasScans = e.ent > 0;
     e.conv = e.over && e.hasScans ? round1((100 * e.ent) / e.reg) : null;
@@ -186,6 +188,59 @@ export function birthdaysNext(utenti, now = new Date(), days = 7) {
   });
 }
 
+// ---------------------------------------------------------------- series
+
+/*
+ * A series is a set of nights grouped by hand across brands (e.g. the season openings
+ * of a venue). It lives in the event catalog as { name: [{ name, date }] }: the night's
+ * name in the export and its day, which survive brand renames and new exports.
+ */
+const ymd = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+// Accented letters are dropped whole, so "VENERDÌ" and the export's "VENERD�" match
+const nameKey = (raw) => String(raw || '').toLowerCase().normalize('NFD').replace(/[a-z][̀-ͯ]+/g, '').replace(/[^a-z0-9]/g, '');
+const memberKey = (name, day) => `${nameKey(name)}|${day}`;
+const editionMemberKeys = (e) => (e.date ? e.rawNames.map((n) => memberKey(n, ymd(e.date))) : []);
+
+export const seriesMember = (ed) => ({ name: ed.rawName, date: ymd(ed.date) });
+
+/** Series with their nights (oldest first) and the series of each night. */
+export function indexSeries(eds, series) {
+  const byMember = new Map();
+  for (const e of eds) for (const k of editionMemberKeys(e)) byMember.set(k, e);
+  const list = [];
+  const ofEdition = new Map();
+  for (const [name, members] of Object.entries(series || {}).sort((a, b) => a[0].localeCompare(b[0]))) {
+    const found = [...new Set((members || []).map((m) => byMember.get(memberKey(m.name, m.date))).filter(Boolean))]
+      .sort((a, b) => a.date - b.date);
+    list.push({ name, eds: found, hidden: (members || []).length - found.length });
+    for (const e of found) if (!ofEdition.has(e.key)) ofEdition.set(e.key, name);
+  }
+  return { list, ofEdition };
+}
+
+/**
+ * Catalog with series `name` set to `nights`. Members not among `eds` (hidden by the
+ * venue filter) are kept, so saving from a filtered view doesn't drop them.
+ */
+export function withSeries(config, name, nights, eds) {
+  const visible = new Set(eds.flatMap(editionMemberKeys));
+  const kept = (config?.series?.[name] || []).filter((m) => !visible.has(memberKey(m.name, m.date)));
+  return { ...(config || {}), series: { ...(config?.series || {}), [name]: [...kept, ...nights.filter((e) => e.date).map(seriesMember)] } };
+}
+
+export function withoutSeries(config, name) {
+  const series = { ...(config?.series || {}) };
+  delete series[name];
+  return { ...(config || {}), series };
+}
+
+/** The nights a night is compared with: its series if it has one, else its brand. */
+export function peersOf(ed, eds, seriesIdx) {
+  const name = seriesIdx?.ofEdition.get(ed.key);
+  if (name) return { series: name, eds: seriesIdx.list.find((s) => s.name === name).eds };
+  return { series: null, eds: eds.filter((e) => e.brand === ed.brand) };
+}
+
 // ---------------------------------------------------------------- tracker
 
 const cumAt = (cumulative, d) => {
@@ -197,15 +252,29 @@ const cumAt = (cumulative, d) => {
 // The tracker curves cover up to 60 days before the event (the screen shows 14, 30 or 60)
 export const TRACKER_MAX_DAYS = 60;
 
-/** Tracker for the upcoming nights within `horizonDays`, nearest first. */
-export function upcomingEvents(records, eds, now = new Date(), horizonDays = 60) {
+const SERIES_BRAND = '\u0000series';
+
+/**
+ * Tracker for the upcoming nights within `horizonDays`, nearest first. A night in a
+ * series is compared with the other nights of the series instead of its brand.
+ */
+export function upcomingEvents(records, eds, now = new Date(), horizonDays = 60, seriesIdx = null) {
+  const dataAsOf = latestPurchase(records);
   return eds
     .filter((e) => e.date && !e.over && dayDiff(now, e.date) <= horizonDays)
     .map((e) => {
-      const t = computeWhereAreWeNow(records, e.brand, e.edition, null, { now });
+      const series = seriesIdx?.ofEdition.get(e.key) || null;
+      let pool = records, brand = e.brand, edition = e.edition;
+      if (series) {
+        // The series as one synthetic brand, one edition per night
+        pool = peersOf(e, eds, seriesIdx).eds.flatMap((p) => p.rows.map((r) => ({ ...r, brand: SERIES_BRAND, editionLabel: p.key })));
+        brand = SERIES_BRAND;
+        edition = e.key;
+      }
+      const t = computeWhereAreWeNow(pool, brand, edition, null, { now, dataAsOf });
       if (!t) return null;
       const at = t.comparisons.map((c) => c.atSamePointAdjusted);
-      const lists = computeEditionUserLists(records, e.brand, e.edition);
+      const lists = computeEditionUserLists(pool, brand, edition);
       const maxD = TRACKER_MAX_DAYS;
       const band = [];
       for (let d = maxD; d >= 0; d--) {
@@ -214,6 +283,7 @@ export function upcomingEvents(records, eds, now = new Date(), horizonDays = 60)
       }
       return {
         ed: e,
+        series,
         tracker: t,
         range: at.length ? [Math.min(...at), median(at), Math.max(...at)] : null,
         retarget: lists.retarget.filter((u) => u.phone).length,
@@ -232,13 +302,14 @@ const NIGHT_HOURS = [12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26,
 
 /**
  * Hour by hour on the event day (12:00 → 03:00): registrations and entries so far
- * against past nights of the same brand at the same hour.
+ * against past nights of the same brand (or series) at the same hour.
  */
-export function liveNight(ed, eds, records, now = new Date()) {
+export function liveNight(ed, eds, records, now = new Date(), seriesIdx = null) {
   const dataAsOf = latestPurchase(records);
   const reference = dataAsOf && dataAsOf < now ? dataAsOf : now;
   const day0 = midnight(ed.date).getTime();
-  const past = eds.filter((e) => e.brand === ed.brand && e.over && e.key !== ed.key);
+  const peers = peersOf(ed, eds, seriesIdx);
+  const past = peers.eds.filter((e) => e.over && e.key !== ed.key);
   const countUntil = (rows, t, field) => rows.filter((r) => r[field] && r[field].getTime() <= t).length;
   const refHour = (reference.getTime() - day0) / HOUR;
   const hours = [...NIGHT_HOURS, refHour].filter((h, i, a) => a.indexOf(h) === i).sort((a, b) => a - b);
@@ -256,7 +327,7 @@ export function liveNight(ed, eds, records, now = new Date()) {
     };
   });
   const nowPoint = points.find((p) => p.h === refHour);
-  return { reference, refHour, points, past: past.length, now: nowPoint, notIn: ed.reg - ed.ent };
+  return { reference, refHour, points, past: past.length, series: peers.series, now: nowPoint, notIn: ed.reg - ed.ent };
 }
 
 // ---------------------------------------------------------------- comparison table

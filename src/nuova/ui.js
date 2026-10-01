@@ -43,6 +43,9 @@ export const dayTick = (windowDays) => (x) => {
   return x % (windowDays > 30 ? 14 : 7) === 0 ? `${x} g` : '';
 };
 
+/** "128–338", or "su 1 serata" when a single night gives no range. */
+export const projRange = (p) => (p.low === p.high ? `su ${p.basedOn} ${p.basedOn === 1 ? 'serata' : 'serate'}` : `${fmt(p.low)}–${fmt(p.high)}`);
+
 export function Delta({ value }) {
   return <span className={deltaClass(value)}>{signed(value)}</span>;
 }
@@ -61,21 +64,21 @@ export function UpcomingTable({ upcoming, selectedKey, onSelect }) {
             </tr>
           </thead>
           <tbody>
-            {upcoming.map(({ ed, tracker: t, range, retarget }) => {
+            {upcoming.map(({ ed, series, tracker: t, range, retarget }) => {
               const compared = t.comparisons.length;
               return (
                 <tr key={ed.key} className={`nx-click ${selectedKey === ed.key ? 'nx-sel' : ''}`} onClick={() => onSelect(ed.key)}>
                   <td className="n">{dshort(ed.date)}</td>
-                  <td className="nx-name"><VenueDot venue={ed.venue} /> {ed.title}<span className="nx-subline">{ed.venue}</span></td>
+                  <td className="nx-name"><VenueDot venue={ed.venue} /> {ed.title}<span className="nx-subline">{ed.venue}{series && <> · serie <b>{series}</b></>}</span></td>
                   <td className="n">{t.currentDaysBefore} g</td>
                   <td className="n"><b>{fmt(t.currentRegistrations)}</b></td>
                   <td className="n">{compared ? fmt(t.avgAtSamePoint) : '–'}</td>
                   <td className="n">{compared && t.avgAtSamePoint ? <Delta value={pctChange(t.currentRegistrations, t.avgAtSamePoint)} /> : '–'}</td>
                   <td>{range && range[2] > 0
                     ? <RangeBar range={range} current={t.currentRegistrations} />
-                    : <span className="nx-tag">{compared ? 'a zero allo stesso punto' : 'prima edizione'}</span>}</td>
+                    : <span className="nx-tag">{compared ? 'a zero allo stesso punto' : series ? 'prima della serie' : 'prima edizione'}</span>}</td>
                   <td className="n">{t.projection
-                    ? <><b style={{ color: 'var(--nx-proj)' }}>~{fmt(t.projection.value)}</b> <span className="nx-flat">{fmt(t.projection.low)}–{fmt(t.projection.high)}</span></>
+                    ? <><b style={{ color: 'var(--nx-proj)' }}>~{fmt(t.projection.value)}</b> <span className="nx-flat">{projRange(t.projection)}</span></>
                     : '–'}</td>
                   <td className="n">{retarget ? fmt(retarget) : '–'}</td>
                 </tr>
@@ -97,7 +100,7 @@ export function UpcomingTable({ upcoming, selectedKey, onSelect }) {
 /** Tracker of one upcoming night: numbers + cumulative curve against past editions. */
 export function TrackerView({ item, onCompare, windowDays = 30 }) {
   if (!item) return null;
-  const { ed, tracker: t, retarget } = item;
+  const { ed, series, tracker: t, retarget } = item;
   const band = item.band.filter((p) => p.d <= windowDays);
   const compared = t.comparisons.length;
   const delta = compared && t.avgAtSamePoint ? pctChange(t.currentRegistrations, t.avgAtSamePoint) : null;
@@ -108,10 +111,10 @@ export function TrackerView({ item, onCompare, windowDays = 30 }) {
     <>
       <div className="nx-stats">
         <div className="nx-stat"><div className="v">{fmt(t.currentRegistrations)}</div><div className="l">registrati a {t.pointDaysBefore} giorni</div></div>
-        <div className="nx-stat"><div className="v">{compared ? fmt(t.avgAtSamePoint) : '–'}</div><div className="l">media allo stesso punto{compared ? ` · ${compared} ed.` : ''}</div></div>
+        <div className="nx-stat"><div className="v">{compared ? fmt(t.avgAtSamePoint) : '–'}</div><div className="l">media allo stesso punto{compared ? ` · ${compared} ${series ? (compared > 1 ? 'serate della serie' : 'serata della serie') : 'ed.'}` : ''}</div></div>
         <div className="nx-stat"><div className="v">{delta != null ? <Delta value={delta} /> : '–'}</div><div className="l">rispetto alla media</div></div>
         <div className="nx-stat"><div className="v" style={{ color: 'var(--nx-proj)' }}>{t.projection ? `~${fmt(t.projection.value)}` : '–'}</div>
-          <div className="l">{t.projection ? `proiezione · ${fmt(t.projection.low)}–${fmt(t.projection.high)}${t.projection.reliable ? '' : ' · incerta'}` : compared ? 'presto per stimare' : 'nessuna edizione da confrontare'}</div></div>
+          <div className="l">{t.projection ? `proiezione · ${projRange(t.projection)}${t.projection.reliable ? '' : ' · incerta'}` : compared ? 'presto per stimare' : series ? 'nessuna serata conclusa nella serie' : 'nessuna edizione da confrontare'}</div></div>
       </div>
       <LineChart
         xs={xs}
@@ -124,15 +127,16 @@ export function TrackerView({ item, onCompare, windowDays = 30 }) {
         yLabel="Registrazioni cumulative"
       />
       <div className="nx-legend">
-        <span><i style={{ background: 'var(--nx-now)' }} />questa edizione</span>
-        {compared > 0 && <><span><i style={{ background: 'var(--nx-band)', height: 8 }} />edizioni passate (min–max)</span><span><i style={{ borderTop: '1.5px dashed var(--nx-muted)', height: 0 }} />mediana</span></>}
+        <span><i style={{ background: 'var(--nx-now)' }} />questa {series ? 'serata' : 'edizione'}</span>
+        {compared > 0 && <><span><i style={{ background: 'var(--nx-band)', height: 8 }} />{series ? `serie ${series}` : 'edizioni passate'} (min–max)</span><span><i style={{ borderTop: '1.5px dashed var(--nx-muted)', height: 0 }} />mediana</span></>}
         {t.projection && <span><i style={{ borderTop: '2px dashed var(--nx-proj)', height: 0 }} />proiezione</span>}
       </div>
       <p className="nx-note">
+        {series && <>Confronto con la serie <b>{series}</b> invece che con il brand. </>}
         {outside && <>Mancano <b>{t.pointDaysBefore} giorni</b>: il punto di oggi è prima della finestra, allargala a 60 giorni per vederlo. </>}
-        {prev && <>Edizione precedente ({dshort(prev.eventDate)}): <b>{fmt(prev.atSamePointAdjusted)}</b> a questo punto, <b>{fmt(prev.totalFinal)}</b> a fine serata, conversione {pct(prev.finalConversion)}. </>}
+        {prev && <>{series ? 'Serata precedente della serie' : 'Edizione precedente'} ({dshort(prev.eventDate)}): <b>{fmt(prev.atSamePointAdjusted)}</b> a questo punto, <b>{fmt(prev.totalFinal)}</b> a fine serata, conversione {pct(prev.finalConversion)}. </>}
         {retarget > 0 && <><b>{fmt(retarget)}</b> persone già venute non sono ancora registrate. </>}
-        {onCompare && <button className="nx-link" onClick={() => onCompare(ed.key)}>Apri nel confronto con le edizioni passate</button>}
+        {onCompare && <button className="nx-link" onClick={() => onCompare(ed.key)}>Apri nel confronto con {series ? 'le altre serate della serie' : 'le edizioni passate'}</button>}
       </p>
     </>
   );

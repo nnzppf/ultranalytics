@@ -26,7 +26,7 @@ function LiveNight({ ed, live }) {
   const k = mode === 'reg' ? ['reg', 'regMin', 'regMed', 'regMax'] : ['ent', 'entMin', 'entMed', 'entMax'];
   const n = live.now;
   return (
-    <Panel span={8} title={`Stasera · ${ed.title}`} hint={`${ed.venue} · confronto con ${live.past} serate dello stesso brand alla stessa ora`}
+    <Panel span={8} title={`Stasera · ${ed.title}`} hint={`${ed.venue} · confronto con ${live.past} serate ${live.series ? `della serie ${live.series}` : 'dello stesso brand'} alla stessa ora`}
       actions={<Seg value={mode} onChange={setMode} label="Grafico" options={[['reg', 'registrati'], ['ent', 'entrati']]} />}>
       <div className="nx-stats">
         <div className="nx-stat"><div className="v">{fmt(n.reg)}</div><div className="l">registrati · <Delta value={pctChange(n.reg, n.regAvg)} /> vs {fmt(n.regAvg)}</div></div>

@@ -4,6 +4,7 @@ import { useUltraData } from './useUltraData';
 import {
   indexEditions, summaryKpis, brandTable, hourCounts, peopleStats, birthdaysNext,
   upcomingEvents, tonightEdition, liveNight, attendanceIndex, venueKey, VENUES,
+  indexSeries, withSeries, withoutSeries,
 } from './model';
 import { latestPurchase } from '../utils/eventTime';
 import { VenueDot } from './ui';
@@ -74,9 +75,13 @@ export default function NewApp({ user, logout, onOpenClassic }) {
   const kpis = useMemo(() => summaryKpis(records, eds, people), [records, eds, people]);
   const brandRows = useMemo(() => brandTable(eds), [eds]);
   const hours = useMemo(() => hourCounts(records), [records]);
-  const upcoming = useMemo(() => upcomingEvents(records, eds, now), [records, eds, now]);
+  const seriesIdx = useMemo(() => indexSeries(eds, data.config?.series), [eds, data.config]);
+  const upcoming = useMemo(() => upcomingEvents(records, eds, now, 60, seriesIdx), [records, eds, now, seriesIdx]);
   const tonight = useMemo(() => tonightEdition(eds, now), [eds, now]);
-  const live = useMemo(() => (tonight ? liveNight(tonight, eds, records, now) : null), [tonight, eds, records, now]);
+  const live = useMemo(() => (tonight ? liveNight(tonight, eds, records, now, seriesIdx) : null), [tonight, eds, records, now, seriesIdx]);
+  const { config, saveConfig } = data;
+  const saveSeries = useCallback((name, nights) => saveConfig(withSeries(config, name, nights, eds)), [config, saveConfig, eds]);
+  const deleteSeries = useCallback((name) => saveConfig(withoutSeries(config, name)), [config, saveConfig]);
   const birthdays = useMemo(() => birthdaysNext(data.utenti, now), [data.utenti, now]);
   const attendance = useMemo(() => attendanceIndex(records), [records]);
   const dataAsOf = useMemo(() => latestPurchase(data.records), [data.records]);
@@ -95,6 +100,7 @@ export default function NewApp({ user, logout, onOpenClassic }) {
     selectedEvent: section === 'eventi' ? route.param : null,
     seedKey: section === 'confronta' ? route.param : null,
     clearSeed, goTo, openClassic: onOpenClassic, windowDays, setWindowDays,
+    seriesIdx, saveSeries, deleteSeries,
   };
   const nav = (cls) => Object.entries(SECTIONS).map(([k, s]) => (
     <button key={k} className={cls} aria-current={section === k ? 'page' : undefined} onClick={() => goTo(k)}>

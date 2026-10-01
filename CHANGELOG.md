@@ -1,5 +1,15 @@
 # Changelog - Ultranalytics
 
+## 1 Ottobre 2026 (v6) — Serie di serate
+
+- **Serie**: gruppi di serate scelti a mano anche tra brand diversi (es. "Opening Too Late": l'opening Atipico del 18.10.25 e l'Opening Party del 9.10.26). Si creano da Confronta: serate sul tavolo → "Salva come serie"; l'elenco "Serie salvate" le rimette sul tavolo o le elimina
+- Salvate nel catalogo online (`appConfig/eventConfig.series`, nome export + giorno della serata): valgono per tutti gli account e restano anche dopo nuovi export o rinomine dei brand. Le serate restano anche nel loro brand
+- Una serata in vendita che fa parte di una serie si confronta con le altre serate della serie invece che col brand: prossimi eventi, tracker, proiezione, da ricontattare, serata in corso ora per ora e suggerimenti di Confronta
+- Il catalogo eventi della vista classica ora conserva i campi che non gestisce (le serie) quando salva
+- Proiezione con una sola serata di riferimento: "su 1 serata" invece di un intervallo vuoto; date sotto i nomi lunghi nella lista serate
+
+---
+
 ## 1 Ottobre 2026 (v5) — Finestra 14 / 30 / 60 giorni
 
 - Tracker e curve con selettore **14 g · 30 g · 60 g** (giorni prima dell'evento): in Stasera, Eventi e nelle viste Curve e Previsione di Confronta. La scelta si ricorda (`nx_window`, predefinito 30)

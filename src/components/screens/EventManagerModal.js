@@ -26,8 +26,10 @@ export default function EventManagerModal({ data, eventConfig, onSave, onClose }
   const [showExcluded, setShowExcluded] = useState(false);
   const [saving, setSaving] = useState(false);
 
-  // Build working config from eventConfig or empty
+  // Build working config from eventConfig or empty. Fields this editor doesn't
+  // handle (the new interface's series) are carried over untouched.
   const [localConfig, setLocalConfig] = useState(() => ({
+    ...(eventConfig || {}),
     brands: eventConfig?.brands || {},
     excludedBrands: eventConfig?.excludedBrands || [],
     renames: eventConfig?.renames || {},

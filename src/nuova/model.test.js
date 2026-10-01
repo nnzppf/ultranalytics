@@ -1,6 +1,7 @@
 import {
   indexEditions, brandTable, groupTable, peopleStats, curveByDays, curveByHours,
   editionMetrics, attendanceIndex, audienceOverlap, projectFromSet, tonightEdition, liveNight,
+  indexSeries, withSeries, withoutSeries, upcomingEvents, peersOf,
 } from './model';
 import { daysBeforeEvent } from '../utils/eventTime';
 
@@ -81,5 +82,60 @@ describe('model', () => {
     expect(tonight.key).toBe('GELSI|03.09.26');
     const view = liveNight(tonight, live, records.filter((r) => r.purchaseDate <= at), at);
     expect(view.now).toMatchObject({ reg: 3, regMed: 3 });
+  });
+});
+
+describe('series', () => {
+  const named = (rows, rawEventName) => rows.map((r) => ({ ...r, rawEventName }));
+  const op25 = new Date(2025, 9, 18), ati = new Date(2025, 10, 22), op26 = new Date(2026, 9, 9);
+  const recs = [
+    // last year's opening: 2 registrations by 10 Oct 14:00 (same point as today), 5 in the end
+    ...named(night('ATIPICO', '18.10.25', op25, 'TooLate', [[-240, '1', true], [-200, '2', true], [-100, '3', false], [20, '4', true], [22, '5', true]]), '18.10.25 TOO LATE OPENING PARTY - ATIPICO w/ IDRISS D'),
+    ...named(night('ATIPICO', '22.11.25', ati, 'TooLate', [[-30, '1', true], [20, '6', true]]), 'VENERD� 22 NOVEMBRE - ATIPICO'),
+    // this year's opening: its own brand, 3 registrations by 1 Oct 14:00
+    ...named(night('TOO LATE - OPENING PARTY', '09.10.26', op26, 'TooLate', [[-336, '7', false], [-240, '8', false], [-178, '9', false]]), 'TOO LATE - OPENING PARTY w/GERMANO VENTURA'),
+  ];
+  const eds = indexEditions(recs, NOW);
+  const config = { brands: { X: {} }, series: { 'Opening Too Late': [
+    { name: '18.10.25 TOO LATE OPENING PARTY - ATIPICO w/ IDRISS D', date: '2025-10-18' },
+    { name: 'TOO LATE - OPENING PARTY w/GERMANO VENTURA', date: '2026-10-09' },
+  ] } };
+
+  it('finds the nights of a series by export name and day, accents or not', () => {
+    const idx = indexSeries(eds, config.series);
+    expect(idx.list[0].eds.map((e) => e.key)).toEqual(['ATIPICO|18.10.25', 'TOO LATE - OPENING PARTY|09.10.26']);
+    expect(idx.ofEdition.get('ATIPICO|22.11.25')).toBeUndefined();
+    const accents = indexSeries(eds, { A: [{ name: 'VENERDÌ 22 NOVEMBRE - ATIPICO', date: '2025-11-22' }, { name: 'VENERDÌ 22 NOVEMBRE - ATIPICO', date: '2025-11-29' }] });
+    expect(accents.list[0]).toMatchObject({ hidden: 1 });
+    expect(accents.list[0].eds.map((e) => e.key)).toEqual(['ATIPICO|22.11.25']);
+  });
+
+  it('compares a night with its series instead of its brand', () => {
+    const plain = upcomingEvents(recs, eds, NOW, 60);
+    expect(plain[0]).toMatchObject({ series: null });
+    expect(plain[0].tracker.comparisons).toHaveLength(0);
+    const idx = indexSeries(eds, config.series);
+    const [item] = upcomingEvents(recs, eds, NOW, 60, idx);
+    expect(item.series).toBe('Opening Too Late');
+    expect(item.tracker.currentRegistrations).toBe(3);
+    expect(item.tracker.pointDaysBefore).toBe(8);
+    expect(item.tracker.comparisons).toHaveLength(1); // the Atipico of November stays out
+    expect(item.tracker.comparisons[0]).toMatchObject({ atSamePointAdjusted: 2, totalFinal: 5 });
+    expect(item.tracker.avgAtSamePoint).toBe(2);
+    expect(item.retarget).toBe(4); // came to last year's opening (phones 1, 2, 4, 5), not registered yet
+    expect(peersOf(eds[2], eds, idx).series).toBe('Opening Too Late');
+    expect(peersOf(eds[1], eds, idx)).toMatchObject({ series: null });
+  });
+
+  it('saves a series keeping nights hidden by the venue filter', () => {
+    const before = { ...config, series: { Opening: [{ name: 'OLD 2024', date: '2024-11-09' }, { name: 'VENERDÌ 22 NOVEMBRE - ATIPICO', date: '2025-11-22' }] } };
+    const after = withSeries(before, 'Opening', [eds[0], eds[2]], eds);
+    expect(after.brands).toEqual({ X: {} });
+    expect(after.series.Opening).toEqual([
+      { name: 'OLD 2024', date: '2024-11-09' },
+      { name: '18.10.25 TOO LATE OPENING PARTY - ATIPICO w/ IDRISS D', date: '2025-10-18' },
+      { name: 'TOO LATE - OPENING PARTY w/GERMANO VENTURA', date: '2026-10-09' },
+    ]);
+    expect(withoutSeries(after, 'Opening').series).toEqual({});
   });
 });

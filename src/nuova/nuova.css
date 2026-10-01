@@ -96,7 +96,7 @@ html.light .nx {
 .nx tr.nx-click { cursor: pointer; }
 .nx tr.nx-click:hover td, .nx tr.nx-sel td { background: var(--nx-panel-2); }
 .nx td.nx-name { font-weight: 500; max-width: 240px; overflow: hidden; text-overflow: ellipsis; }
-.nx td .nx-subline { display: block; font-size: 11.5px; color: var(--nx-faint); font-weight: 400; }
+.nx td .nx-subline, .nx-libitem .nx-subline, .nx-seriesitem .nx-subline { display: block; font-size: 11.5px; color: var(--nx-faint); font-weight: 400; }
 .nx-up { color: var(--nx-good); } .nx-down { color: var(--nx-bad); } .nx-flat, .nx-dim { color: var(--nx-muted); }
 .nx-tag { font-size: 11px; padding: 1px 6px; border-radius: 2px; border: 1px solid var(--nx-line); color: var(--nx-muted); }
 .nx-tag.warn { color: var(--nx-warn); border-color: currentColor; }
@@ -133,6 +133,12 @@ html.light .nx {
 .nx-libitem:hover { border-color: var(--nx-line); background: var(--nx-panel-2); }
 .nx-libitem.on { opacity: .45; }
 .nx-libitem .add { border: 1px solid var(--nx-line); background: none; border-radius: 3px; width: 28px; height: 28px; cursor: pointer; color: var(--nx-now); font-size: 16px; line-height: 1; }
+.nx-series { border-bottom: 1px solid var(--nx-line); padding-bottom: 8px; margin-bottom: 10px; display: grid; gap: 4px; }
+.nx-seriesitem { display: grid; grid-template-columns: 1fr auto; gap: 6px; align-items: center; padding: 5px 6px; border: 1px solid var(--nx-line); border-radius: 3px; font-size: 12.5px; background: var(--nx-panel-2); }
+.nx-seriesitem .acts { display: flex; gap: 8px; align-items: center; }
+.nx-saveseries { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-top: 10px; }
+.nx-saveseries .nx-input { flex: 1 1 200px; width: auto; }
+.nx-saveseries label { flex-basis: 100%; }
 .nx-drop { border: 1.5px dashed var(--nx-line); border-radius: 4px; padding: 10px; min-height: 64px; display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
 .nx-drop.over { border-color: var(--nx-now); background: var(--nx-panel-2); }
 .nx-pill { display: inline-flex; align-items: center; gap: 6px; border: 1px solid var(--nx-line); border-radius: 3px; padding: 4px 4px 4px 8px; font-size: 12.5px; background: var(--nx-panel-2); }
