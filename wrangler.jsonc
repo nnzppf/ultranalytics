@@ -1,0 +1,11 @@
+// Cloudflare Workers: serves the CRA build as static assets.
+// Deployed by Workers Builds on every push to main (build: npm run build, deploy: npx wrangler deploy).
+// REACT_APP_* variables must be set as *build* variables in the Cloudflare project settings.
+{
+  "name": "ultranalytics",
+  "compatibility_date": "2026-09-01",
+  "assets": {
+    "directory": "./build",
+    "not_found_handling": "single-page-application"
+  }
+}
