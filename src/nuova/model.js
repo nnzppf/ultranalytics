@@ -521,7 +521,7 @@ export function projectFromSet(target, refs, records, now = new Date()) {
   const reference = dataAsOf && dataAsOf < now ? dataAsOf : now;
   const comps = refs.filter((r) => r.over && r.date).map((r) => {
     const cutoff = samePointFor(r.date, reference, target.date);
-    return { ed: r, atSamePointAdjusted: r.rows.filter((x) => x.purchaseDate && x.purchaseDate <= cutoff).length, totalFinal: r.reg };
+    return { ed: r, eventDate: r.date, atSamePointAdjusted: r.rows.filter((x) => x.purchaseDate && x.purchaseDate <= cutoff).length, totalFinal: r.reg };
   });
   const summary = summarizeComparisons(comps, target.reg, false);
   return { reference, pointDaysBefore: Math.max(0, dayDiff(reference, target.date)), comps, ...summary };

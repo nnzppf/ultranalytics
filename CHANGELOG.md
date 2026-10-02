@@ -1,5 +1,15 @@
 # Changelog - Ultranalytics
 
+## 2 Ottobre 2026 (v8) — Proiezione più precisa
+
+- Nuovo metodo (`projectFinal` in `utils/comparisonEngine.js`, usato da tutte e due le viste, da Confronta e dalla verifica sulle serate passate): unisce il **ritmo** (registrati di oggi per il moltiplicatore mediano delle serate passate) e il **livello** (media dei registrati finali delle ultime 3). Il peso del ritmo è la radice della quota del finale che le serate passate avevano a quel punto: lontano dalla serata il ritmo moltiplica numeri piccoli e pesa poco. Mai sotto i registrati già presenti
+- Verificato sulle serate passate (ognuna stimata con i soli dati di allora), errore tipico: 14 giorni da ±54% a ±42%, 7 giorni da ±46% a ±37%, 3 giorni da ±40% a ±23%, 1 giorno da ±24% a ±17%; entro ±20% il giorno prima dal 48% al 62%. La tendenza a sottostimare sparisce a 3 e 1 giorno (a 7–14 giorni ora sovrastima di circa il 15%)
+- **Fascia probabile**: dagli errori passati a quella distanza, la fascia in cui sono finite 8 serate su 10 (tracker, prossimi eventi, previsione di Confronta)
+- Il tracker dice come è fatta la stima: ritmo, peso e livello
+- Con serate di riferimento a zero a quel punto la stima è il livello (prima nessuna stima)
+
+---
+
 ## 2 Ottobre 2026 (v7) — Confronto rivisto
 
 **Confronta**

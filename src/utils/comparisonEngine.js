@@ -53,46 +53,58 @@ function buildCumulativeCurve(rows) {
 }
 
 /**
- * Average, progress and projection from the comparable past editions.
- * Shared by the engine, the tracker screen (year filters) and the AI report, so
- * they always show the same numbers.
+ * Final registrations expected for a night on sale, from past nights at the same
+ * point: [{ atSamePointAdjusted, totalFinal, eventDate }].
  *
- * Projection: each past edition says "at this point I had X, I ended with Y";
- * the current count is scaled by the median of Y/X (robust to one odd edition),
- * with the interquartile range (min-max under 4 editions) as uncertainty.
- * It is flagged unreliable when, at this point, past editions typically had less
- * than 20% of their final registrations, or when fewer than 3 editions back it.
+ * Two estimates are blended:
+ * - the pace: the current count times the median of final / count-at-this-point;
+ * - the level: the average final of the last 3 nights.
+ * Far from the event past nights had only a small share of their final by now, so
+ * the pace multiplies a small, noisy number by 10-40: its weight is the square
+ * root of that typical share, and the level weighs the rest. Measured on past
+ * nights (Confronta > stime) this took the typical error from ±39% to ±23% three
+ * days out and from ±23% to ±16% the day before, without the old underestimate.
+ * The range blends the pace's interquartile range (min-max under 4 nights) with
+ * the lowest and highest of the last 3 finals. Never below the current count.
+ * Flagged unreliable when fewer than 3 nights back it or, at this point, past
+ * nights typically had less than 20% of their final.
+ */
+export function projectFinal(comps, current) {
+  const valid = comps.filter(c => c.totalFinal > 0);
+  if (!valid.length || !(current > 0)) return null;
+  const ratios = valid
+    .filter(c => c.atSamePointAdjusted > 0)
+    .map(c => c.totalFinal / c.atSamePointAdjusted)
+    .sort((a, b) => a - b);
+  const completion = quantile(valid.map(c => c.atSamePointAdjusted / c.totalFinal).sort((a, b) => a - b), 0.5);
+  const w = ratios.length ? Math.sqrt(Math.min(1, completion)) : 0;
+  const recent = [...valid].sort((a, b) => (a.eventDate || 0) - (b.eventDate || 0)).slice(-3).map(c => c.totalFinal);
+  const level = recent.reduce((s, v) => s + v, 0) / recent.length;
+  const ratio = (q, fallback) => (ratios.length ? (ratios.length >= 4 ? quantile(ratios, q) : fallback) : 0);
+  const blend = (r, lvl) => Math.max(current, Math.round(w * current * r + (1 - w) * lvl));
+  return {
+    value: blend(ratio(0.5, quantile(ratios, 0.5)), level),
+    low: blend(ratio(0.25, ratios[0]), Math.min(...recent)),
+    high: blend(ratio(0.75, ratios[ratios.length - 1]), Math.max(...recent)),
+    pace: ratios.length ? Math.round(current * quantile(ratios, 0.5)) : null,
+    level: Math.round(level),
+    paceWeight: Math.round(w * 100) / 100,
+    basedOn: valid.length,
+    typicalCompletion: completion,
+    reliable: valid.length >= 3 && completion >= 0.2,
+  };
+}
+
+/**
+ * Averages at the same point and projection (see projectFinal) from the past
+ * nights: the one place KPIs, chart, year filters and the AI report get them.
  */
 export function summarizeComparisons(comps, currentRegistrations, isEventPast) {
   const n = comps.length;
   const avgAtSamePoint = n ? Math.round(comps.reduce((s, c) => s + (c.atSamePointAdjusted || 0), 0) / n) : 0;
   const avgFinal = n ? Math.round(comps.reduce((s, c) => s + c.totalFinal, 0) / n) : 0;
   const progressPercent = avgFinal > 0 ? Math.round((currentRegistrations / avgFinal) * 100) : 0;
-
-  let projection = null;
-  if (!isEventPast && currentRegistrations > 0) {
-    const ratios = comps
-      .filter(c => c.atSamePointAdjusted > 0 && c.totalFinal > 0)
-      .map(c => c.totalFinal / c.atSamePointAdjusted)
-      .sort((a, b) => a - b);
-    if (ratios.length > 0) {
-      const lowRatio = ratios.length >= 4 ? quantile(ratios, 0.25) : ratios[0];
-      const highRatio = ratios.length >= 4 ? quantile(ratios, 0.75) : ratios[ratios.length - 1];
-      const completion = quantile(
-        comps.filter(c => c.totalFinal > 0).map(c => c.atSamePointAdjusted / c.totalFinal).sort((a, b) => a - b),
-        0.5
-      );
-      projection = {
-        value: Math.round(currentRegistrations * quantile(ratios, 0.5)),
-        low: Math.round(currentRegistrations * lowRatio),
-        high: Math.round(currentRegistrations * highRatio),
-        basedOn: ratios.length,
-        typicalCompletion: completion,
-        reliable: ratios.length >= 3 && completion >= 0.2,
-      };
-    }
-  }
-
+  const projection = isEventPast ? null : projectFinal(comps, currentRegistrations);
   return { avgAtSamePoint, avgFinal, progressPercent, projection };
 }
 

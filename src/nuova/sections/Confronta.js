@@ -1,10 +1,10 @@
 import { useState, useEffect, useMemo } from 'react';
-import { Panel, Seg, VenueDot, compareColor, Delta, WindowSeg, daysAxis, dayTick, NoteEditor, AccuracyNote } from '../ui';
+import { Panel, Seg, VenueDot, compareColor, Delta, WindowSeg, daysAxis, dayTick, NoteEditor, AccuracyNote, ProjectionNote } from '../ui';
 import { LineChart } from '../charts';
 import { editionMetrics, audienceOverlap, projectFromSet, lookupNight, median } from '../model';
 import {
   itemCurve, checkpointsFor, groupCatalog, groupMetrics, suggestionsFor, companionsFor,
-  expectedEntries, accuracyFor, audienceFlow, encodeTable, decodeTable,
+  expectedEntries, accuracyFor, likelyRange, audienceFlow, encodeTable, decodeTable,
 } from '../compare';
 import { fmt, pct, dshort, dmy, pctChange } from '../format';
 import Tabelle from './Tabelle';
@@ -338,6 +338,7 @@ function Forecast({ sel, records, now, upcoming, windowDays, setWindowDays, accu
   const proj = p.projection;
   const entries = expectedEntries(target.ed, refs.map((r) => r.ed), p.reference, target.ed.reg, proj);
   const acc = proj ? accuracyFor(accuracy, null, p.pointDaysBefore) : null;
+  const likely = proj ? likelyRange(accuracy, proj.value, p.pointDaysBefore) : null;
   const groupLines = sel.filter((it) => it.kind === 'group').map((it) => ({ key: it.key, color: it.color, label: it.title, width: 2, dashed: true, points: itemCurve(it, 'giorni', windowDays, now) }));
   const nightRefs = refs.filter((r) => sel.some((it) => it.kind === 'night' && it.key === r.ed.key));
   return (
@@ -348,7 +349,7 @@ function Forecast({ sel, records, now, upcoming, windowDays, setWindowDays, accu
         <div className="nx-stat"><div className="v">{fmt(p.avgAtSamePoint)}</div><div className="l">media delle serate scelte allo stesso punto</div></div>
         <div className="nx-stat"><div className="v">{p.avgAtSamePoint ? <Delta value={pctChange(target.ed.reg, p.avgAtSamePoint)} /> : '–'}</div><div className="l">rispetto alla media</div></div>
         <div className="nx-stat"><div className="v" style={{ color: 'var(--nx-proj)' }}>{proj ? `~${fmt(proj.value)}` : '–'}</div>
-          <div className="l">{proj ? `registrati a fine serata · ${proj.low === proj.high ? '' : `${fmt(proj.low)}–${fmt(proj.high)} · `}su ${proj.basedOn} ${proj.basedOn === 1 ? 'serata' : 'serate'}${proj.reliable ? '' : ' · incerta'}` : 'a questo punto le serate scelte erano a zero'}</div></div>
+          <div className="l">{proj ? `registrati a fine serata · ${likely ? `probabile ${fmt(likely.low)}–${fmt(likely.high)} · ` : proj.low === proj.high ? '' : `${fmt(proj.low)}–${fmt(proj.high)} · `}su ${proj.basedOn} ${proj.basedOn === 1 ? 'serata' : 'serate'}${proj.reliable ? '' : ' · incerta'}` : 'nessuna serata di riferimento con registrati'}</div></div>
         {entries && <div className="nx-stat"><div className="v">~{fmt(entries.value ?? entries.sofar)}</div><div className="l">{entries.value != null ? `ingressi stimati${entries.low !== entries.high ? ` · ${fmt(entries.low)}–${fmt(entries.high)}` : ''}` : 'ingressi dai registrati di oggi'}</div></div>}
         {brandView && brandView.value !== proj?.value && <div className="nx-stat"><div className="v nx-flat">~{fmt(brandView.value)}</div><div className="l">{tracked.series ? `stima del tracker (serie ${tracked.series})` : 'stima con le sole edizioni del brand'}</div></div>}
       </div>
@@ -384,7 +385,8 @@ function Forecast({ sel, records, now, upcoming, windowDays, setWindowDays, accu
         </table>
       </div>
       <p className="nx-note">
-        Ogni serata di riferimento dice "a questo punto ne avevo X, ho chiuso a Y": la stima applica la mediana dei moltiplicatori ai registrati di oggi; l'intervallo va dal più basso al più alto (dal primo al terzo quartile con 4 serate o più).{' '}
+        Ogni serata di riferimento dice "a questo punto ne avevo X, ho chiuso a Y". La stima unisce il ritmo (registrati di oggi per il moltiplicatore mediano) e il livello (media delle ultime 3 serate): lontano dalla serata pesa di più il livello, perché il ritmo moltiplica numeri piccoli.{' '}
+        <ProjectionNote p={proj} likely={likely} />
         {acc && <AccuracyNote accuracy={acc} />}
         {entries && <>Ingressi: chi si è registrato finora entra di solito al {fmt(entries.early, 0)}%, chi si registra da qui in poi al {fmt(entries.late, 0)}%.</>}
       </p>

@@ -1,4 +1,4 @@
-import { computeWhereAreWeNow, summarizeComparisons, computeEditionUserLists } from './comparisonEngine';
+import { computeWhereAreWeNow, summarizeComparisons, computeEditionUserLists, projectFinal } from './comparisonEngine';
 import { daysBeforeEvent, isEditionOver, conversionOf } from './eventTime';
 
 // Registration pattern of an edition, in hours from the event-day midnight, with
@@ -80,7 +80,8 @@ describe('computeWhereAreWeNow', () => {
     const rows = [...pastEditions.flat(), ...edition('B', 'now', target, 300, -6)];
     const r = computeWhereAreWeNow(rows, 'B', 'now', null, { now: at(target, -6) });
     expect(r.pointDaysBefore).toBe(1);
-    expect(r.projection.value).toBe(300);
+    // pace 120 × 2.5 and level of the last 3 (250, 300, 350): both ~300 (shares are rounded per edition)
+    expect(Math.abs(r.projection.value - 300)).toBeLessThanOrEqual(2);
     expect(r.projection.basedOn).toBe(4);
     expect(r.projection.reliable).toBe(true); // 40% of final by then
     const early = computeWhereAreWeNow([...pastEditions.flat(), ...edition('B', 'now', target, 300, -72)], 'B', 'now', null, { now: at(target, -72) });
@@ -134,5 +135,26 @@ describe('summarizeComparisons', () => {
 
   it('does not project once the event is over', () => {
     expect(summarizeComparisons([{ atSamePointAdjusted: 100, totalFinal: 100 }], 90, true).projection).toBeNull();
+  });
+});
+
+describe('projectFinal', () => {
+  const night = (at, final, d) => ({ atSamePointAdjusted: at, totalFinal: final, eventDate: new Date(2026, 0, d) });
+
+  it('far from the event leans on the level of the last nights, not on the pace', () => {
+    // 5% of the final known by now: pace 30 × 20 = 600, level (200+300+400)/3 = 300, pace weight √0.05
+    const p = projectFinal([night(10, 200, 1), night(10, 300, 8), night(20, 400, 15)], 30);
+    expect(p).toMatchObject({ value: 367, low: 289, high: 512, pace: 600, level: 300, paceWeight: 0.22, basedOn: 3, reliable: false });
+  });
+
+  it('close to the event follows the pace', () => {
+    const p = projectFinal([night(250, 300, 1), night(250, 300, 8), night(250, 300, 15)], 200);
+    expect(p.paceWeight).toBe(0.91);
+    expect(p.value).toBe(Math.round(0.9129 * 240 + 0.0871 * 300));
+  });
+
+  it('never projects below the registrations already in', () => {
+    expect(projectFinal([night(0, 50, 1)], 80).value).toBe(80);
+    expect(projectFinal([night(0, 50, 1)], 0)).toBeNull();
   });
 });

@@ -77,7 +77,7 @@ function Accuracy({ accuracy }) {
           </table>
         </div>
       )}
-      <p className="nx-note">Errore tipico: metà delle serate finisce entro questo scarto dalla stima fatta quei giorni prima (a fine giornata). Più ci si avvicina alla serata, più la stima è precisa. Brand e serie con almeno 3 serate stimabili.</p>
+      <p className="nx-note">La stima unisce il ritmo (registrati di quel momento per il moltiplicatore delle serate passate) e il livello (media delle ultime 3 serate), con più peso al livello lontano dalla serata. Errore tipico: metà delle serate finisce entro questo scarto dalla stima fatta quei giorni prima (a fine giornata). Brand e serie con almeno 3 serate stimabili.</p>
     </Panel>
   );
 }

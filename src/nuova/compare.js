@@ -5,6 +5,7 @@
  * Pure functions on the nights built by model.indexEditions.
  */
 import { dayDiff, samePointFor } from '../utils/eventTime';
+import { projectFinal } from '../utils/comparisonEngine';
 import { median, curveByDays, curveByHours, peersOf, personKey, editionMetrics } from './model';
 
 const DAY = 24 * 3600000;
@@ -225,8 +226,11 @@ export const ACCURACY_POINTS = [14, 7, 3, 1];
 /**
  * How far the tracker's projection was from the final count on past nights. For
  * every concluded night and every point (14, 7, 3, 1 days before, end of day) the
- * projection is redone with only the nights concluded before it, as it was then.
- * typical = median absolute error in %; within20 = share of nights within ±20%.
+ * projection (projectFinal, the tracker's own) is redone with only the nights of the
+ * same brand or series concluded before it, as it was then.
+ * typical = median absolute error in %; within20 = share of nights within ±20%;
+ * bias = median error (negative: the projection was low); q10/q90 = error deciles,
+ * which turn a projection into the range 8 nights out of 10 ended in.
  */
 export function projectionAccuracy(eds, seriesIdx, points = ACCURACY_POINTS) {
   const done = eds.filter((e) => e.over && e.date);
@@ -244,21 +248,28 @@ export function projectionAccuracy(eds, seriesIdx, points = ACCURACY_POINTS) {
     if (!prior.length) continue;
     for (const d of points) {
       const cur = cum.get(e.key)[d];
-      if (!cur) continue;
-      const ratios = prior.map((p) => {
-        const at = cum.get(p.key)?.[d];
-        return at > 0 ? p.reg / at : null;
-      }).filter((x) => x != null);
-      if (!ratios.length) continue;
-      samples.push({ group: peers.series || e.brand, d, err: (cur * median(ratios) - e.reg) / e.reg });
+      const proj = projectFinal(prior.map((p) => ({ atSamePointAdjusted: cum.get(p.key)[d], totalFinal: p.reg, eventDate: p.date })), cur);
+      if (!proj) continue;
+      samples.push({ group: peers.series || e.brand, d, err: (proj.value - e.reg) / e.reg });
     }
   }
-  const summarize = (list) => ({
-    n: list.length,
-    typical: list.length ? Math.round(100 * median(list.map((s) => Math.abs(s.err)))) : null,
-    within20: list.length ? Math.round((100 * list.filter((s) => Math.abs(s.err) <= 0.2).length) / list.length) : null,
-    bias: list.length ? Math.round(100 * median(list.map((s) => s.err))) : null,
-  });
+  const q = (sorted, p) => {
+    const pos = (sorted.length - 1) * p;
+    const lo = Math.floor(pos), hi = Math.ceil(pos);
+    return sorted[lo] + (sorted[hi] - sorted[lo]) * (pos - lo);
+  };
+  const summarize = (list) => {
+    if (!list.length) return { n: 0, typical: null, within20: null, bias: null, q10: null, q90: null };
+    const errs = list.map((s) => s.err).sort((x, y) => x - y);
+    return {
+      n: list.length,
+      typical: Math.round(100 * median(errs.map(Math.abs))),
+      within20: Math.round((100 * errs.filter((x) => Math.abs(x) <= 0.2).length) / errs.length),
+      bias: Math.round(100 * median(errs)),
+      q10: q(errs, 0.1),
+      q90: q(errs, 0.9),
+    };
+  };
   const overall = points.map((d) => ({ d, ...summarize(samples.filter((s) => s.d === d)) }));
   const byGroup = new Map();
   for (const s of samples) {
@@ -267,6 +278,19 @@ export function projectionAccuracy(eds, seriesIdx, points = ACCURACY_POINTS) {
   }
   const groups = [...byGroup].map(([group, list]) => ({ group, points: points.map((d) => ({ d, ...summarize(list.filter((s) => s.d === d)) })) }));
   return { overall, groups, points };
+}
+
+/**
+ * Range 8 past nights out of 10 ended in, for a projection made `daysBefore` days
+ * out: the projection corrected by the errors' first and last decile (all nights,
+ * at the nearest point with at least 10 cases).
+ */
+export function likelyRange(acc, value, daysBefore) {
+  if (!acc || !(value > 0)) return null;
+  const pts = acc.overall.filter((p) => p.n >= 10);
+  if (!pts.length) return null;
+  const p = pts.reduce((best, x) => (Math.abs(x.d - daysBefore) < Math.abs(best.d - daysBefore) ? x : best), pts[0]);
+  return { low: Math.round(value / (1 + p.q90)), high: Math.round(value / Math.max(0.1, 1 + p.q10)), d: p.d, n: p.n };
 }
 
 /** Accuracy to show next to a projection made `daysBefore` days out: the group's own when it has 3+ cases, else all nights. */
@@ -288,6 +312,7 @@ export function enrichUpcoming(items, eds, seriesIdx, acc) {
       ...u,
       entries: expectedEntries(u.ed, refs, t.referenceTime, t.currentRegistrations, t.projection),
       accuracy: t.projection ? accuracyFor(acc, u.series || u.ed.brand, t.pointDaysBefore) : null,
+      likely: t.projection ? likelyRange(acc, t.projection.value, t.pointDaysBefore) : null,
     };
   });
 }

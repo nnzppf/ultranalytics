@@ -65,7 +65,7 @@ export function UpcomingTable({ upcoming, selectedKey, onSelect }) {
             </tr>
           </thead>
           <tbody>
-            {upcoming.map(({ ed, series, manual, tracker: t, range, retarget }) => {
+            {upcoming.map(({ ed, series, manual, tracker: t, range, retarget, likely }) => {
               const compared = t.comparisons.length;
               return (
                 <tr key={ed.key} className={`nx-click ${selectedKey === ed.key ? 'nx-sel' : ''}`} onClick={() => onSelect(ed.key)}>
@@ -79,7 +79,7 @@ export function UpcomingTable({ upcoming, selectedKey, onSelect }) {
                     ? <RangeBar range={range} current={t.currentRegistrations} />
                     : <span className="nx-tag">{compared ? 'a zero allo stesso punto' : series ? 'prima della serie' : 'prima edizione'}</span>}</td>
                   <td className="n">{t.projection
-                    ? <><b style={{ color: 'var(--nx-proj)' }}>~{fmt(t.projection.value)}</b> <span className="nx-flat">{projRange(t.projection)}</span></>
+                    ? <><b style={{ color: 'var(--nx-proj)' }}>~{fmt(t.projection.value)}</b> <span className="nx-flat">{likely ? `${fmt(likely.low)}–${fmt(likely.high)}` : projRange(t.projection)}</span></>
                     : '–'}</td>
                   <td className="n">{retarget ? fmt(retarget) : '–'}</td>
                 </tr>
@@ -168,6 +168,17 @@ function CountEditor({ item, onSave }) {
   );
 }
 
+/** How the projection was made: pace and level, and the range most past nights ended in. */
+export function ProjectionNote({ p, likely }) {
+  if (!p) return null;
+  return (
+    <>
+      Stima: {p.pace != null ? <>ritmo di oggi ~{fmt(p.pace)} (peso {fmt(p.paceWeight * 100, 0)}%) e </> : null}livello delle ultime serate ~{fmt(p.level)}.{' '}
+      {likely && <>8 serate su 10 sono finite tra <b>{fmt(likely.low)}</b> e <b>{fmt(likely.high)}</b> rispetto a una stima così. </>}
+    </>
+  );
+}
+
 /** "Di solito a 7 giorni la stima sbaglia del ±18% (12 serate di questo brand)". */
 export function AccuracyNote({ accuracy, series }) {
   if (!accuracy) return null;
@@ -178,7 +189,7 @@ export function AccuracyNote({ accuracy, series }) {
 /** Tracker of one upcoming night: numbers + cumulative curve against past editions. */
 export function TrackerView({ item, onCompare, windowDays = 30, onSaveCount, note, onSaveNote }) {
   if (!item) return null;
-  const { ed, series, tracker: t, retarget, entries, accuracy } = item;
+  const { ed, series, tracker: t, retarget, entries, accuracy, likely } = item;
   const band = item.band.filter((p) => p.d <= windowDays);
   const compared = t.comparisons.length;
   const delta = compared && t.avgAtSamePoint ? pctChange(t.currentRegistrations, t.avgAtSamePoint) : null;
@@ -193,7 +204,7 @@ export function TrackerView({ item, onCompare, windowDays = 30, onSaveCount, not
         <div className="nx-stat"><div className="v">{compared ? fmt(t.avgAtSamePoint) : '–'}</div><div className="l">media allo stesso punto{compared ? ` · ${compared} ${series ? (compared > 1 ? 'serate della serie' : 'serata della serie') : 'ed.'}` : ''}</div></div>
         <div className="nx-stat"><div className="v">{delta != null ? <Delta value={delta} /> : '–'}</div><div className="l">rispetto alla media</div></div>
         <div className="nx-stat"><div className="v" style={{ color: 'var(--nx-proj)' }}>{t.projection ? `~${fmt(t.projection.value)}` : '–'}</div>
-          <div className="l">{t.projection ? `registrati a fine serata · ${projRange(t.projection)}${t.projection.reliable ? '' : ' · incerta'}` : compared ? 'presto per stimare' : series ? 'nessuna serata conclusa nella serie' : 'nessuna edizione da confrontare'}</div></div>
+          <div className="l">{t.projection ? `registrati a fine serata · ${likely ? `probabile ${fmt(likely.low)}–${fmt(likely.high)}` : projRange(t.projection)}${t.projection.reliable ? '' : ' · incerta'}` : compared ? 'presto per stimare' : series ? 'nessuna serata conclusa nella serie' : 'nessuna edizione da confrontare'}</div></div>
         {entries && (
           <div className="nx-stat"><div className="v">{entries.value != null ? `~${fmt(entries.value)}` : `~${fmt(entries.sofar)}`}</div>
             <div className="l">{entries.value != null ? `ingressi stimati${entries.low !== entries.high ? ` · ${fmt(entries.low)}–${fmt(entries.high)}` : ''}` : 'ingressi dai registrati di oggi'}</div></div>
@@ -220,6 +231,7 @@ export function TrackerView({ item, onCompare, windowDays = 30, onSaveCount, not
         {series && <>Confronto con la serie <b>{series}</b> invece che con il brand. </>}
         {outside && <>Mancano <b>{t.pointDaysBefore} giorni</b>: il punto di oggi è prima della finestra, allargala a 60 giorni per vederlo. </>}
         {prev && <>{series ? 'Serata precedente della serie' : 'Edizione precedente'} ({dshort(prev.eventDate)}): <b>{fmt(prev.atSamePointAdjusted)}</b> a questo punto, <b>{fmt(prev.totalFinal)}</b> a fine serata, conversione {pct(prev.finalConversion)}. </>}
+        {t.projection && <ProjectionNote p={t.projection} likely={likely} />}
         {t.projection && <AccuracyNote accuracy={accuracy} series={series} />}
         {entries && <>Ingressi: chi si è registrato finora entra di solito al {fmt(entries.early, 0)}%, chi si registra da qui in poi al {fmt(entries.late, 0)}% ({entries.basedOn} {entries.basedOn === 1 ? 'serata' : 'serate'} con ingressi). </>}
         {retarget > 0 && <><b>{fmt(retarget)}</b> persone già venute non sono ancora registrate. </>}

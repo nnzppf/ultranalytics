@@ -72,7 +72,8 @@ describe('model', () => {
     expect(p.comps).toHaveLength(2);
     expect(p.pointDaysBefore).toBe(9);
     expect(p.comps.every((c) => c.atSamePointAdjusted === 0)).toBe(true); // nobody 9 days before
-    expect(p.projection).toBeNull();
+    // No pace to go on: the projection is the level of the reference nights (4 and 5)
+    expect(p.projection).toMatchObject({ pace: null, level: 5, value: 5 });
   });
 
   it('finds the night in progress and compares it hour by hour', () => {
