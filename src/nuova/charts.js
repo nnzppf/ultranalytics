@@ -46,7 +46,7 @@ export function LineChart({ series, band, projection, xs, xLabel, xTitle, yForma
     for (const x of xs) if (Math.abs(X(x) - px) < Math.abs(X(best) - px)) best = x;
     setHover(best);
   };
-  const rows = hover == null ? [] : series.map((s) => ({ s, p: s.points.find((p) => p.x === hover) })).filter((r) => r.p && r.p.y != null);
+  const rows = hover == null ? [] : series.filter((s) => s.tip !== false).map((s) => ({ s, p: s.points.find((p) => p.x === hover) })).filter((r) => r.p && r.p.y != null);
   const first = rows.length && rows[0].s === series[0] ? rows[0].p.y : null;
   const bandAt = hover == null ? null : bandPts.find((p) => p.x === hover);
   const left = hover == null ? 0 : (X(hover) / W) * 100;
@@ -86,8 +86,8 @@ export function LineChart({ series, band, projection, xs, xLabel, xTitle, yForma
           return (
             <g key={s.key}>
               {range.length > 1 && <polygon fill={s.color} opacity=".12" points={`${range.map((p) => `${X(p.x)},${Y(p.max)}`).join(' ')} ${[...range].reverse().map((p) => `${X(p.x)},${Y(p.min)}`).join(' ')}`} />}
-              {pts.length > 1 && <polyline fill="none" stroke={s.color} strokeWidth={s.width || 2} strokeLinejoin="round" strokeDasharray={s.dashed ? '6 3' : undefined} points={pts.map((p) => `${X(p.x)},${Y(p.y)}`).join(' ')} />}
-              <circle cx={X(last.x)} cy={Y(last.y)} r={s.width > 2 ? 3.5 : 2.5} fill={s.color} />
+              {pts.length > 1 && <polyline fill="none" stroke={s.color} strokeOpacity={s.opacity ?? 1} strokeWidth={s.width || 2} strokeLinejoin="round" strokeDasharray={s.dashed ? '6 3' : undefined} points={pts.map((p) => `${X(p.x)},${Y(p.y)}`).join(' ')} />}
+              {s.tip !== false && <circle cx={X(last.x)} cy={Y(last.y)} r={s.width > 2 ? 3.5 : 2.5} fill={s.color} />}
             </g>
           );
         })}
@@ -122,6 +122,81 @@ export function LineChart({ series, band, projection, xs, xLabel, xTitle, yForma
         </div>
       )}
     </div>
+  );
+}
+
+/**
+ * Each night as a dot along one axis, one row per set: the spread, the median
+ * (tick) and the outliers at a glance. Tapping a dot calls onPick(key).
+ * rows: [{ id, label, color, points: [{ key, v, title }] }]
+ */
+export function StripPlot({ rows, format = (v) => fmt(v), onPick, picked, width = 760 }) {
+  const L = 12, R = 12, T = 8, rowH = 46, B = 22;
+  const h = T + rows.length * rowH + B;
+  const vals = rows.flatMap((r) => r.points.map((p) => p.v)).filter((v) => v != null);
+  const top = niceTop(Math.max(1, ...vals));
+  const X = (v) => L + (v / top) * (width - L - R);
+  const ticks = [0, top / 4, top / 2, (3 * top) / 4, top];
+  return (
+    <svg viewBox={`0 0 ${width} ${h}`} role="img" aria-label="Serate a confronto">
+      {ticks.map((t) => (
+        <g key={t}>
+          <line x1={X(t)} x2={X(t)} y1={T} y2={h - B} stroke="var(--nx-line)" />
+          <text x={X(t)} y={h - 6} textAnchor={t === 0 ? 'start' : t === top ? 'end' : 'middle'} fontSize="10" fill="var(--nx-faint)" fontFamily="var(--nx-mono)">{format(t)}</text>
+        </g>
+      ))}
+      {rows.map((r, i) => {
+        const y = T + i * rowH + rowH / 2;
+        const sorted = r.points.map((p) => p.v).filter((v) => v != null).sort((a, b) => a - b);
+        const med = sorted.length ? sorted[Math.floor((sorted.length - 1) / 2)] / 2 + sorted[Math.ceil((sorted.length - 1) / 2)] / 2 : null;
+        return (
+          <g key={r.id}>
+            <text x={L} y={y - 14} fontSize="10.5" fill={r.color} fontFamily="var(--nx-mono)">{r.label}</text>
+            <line x1={L} x2={width - R} y1={y} y2={y} stroke="var(--nx-line)" strokeDasharray="2 3" />
+            {med != null && <line x1={X(med)} x2={X(med)} y1={y - 12} y2={y + 12} stroke={r.color} strokeWidth="2" />}
+            {r.points.map((p, j) => (p.v == null ? null : (
+              <circle key={p.key} cx={X(p.v)} cy={y + ((j % 3) - 1) * 5} r={picked === p.key ? 7 : 5} fill={r.color} fillOpacity={picked && picked !== p.key ? 0.35 : 0.8}
+                stroke={picked === p.key ? 'var(--nx-fg)' : 'var(--nx-panel)'} strokeWidth="1.5" style={{ cursor: onPick ? 'pointer' : undefined }}
+                onClick={onPick ? () => onPick(p.key) : undefined}>
+                <title>{`${p.title}: ${format(p.v)}`}</title>
+              </circle>
+            )))}
+          </g>
+        );
+      })}
+    </svg>
+  );
+}
+
+/** Nights over time (x = date, y = value), colored by set; tapping a dot calls onPick(key). */
+export function TimeDots({ points, format = (v) => fmt(v), onPick, picked, width = 760, height = 200 }) {
+  const L = 40, R = 12, T = 10, B = 24;
+  const dated = points.filter((p) => p.date && p.v != null);
+  if (!dated.length) return null;
+  const t0 = Math.min(...dated.map((p) => p.date.getTime())), t1 = Math.max(...dated.map((p) => p.date.getTime()));
+  const span = Math.max(t1 - t0, 30 * 864e5);
+  const top = niceTop(Math.max(1, ...dated.map((p) => p.v)));
+  const X = (d) => L + ((d.getTime() - t0) / span) * (width - L - R);
+  const Y = (v) => T + (1 - v / top) * (height - T - B);
+  const months = [];
+  for (let d = new Date(new Date(t0).getFullYear(), new Date(t0).getMonth() + 1, 1); d.getTime() <= t0 + span; d = new Date(d.getFullYear(), d.getMonth() + 1, 1)) months.push(d);
+  const step = Math.max(1, Math.ceil(months.length / 8));
+  return (
+    <svg viewBox={`0 0 ${width} ${height}`} role="img" aria-label="Serate nel tempo">
+      <Grid top={top} W={width} h={height} L={L} R={R} T={T} B={B} />
+      {months.filter((_, i) => i % step === 0).map((d) => (
+        <text key={d.getTime()} x={X(d)} y={height - 7} fontSize="10" fill="var(--nx-faint)" fontFamily="var(--nx-mono)" textAnchor="middle">
+          {d.toLocaleDateString('it', { month: 'short' })}{d.getMonth() === 0 || d === months[0] ? ` ${String(d.getFullYear()).slice(2)}` : ''}
+        </text>
+      ))}
+      {dated.map((p) => (
+        <circle key={p.key} cx={X(p.date)} cy={Y(p.v)} r={picked === (p.id ?? p.key) ? 6.5 : 4.5} fill={p.color} fillOpacity={picked && picked !== (p.id ?? p.key) ? 0.35 : 0.85}
+          stroke={picked === (p.id ?? p.key) ? 'var(--nx-fg)' : 'var(--nx-panel)'} strokeWidth="1.5" style={{ cursor: onPick ? 'pointer' : undefined }}
+          onClick={onPick ? () => onPick(p.id ?? p.key) : undefined}>
+          <title>{`${p.title}: ${format(p.v)}`}</title>
+        </circle>
+      ))}
+    </svg>
   );
 }
 

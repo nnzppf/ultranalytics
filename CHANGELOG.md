@@ -1,5 +1,21 @@
 # Changelog - Ultranalytics
 
+## 6 Ottobre 2026 (v9) — Confronta: A contro B
+
+Il tavolo di confronto è sostituito da due insiemi, A e B (`sections/Insiemi.js`, logica in `nuova/sets.js` con test).
+- **Elementi** da trascinare dentro e fuori: format, serata in una data, locale, genere, giorno della settimana, mese, stagione, categoria, serie. Stesso tipo si somma (Atipico o Ultravivid), tipi diversi si restringono (TooLate e sabato), le serate singole si aggiungono sempre; ogni serata si può togliere a mano. Una frase dice cosa c'è dentro ("Serate di ATIPICO, a TooLate, di sabato · 9 serate concluse")
+- Trascinamento con il mouse da tutto l'elemento, con il dito dalla maniglia ⠿; da A a B per spostare, fuori per togliere. Su telefono e tablet "+ aggiungi" apre gli elementi dal basso: un tocco e l'elemento entra in quell'insieme
+- **In breve**: cosa cambia tra A e B in frasi (registrati, ingressi, conversione, ultimo minuto, apertura, età, fedeltà, gente nuova, ritorni, pubblico in comune) e una tabella A/B con barra e differenza
+- **Curve**: serata tipica (mediana) di A e B con fascia, singole serate in trasparenza, serate in vendita tratteggiate; giorni all'evento, dall'apertura, % del finale, ore della serata; tappe in tabella
+- **Serate**: ogni serata come un punto (registrati, ingressi o conversione) e nel tempo; tocchi un punto, vedi la serata, la nota, e la togli dall'insieme
+- **Pubblico**: persone solo in A, in tutti e due, solo in B (entrati o registrati), chi sono, dove vanno dopo
+- **Previsione**: una serata in vendita in A stimata con le serate di B
+- **Domande pronte**: il prossimo evento contro le sue edizioni, venerdì contro sabato, stagione contro stagione, commerciale contro elettronica, locale contro locale, young contro standard
+- Copia link del confronto, salva come serie un insieme di serate, scambia A e B
+- "Classifiche e stime" (generi, locali, brand, affidabilità delle stime, promoter) resta nella seconda scheda
+
+---
+
 ## 6 Ottobre 2026 — Dati al 6/10 e correzione della proiezione
 
 - Caricati gli export dal 1/9 al 6/10 (1.582 biglietti, 379 utenti): 128 registrazioni nuove, totale 43.405, nessun doppione, ingressi invariati

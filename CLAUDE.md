@@ -87,6 +87,7 @@ Altri campi del catalogo (nuova interfaccia, salvati campo per campo con `patchE
 - `dates: { nightNameKey: { name, date: "YYYY-MM-DD" } }` — data evento impostata a mano, applicata da `applyDates` (in `applyEventConfig`, vale per entrambe le viste) e vince su quella trovata all'import
 - `notes: { nightId: { text, by, at } }` e `counts: { nightId: { value, by, at } }` — note sulle serate e numero letto sul portale (usato dal tracker finché non arriva un export più recente). `nightId` = giorno + `nightNameKey` del nome nell'export (`model.js`)
 I calcoli del confronto (curve per asse, gruppi, suggerimenti, ingressi stimati, affidabilità della proiezione, flussi del pubblico, link del tavolo) sono in `nuova/compare.js`, con test.
+La scheda Confronta è "A contro B" (`sections/Insiemi.js`): due insiemi di elementi (format, serata, locale, genere, giorno, mese, stagione, categoria, serie); la logica degli insiemi (stesso tipo = o, tipi diversi = e, serate singole sempre aggiunte, esclusioni), il confronto, le frasi e il link sono in `nuova/sets.js`, con test. Insiemi salvati in `localStorage.nx_insiemi_v1`.
 Caricato al boot con `Promise.all([loadEventConfig(), hasStoredData()])`, applicato ai record tramite `applyEventConfig()` in App.js.
 
 ### Live Tracker (comparisonEngine.js)
