@@ -64,16 +64,21 @@ function buildCumulativeCurve(rows) {
  * root of that typical share, and the level weighs the rest. Measured on past
  * nights (Confronta > stime) this took the typical error from ±39% to ±23% three
  * days out and from ±23% to ±16% the day before, without the old underestimate.
+ * A night counts for the pace only if it had at least 5 registrations at this point:
+ * a ratio from 3 people is noise (Je Suis Mimì 2026: 125 now against 3 last year
+ * gave ×324 and a projection of 3,000+); with no such night the level alone is used.
  * The range blends the pace's interquartile range (min-max under 4 nights) with
  * the lowest and highest of the last 3 finals. Never below the current count.
  * Flagged unreliable when fewer than 3 nights back it or, at this point, past
  * nights typically had less than 20% of their final.
  */
+const MIN_AT_POINT = 5;
+
 export function projectFinal(comps, current) {
   const valid = comps.filter(c => c.totalFinal > 0);
   if (!valid.length || !(current > 0)) return null;
   const ratios = valid
-    .filter(c => c.atSamePointAdjusted > 0)
+    .filter(c => c.atSamePointAdjusted >= MIN_AT_POINT)
     .map(c => c.totalFinal / c.atSamePointAdjusted)
     .sort((a, b) => a - b);
   const completion = quantile(valid.map(c => c.atSamePointAdjusted / c.totalFinal).sort((a, b) => a - b), 0.5);

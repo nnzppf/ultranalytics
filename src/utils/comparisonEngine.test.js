@@ -153,6 +153,12 @@ describe('projectFinal', () => {
     expect(p.value).toBe(Math.round(0.9129 * 240 + 0.0871 * 300));
   });
 
+  it('takes no pace from nights with a handful of registrations at this point', () => {
+    // Last year 3 registered by now (×324): the level alone, not 125 × 324
+    const p = projectFinal([night(3, 971, 1)], 125);
+    expect(p).toMatchObject({ value: 971, pace: null, paceWeight: 0 });
+  });
+
   it('never projects below the registrations already in', () => {
     expect(projectFinal([night(0, 50, 1)], 80).value).toBe(80);
     expect(projectFinal([night(0, 50, 1)], 0)).toBeNull();

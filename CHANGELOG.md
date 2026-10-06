@@ -1,5 +1,12 @@
 # Changelog - Ultranalytics
 
+## 6 Ottobre 2026 — Dati al 6/10 e correzione della proiezione
+
+- Caricati gli export dal 1/9 al 6/10 (1.582 biglietti, 379 utenti): 128 registrazioni nuove, totale 43.405, nessun doppione, ingressi invariati
+- Proiezione: una serata passata conta per il ritmo solo se a quel punto aveva almeno 5 registrati. Je Suis Mimì (125 oggi contro 3 al 31/12 dell'anno scorso, ×324) era stimata a ~3.166; ora ~971 (livello). Sulle serate passate gli errori non cambiano
+
+---
+
 ## 2 Ottobre 2026 (v8) — Proiezione più precisa
 
 - Nuovo metodo (`projectFinal` in `utils/comparisonEngine.js`, usato da tutte e due le viste, da Confronta e dalla verifica sulle serate passate): unisce il **ritmo** (registrati di oggi per il moltiplicatore mediano delle serate passate) e il **livello** (media dei registrati finali delle ultime 3). Il peso del ritmo è la radice della quota del finale che le serate passate avevano a quel punto: lontano dalla serata il ritmo moltiplica numeri piccoli e pesa poco. Mai sotto i registrati già presenti

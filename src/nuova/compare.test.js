@@ -81,8 +81,8 @@ describe('compare', () => {
   it('measures how far past projections were from the final count', () => {
     const acc = projectionAccuracy(eds, null);
     const at7 = acc.overall.find((p) => p.d === 7);
-    // A2 at 7 days: pace 1 × 5/2 = 2.5, level 5, pace weight √(2/5) → 3 against a final of 6
-    expect(at7).toMatchObject({ n: 1, typical: 50, within20: 0, bias: -50 });
+    // A2 at 7 days: A1 had only 2 registrations by then, too few for a pace: level 5 against a final of 6
+    expect(at7).toMatchObject({ n: 1, typical: 17, within20: 100, bias: -17 });
     expect(acc.overall.find((p) => p.d === 14).n).toBe(0);
     expect(accuracyFor(acc, 'A', 6)).toMatchObject({ d: 7, scope: 'all' }); // under 3 cases: all nights
   });
