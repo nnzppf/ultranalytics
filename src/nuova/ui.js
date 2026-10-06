@@ -136,7 +136,7 @@ export function NoteEditor({ note, onSave, compact = false }) {
 }
 
 /** The count read on the ticketing portal, when it is ahead of the last export. */
-function CountEditor({ item, onSave }) {
+export function CountEditor({ item, onSave, compact = false, idSuffix = '' }) {
   const [open, setOpen] = useState(false);
   const [value, setValue] = useState('');
   const [saving, setSaving] = useState(false);
@@ -147,6 +147,17 @@ function CountEditor({ item, onSave }) {
     setSaving(false);
     setOpen(false);
   };
+  if (!open && compact) {
+    return (
+      <span className="nx-countline">
+        <span className="nx-countname">{item.ed.title} {dmy(item.ed.date)}</span>
+        <b>{fmt(m ? m.value : item.ed.reg)}</b>
+        <span className="nx-flat">{m ? `a mano alle ${hm(m.at)}` : 'dall\'export'}</span>
+        <button className="nx-link" onClick={() => { setValue(''); setOpen(true); }}>{m ? 'aggiorna' : 'numero di adesso'}</button>
+        {m && <button className="nx-link" disabled={saving} onClick={() => save(0)}>usa l'export</button>}
+      </span>
+    );
+  }
   if (!open) {
     return (
       <p className="nx-note">
@@ -158,8 +169,8 @@ function CountEditor({ item, onSave }) {
   }
   return (
     <form className="nx-noteform" onSubmit={(e) => { e.preventDefault(); const v = parseInt(value, 10); if (v > 0) save(v); }}>
-      <label className="nx-hint" htmlFor={`nx-count-${item.ed.key}`}>Registrati di adesso sul portale (lo vedono tutti, finché non arriva un export più recente)</label>
-      <input id={`nx-count-${item.ed.key}`} className="nx-input" type="number" inputMode="numeric" min="1" value={value} onChange={(e) => setValue(e.target.value)} autoFocus style={{ maxWidth: 160 }} />
+      <label className="nx-hint" htmlFor={`nx-count-${item.ed.key}${idSuffix}`}>Registrati di adesso{compact ? ` a ${item.ed.title}` : ''} sul portale (vale ovunque, anche nel tracker, finché non arriva un export più recente)</label>
+      <input id={`nx-count-${item.ed.key}${idSuffix}`} className="nx-input" type="number" inputMode="numeric" min="1" value={value} onChange={(e) => setValue(e.target.value)} autoFocus style={{ maxWidth: 160 }} />
       <span className="nx-formacts">
         <button className="nx-btn primary" type="submit" disabled={saving || !(parseInt(value, 10) > 0)}>{saving ? 'Salvo…' : 'Salva'}</button>
         <button className="nx-link" type="button" onClick={() => setOpen(false)}>annulla</button>

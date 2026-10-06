@@ -113,7 +113,7 @@ export default function NewApp({ user, logout, onOpenClassic }) {
     selectedEvent: section === 'eventi' ? route.param : null,
     seedKey: section === 'confronta' ? route.param : null,
     clearSeed, goTo, openClassic: onOpenClassic, windowDays, setWindowDays,
-    seriesIdx, saveSeries, deleteSeries, accuracy, notes: config?.notes || {}, saveNote, saveCount, saveDate, dataAsOf,
+    seriesIdx, saveSeries, deleteSeries, accuracy, notes: config?.notes || {}, counts: config?.counts || {}, saveNote, saveCount, saveDate, dataAsOf,
   };
   const nav = (cls) => Object.entries(SECTIONS).map(([k, s]) => (
     <button key={k} className={cls} aria-current={section === k ? 'page' : undefined} onClick={() => goTo(k)}>

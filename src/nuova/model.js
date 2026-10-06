@@ -255,6 +255,17 @@ export const seriesMember = (ed) => ({ name: ed.rawName, date: ymd(ed.date) });
 /** Catalog id of a night (notes, typed-in counts): its day and export name. */
 export const nightId = (ed) => (ed.date && ed.rawName ? `${ymd(ed.date)}_${nightNameKey(ed.rawName)}` : null);
 
+/**
+ * The count typed in from the ticketing portal for a night, when it is newer than
+ * the export (otherwise the export already says more): { value, at: Date, by }.
+ */
+export function typedCount(counts, ed, dataAsOf) {
+  const typed = lookupNight(counts, ed);
+  if (!typed || !(typed.value > 0)) return null;
+  const at = new Date(typed.at);
+  return !dataAsOf || at > dataAsOf ? { ...typed, at } : null;
+}
+
 /** A night's entry in a catalog map keyed by nightId, whichever export name it was saved under. */
 export function lookupNight(map, ed) {
   if (!map || !ed?.date) return null;
@@ -334,9 +345,7 @@ export function upcomingEvents(records, eds, now = new Date(), horizonDays = 60,
         edition = e.key;
       }
       // A count typed in from the ticketing portal, newer than the export, is today's number
-      const typed = lookupNight(counts, e);
-      const typedAt = typed ? new Date(typed.at) : null;
-      const manual = typed && typed.value > 0 && (!dataAsOf || typedAt > dataAsOf) ? { ...typed, at: typedAt } : null;
+      const manual = typedCount(counts, e, dataAsOf);
       const t = manual
         ? computeWhereAreWeNow(pool, brand, edition, { mode: 'now', value: manual.value }, { now: manual.at, dataAsOf })
         : computeWhereAreWeNow(pool, brand, edition, null, { now, dataAsOf });
@@ -514,15 +523,17 @@ export function audienceOverlap(rowLists) {
 
 /**
  * Projection of an upcoming night from nights chosen by hand: each reference says
- * "at this point I had X, I ended with Y" (same rule as the tracker).
+ * "at this point I had X, I ended with Y" (same rule as the tracker). With a count
+ * typed in from the portal ({ value, at }) the point is the moment it was typed.
  */
-export function projectFromSet(target, refs, records, now = new Date()) {
+export function projectFromSet(target, refs, records, now = new Date(), typed = null) {
   const dataAsOf = latestPurchase(records);
-  const reference = dataAsOf && dataAsOf < now ? dataAsOf : now;
+  const reference = typed ? typed.at : dataAsOf && dataAsOf < now ? dataAsOf : now;
+  const current = typed ? typed.value : target.reg;
   const comps = refs.filter((r) => r.over && r.date).map((r) => {
     const cutoff = samePointFor(r.date, reference, target.date);
     return { ed: r, eventDate: r.date, atSamePointAdjusted: r.rows.filter((x) => x.purchaseDate && x.purchaseDate <= cutoff).length, totalFinal: r.reg };
   });
-  const summary = summarizeComparisons(comps, target.reg, false);
-  return { reference, pointDaysBefore: Math.max(0, dayDiff(reference, target.date)), comps, ...summary };
+  const summary = summarizeComparisons(comps, current, false);
+  return { reference, current, pointDaysBefore: Math.max(0, dayDiff(reference, target.date)), comps, ...summary };
 }

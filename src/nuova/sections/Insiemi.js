@@ -1,8 +1,9 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
-import { Seg, VenueDot, WindowSeg, daysAxis, dayTick, NoteEditor, AccuracyNote, ProjectionNote } from '../ui';
+import { Seg, VenueDot, WindowSeg, daysAxis, dayTick, NoteEditor, AccuracyNote, ProjectionNote, CountEditor } from '../ui';
 import { LineChart, StripPlot, TimeDots } from '../charts';
-import { projectFromSet, lookupNight } from '../model';
+import { projectFromSet, lookupNight, typedCount } from '../model';
 import { curveOf, groupCurve, checkpointsFor, suggestionsFor, expectedEntries, accuracyFor, likelyRange } from '../compare';
+import { dayDiff } from '../../utils/eventTime';
 import {
   KINDS, chipId, emptySet, chipCatalog, resolveSet, describeSet, setName, setStats, SCORE_ROWS, rowDiff,
   insights, setOverlap, setFlow, presets, encodeSets, decodeSets, readStoredSets,
@@ -17,6 +18,18 @@ const KIND_SHORT = { brand: 'format', night: 'serata', venue: 'locale', genre: '
 const HOUR_LABEL = { 12: '12', 15: '15', 18: '18', 21: '21', 24: '00', 27: '03' };
 const HOURS = [12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27];
 const other = (side) => (side === 'A' ? 'B' : 'A');
+
+/**
+ * A night on sale with a count typed in from the portal: its curve reaches that
+ * count on the day it was typed (and stays there up to today).
+ */
+function curveNow(ed, axis, windowDays, now, typed) {
+  const pts = curveOf(ed, axis, windowDays, now);
+  if (!typed || ed.over || axis === 'ore' || axis === 'percentuale') return pts;
+  const x = axis === 'apertura' ? (ed.firstReg ? dayDiff(ed.firstReg, typed.at) : null) : -Math.max(0, dayDiff(typed.at, ed.date));
+  if (x == null) return pts;
+  return pts.map((p) => (p.x === x || (p.x > x && p.y != null) ? { ...p, y: Math.max(p.y ?? 0, typed.value) } : p));
+}
 
 const readSets = () => { try { return readStoredSets(localStorage.getItem(STORE)); } catch { return { A: emptySet(), B: emptySet() }; } };
 
@@ -123,7 +136,7 @@ function SaveAsSeries({ count, names, onSave, onCancel }) {
   );
 }
 
-function SetZone({ side, set, res, name, catalog, over, onDown, onTap, onRemoveChip, onClear, onRestore, suggestions, onAddNights, seriesNames, onSaveSeries, onOpenSheet, sheetOpen }) {
+function SetZone({ side, set, res, name, catalog, over, onDown, onTap, onRemoveChip, onClear, onRestore, suggestions, onAddNights, seriesNames, onSaveSeries, onOpenSheet, sheetOpen, typedOf, onSaveCount }) {
   const [saving, setSaving] = useState(false);
   const info = (c) => catalog.find((x) => x.kind === c.kind && x.value === c.value);
   const onlyNights = set.chips.length > 1 && set.chips.every((c) => c.kind === 'night');
@@ -150,6 +163,11 @@ function SetZone({ side, set, res, name, catalog, over, onDown, onTap, onRemoveC
           {res.onSale.length > 0 && <> · <b>{res.onSale.length}</b> in vendita</>}
           {res.excludedCount > 0 && <> · {res.excludedCount} tolte <button className="nx-link" onClick={onRestore}>rimetti</button></>}
         </p>
+      )}
+      {res.onSale.length > 0 && res.onSale.length <= 4 && (
+        <div className="nx-onsale">
+          {res.onSale.map((e) => <CountEditor key={e.key} compact idSuffix={`-${side}`} item={{ ed: e, manual: typedOf(e) }} onSave={onSaveCount} />)}
+        </div>
       )}
       {suggestions?.length > 0 && (
         <div className="nx-sugg">
@@ -240,7 +258,7 @@ function axisSetup(axis, windowDays) {
   return { xs: daysAxis(windowDays), xLabel: dayTick(windowDays), xTitle: (x) => (x === 0 ? 'giorno dell\'evento' : `${-x} ${x === -1 ? 'giorno' : 'giorni'} prima`), tick: (x) => (x === 0 ? 'evento' : `${x} g`) };
 }
 
-function SetCurves({ A, B, nameA, nameB, now, windowDays, setWindowDays }) {
+function SetCurves({ A, B, nameA, nameB, now, windowDays, setWindowDays, typedOf }) {
   const [axis, setAxis] = useState('giorni');
   const { xs, xLabel, xTitle, tick } = axisSetup(axis, windowDays);
   const yFormat = axis === 'percentuale' ? (v) => `${fmt(v, 0)}%` : (v) => fmt(v);
@@ -252,7 +270,7 @@ function SetCurves({ A, B, nameA, nameB, now, windowDays, setWindowDays }) {
     const med = { key: `med-${side}`, side, color: COLOR[side], label: `${side} · ${name} (mediana di ${res.done.length})`, width: 2.6, points: groupCurve(curves) };
     medians.push(med);
     if (res.done.length <= 12) res.done.forEach((e, i) => lines.push({ key: `${side}-${e.key}`, color: COLOR[side], width: 1, opacity: 0.28, tip: false, points: curves[i] }));
-    if (axis !== 'percentuale') res.onSale.forEach((e) => lines.push({ key: `sale-${side}-${e.key}`, color: COLOR[side], width: 3, dashed: true, label: `${e.title} ${dmy(e.date)} · in vendita`, points: curveOf(e, axis, windowDays, now) }));
+    if (axis !== 'percentuale') res.onSale.forEach((e) => lines.push({ key: `sale-${side}-${e.key}`, color: COLOR[side], width: 3, dashed: true, label: `${e.title} ${dmy(e.date)} · in vendita${typedOf(e) ? ' (a mano)' : ''}`, points: curveNow(e, axis, windowDays, now, typedOf(e)) }));
   }
   const series = [...medians, ...lines.filter((l) => l.tip === false), ...lines.filter((l) => l.tip !== false)];
   const points = checkpointsFor(axis, windowDays);
@@ -290,13 +308,13 @@ function SetCurves({ A, B, nameA, nameB, now, windowDays, setWindowDays }) {
   );
 }
 
-const NIGHT_METRICS = [['reg', 'registrati', (e) => e.reg, (v) => fmt(v)], ['ent', 'ingressi', (e) => (e.hasScans ? e.ent : null), (v) => fmt(v)], ['conv', 'conversione', (e) => e.conv, (v) => `${fmt(v, 0)}%`]];
+const NIGHT_METRICS = [['reg', 'registrati', (e, typed) => typed?.value ?? e.reg, (v) => fmt(v)], ['ent', 'ingressi', (e) => (e.hasScans ? e.ent : null), (v) => fmt(v)], ['conv', 'conversione', (e) => e.conv, (v) => `${fmt(v, 0)}%`]];
 
-function Nights({ A, B, nameA, nameB, onExclude, onRestoreOne, sets, notes, saveNote }) {
+function Nights({ A, B, nameA, nameB, onExclude, onRestoreOne, sets, notes, saveNote, typedOf, onSaveCount }) {
   const [metric, setMetric] = useState('reg');
   const [picked, setPicked] = useState(null);
   const [, label, get, format] = NIGHT_METRICS.find(([k]) => k === metric);
-  const point = (e) => ({ key: e.key, v: get(e), title: `${e.title} ${dmy(e.date)}${e.over ? '' : ' (in vendita)'}` });
+  const point = (e) => ({ key: e.key, v: get(e, e.over ? null : typedOf(e)), title: `${e.title} ${dmy(e.date)}${e.over ? '' : ' (in vendita)'}` });
   const rows = [['A', A, nameA], ['B', B, nameB]].filter(([, r]) => r.nights.length).map(([side, r, name]) => ({ id: side, label: `${side} · ${name}`, color: COLOR[side], points: r.nights.map(point) }));
   const timeline = [['A', A], ['B', B]].flatMap(([side, r]) => r.nights.map((e) => ({ ...point(e), id: e.key, date: e.date, color: COLOR[side], key: `${side}:${e.key}` })));
   const all = new Map([...A.nights, ...B.nights].map((e) => [e.key, e]));
@@ -316,6 +334,7 @@ function Nights({ A, B, nameA, nameB, onExclude, onRestoreOne, sets, notes, save
             <span><b>{pct(pickedEd.conv)}</b> conversione</span>
             {!pickedEd.over && <span className="nx-tag">in vendita</span>}
           </div>
+          {!pickedEd.over && <CountEditor idSuffix="-card" item={{ ed: pickedEd, manual: typedOf(pickedEd) }} onSave={onSaveCount} />}
           <NoteEditor note={lookupNight(notes, pickedEd)} onSave={(t) => saveNote(pickedEd, t)} />
           <span className="nx-formacts" style={{ marginTop: 6 }}>
             {sidesOf(pickedEd.key).map((s) => <button key={s} className="nx-btn" onClick={() => { onExclude(s, pickedEd.key); setPicked(null); }}>Togli da {s}</button>)}
@@ -403,7 +422,7 @@ function Audience({ A, B, sa, sb, nameA, nameB, eds, now }) {
   );
 }
 
-function Forecast({ A, B, records, now, windowDays, setWindowDays, accuracy, upcoming }) {
+function Forecast({ A, B, records, now, windowDays, setWindowDays, accuracy, upcoming, typedOf, onSaveCount }) {
   const targetsA = A.onSale, targetsB = B.onSale;
   const side = targetsA.length ? 'A' : targetsB.length ? 'B' : null;
   const targets = side === 'A' ? targetsA : targetsB;
@@ -411,11 +430,12 @@ function Forecast({ A, B, records, now, windowDays, setWindowDays, accuracy, upc
   const target = targets.find((t) => t.key === targetKey) || targets[0];
   const refSide = side && (side === 'A' ? B : A).done.length ? other(side) : side;
   const refs = useMemo(() => (refSide ? (refSide === 'A' ? A : B).done.filter((e) => !target || e.key !== target.key) : []), [refSide, A, B, target]);
-  const p = useMemo(() => (target && refs.length ? projectFromSet(target, refs, records, now) : null), [target, refs, records, now]);
+  const typed = target ? typedOf(target) : null;
+  const p = useMemo(() => (target && refs.length ? projectFromSet(target, refs, records, now, typed) : null), [target, refs, records, now, typed]);
   if (!side) return <p className="nx-empty">Metti in A una serata in vendita (dalla lista "Serate") e in B le serate con cui stimarla: format, serie, stagione…</p>;
   if (!refs.length) return <p className="nx-empty">Metti in {other(side)} le serate concluse con cui stimare {target.title}.</p>;
   const proj = p.projection;
-  const entries = expectedEntries(target, refs, p.reference, target.reg, proj);
+  const entries = expectedEntries(target, refs, p.reference, p.current, proj);
   const likely = proj ? likelyRange(accuracy, proj.value, p.pointDaysBefore) : null;
   const acc = proj ? accuracyFor(accuracy, null, p.pointDaysBefore) : null;
   const tracked = upcoming.find((u) => u.ed.key === target.key);
@@ -424,22 +444,23 @@ function Forecast({ A, B, records, now, windowDays, setWindowDays, accuracy, upc
     <>
       {targets.length > 1 && <div style={{ marginBottom: 8 }}><Seg value={target.key} onChange={setTargetKey} label="Serata da stimare" options={targets.map((t) => [t.key, `${t.title} ${dmy(t.date)}`])} /></div>}
       <div className="nx-stats">
-        <div className="nx-stat"><div className="v">{fmt(target.reg)}</div><div className="l">{target.title} · a {p.pointDaysBefore} giorni</div></div>
+        <div className="nx-stat"><div className="v">{fmt(p.current)}</div><div className="l">{target.title} · a {p.pointDaysBefore} giorni{typed ? ' · a mano' : ''}</div></div>
         <div className="nx-stat"><div className="v">{fmt(p.avgAtSamePoint)}</div><div className="l">media di {refSide} allo stesso punto ({refs.length} serate)</div></div>
         <div className="nx-stat"><div className="v" style={{ color: 'var(--nx-proj)' }}>{proj ? `~${fmt(proj.value)}` : '–'}</div><div className="l">{proj ? `registrati a fine serata${likely ? ` · probabile ${fmt(likely.low)}–${fmt(likely.high)}` : ''}${proj.reliable ? '' : ' · incerta'}` : 'nessuna stima'}</div></div>
         {entries && <div className="nx-stat"><div className="v">~{fmt(entries.value ?? entries.sofar)}</div><div className="l">{entries.value != null ? 'ingressi stimati' : 'ingressi dai registrati di oggi'}</div></div>}
         {tracked?.tracker.projection && tracked.tracker.projection.value !== proj?.value && <div className="nx-stat"><div className="v nx-flat">~{fmt(tracked.tracker.projection.value)}</div><div className="l">stima del tracker ({tracked.series ? `serie ${tracked.series}` : 'brand'})</div></div>}
       </div>
+      <CountEditor idSuffix="-forecast" item={{ ed: target, manual: typed }} onSave={onSaveCount} />
       <div style={{ marginBottom: 6 }}><WindowSeg value={windowDays} onChange={setWindowDays} /></div>
       <LineChart
         xs={daysAxis(windowDays)} xLabel={dayTick(windowDays)} xTitle={(x) => (x === 0 ? 'giorno dell\'evento' : `${-x} giorni prima`)} compare
         series={[
-          { key: 't', color: COLOR[side], label: `${target.title} ${dmy(target.date)}`, width: 3, points: curveOf(target, 'giorni', windowDays, now) },
+          { key: 't', color: COLOR[side], label: `${target.title} ${dmy(target.date)}`, width: 3, points: curveNow(target, 'giorni', windowDays, now, typed) },
           { key: 'refs', color: COLOR[refSide], label: `${refSide} · mediana di ${refs.length}`, width: 2.2, dashed: true, points: groupCurve(curves) },
           ...(refs.length <= 12 ? refs.map((e, i) => ({ key: e.key, color: COLOR[refSide], width: 1, opacity: 0.28, tip: false, points: curves[i] })) : []),
         ]}
-        projection={proj && p.pointDaysBefore <= windowDays ? { x0: -p.pointDaysBefore, y0: target.reg, x1: 0, y1: proj.value } : null}
-        now={p.pointDaysBefore <= windowDays ? -p.pointDaysBefore : null} nowLabel="dati" height={250} width={760} yLabel="Previsione"
+        projection={proj && p.pointDaysBefore <= windowDays ? { x0: -p.pointDaysBefore, y0: p.current, x1: 0, y1: proj.value } : null}
+        now={p.pointDaysBefore <= windowDays ? -p.pointDaysBefore : null} nowLabel={typed ? 'a mano' : 'dati'} height={250} width={760} yLabel="Previsione"
       />
       <p className="nx-note">
         <ProjectionNote p={proj} likely={likely} />
@@ -468,7 +489,9 @@ function Forecast({ A, B, records, now, windowDays, setWindowDays, accuracy, upc
  * anywhere on them, by finger from their grip — or tapped and sent to A or B.
  */
 export default function Insiemi({ ctx }) {
-  const { eds, records, now, attendance, upcoming, seedKey, clearSeed, venueLabel, windowDays, setWindowDays, seriesIdx, saveSeries, deleteSeries, accuracy, notes, saveNote } = ctx;
+  const { eds, records, now, attendance, upcoming, seedKey, clearSeed, venueLabel, windowDays, setWindowDays, seriesIdx, saveSeries, deleteSeries, accuracy, notes, saveNote, counts, saveCount, dataAsOf } = ctx;
+  // Count typed in from the portal for a night on sale, when newer than the export
+  const typedOf = (ed) => typedCount(counts, ed, dataAsOf);
   const [sets, setSets] = useState(readSets);
   const [view, setView] = useState('breve');
   const [menu, setMenu] = useState(null);
@@ -612,7 +635,8 @@ export default function Insiemi({ ctx }) {
             onRestore={() => update(side, (st) => ({ ...st, excluded: [] }))}
             suggestions={side === 'B' ? suggB : null} onAddNights={(keys) => addNights('B', keys)}
             seriesNames={seriesNames} onSaveSeries={saveSide(side)}
-            sheetOpen={sheet === side} onOpenSheet={() => { setSheet(sheet === side ? null : side); setMenu(null); }} />
+            sheetOpen={sheet === side} onOpenSheet={() => { setSheet(sheet === side ? null : side); setMenu(null); }}
+            typedOf={typedOf} onSaveCount={saveCount} />
         ))}
         <div className="nx-vs">
           <span>contro</span>
@@ -646,10 +670,10 @@ export default function Insiemi({ ctx }) {
             <div className="nx-ph"><h2>A contro B</h2><span className="nx-spacer" /><Seg value={view} onChange={setView} label="Vista" options={VIEWS} /></div>
             <div className="nx-pb">
               {view === 'breve' && <Brief A={A} B={B} sa={sa} sb={sb} nameA={nameA} nameB={nameB} />}
-              {view === 'curve' && <SetCurves A={A} B={B} nameA={nameA} nameB={nameB} now={now} windowDays={windowDays} setWindowDays={setWindowDays} />}
-              {view === 'serate' && <Nights A={A} B={B} nameA={nameA} nameB={nameB} sets={sets} onExclude={exclude} onRestoreOne={restoreOne} notes={notes} saveNote={saveNote} />}
+              {view === 'curve' && <SetCurves A={A} B={B} nameA={nameA} nameB={nameB} now={now} windowDays={windowDays} setWindowDays={setWindowDays} typedOf={typedOf} />}
+              {view === 'serate' && <Nights A={A} B={B} nameA={nameA} nameB={nameB} sets={sets} onExclude={exclude} onRestoreOne={restoreOne} notes={notes} saveNote={saveNote} typedOf={typedOf} onSaveCount={saveCount} />}
               {view === 'pubblico' && <Audience A={A} B={B} sa={sa} sb={sb} nameA={nameA} nameB={nameB} eds={eds} now={now} />}
-              {view === 'previsione' && <Forecast A={A} B={B} records={records} now={now} windowDays={windowDays} setWindowDays={setWindowDays} accuracy={accuracy} upcoming={upcoming} />}
+              {view === 'previsione' && <Forecast A={A} B={B} records={records} now={now} windowDays={windowDays} setWindowDays={setWindowDays} accuracy={accuracy} upcoming={upcoming} typedOf={typedOf} onSaveCount={saveCount} />}
             </div>
           </section>
         ) : (

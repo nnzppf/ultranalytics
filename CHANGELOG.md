@@ -1,5 +1,12 @@
 # Changelog - Ultranalytics
 
+## 6 Ottobre 2026 (v10) — Numero di adesso anche in Confronta
+
+- Le serate in vendita dentro A o B mostrano il numero di registrati (dall'export o inserito a mano) con "numero di adesso" per scriverlo dal portale; lo stesso campo è in Previsione e nella scheda della serata. È lo stesso numero del tracker (`counts` nel catalogo): si scrive una volta e vale ovunque, finché non arriva un export più recente
+- Con il numero inserito: la previsione parte da quel numero e da quel momento (`projectFromSet` con `typed`), la curva della serata lo raggiunge, i punti in Serate lo usano. Funzione condivisa `typedCount` in `model.js`
+
+---
+
 ## 6 Ottobre 2026 (v9) — Confronta: A contro B
 
 Il tavolo di confronto è sostituito da due insiemi, A e B (`sections/Insiemi.js`, logica in `nuova/sets.js` con test).

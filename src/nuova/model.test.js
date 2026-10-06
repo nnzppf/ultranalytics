@@ -1,6 +1,6 @@
 import {
   indexEditions, brandTable, groupTable, peopleStats, curveByDays, curveByHours,
-  editionMetrics, attendanceIndex, audienceOverlap, projectFromSet, tonightEdition, liveNight,
+  editionMetrics, attendanceIndex, audienceOverlap, projectFromSet, tonightEdition, liveNight, typedCount, nightId,
   indexSeries, withSeries, withoutSeries, upcomingEvents, peersOf,
 } from './model';
 import { daysBeforeEvent } from '../utils/eventTime';
@@ -74,6 +74,18 @@ describe('model', () => {
     expect(p.comps.every((c) => c.atSamePointAdjusted === 0)).toBe(true); // nobody 9 days before
     // No pace to go on: the projection is the level of the reference nights (4 and 5)
     expect(p.projection).toMatchObject({ pace: null, level: 5, value: 5 });
+  });
+
+  it('projects from a count typed in from the portal', () => {
+    const rookie = eds[2];
+    const at = new Date(2026, 9, 9, 12, 0);
+    const p = projectFromSet(rookie, [eds[0], eds[1]], records, NOW, { value: 4, at });
+    expect(p).toMatchObject({ current: 4, reference: at, pointDaysBefore: 1 });
+    expect(p.projection.value).toBeGreaterThanOrEqual(4);
+    const counts = { [nightId({ ...rookie, rawName: 'ROOKIE NIGHT', rawNames: ['ROOKIE NIGHT'] })]: { value: 9, at: at.toISOString() } };
+    const named = { ...rookie, rawName: 'ROOKIE NIGHT', rawNames: ['ROOKIE NIGHT'] };
+    expect(typedCount(counts, named, new Date(2026, 9, 1))).toMatchObject({ value: 9, at });
+    expect(typedCount(counts, named, new Date(2026, 9, 9, 13))).toBeNull(); // the export is newer
   });
 
   it('finds the night in progress and compares it hour by hour', () => {
