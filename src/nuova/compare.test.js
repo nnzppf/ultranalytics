@@ -1,6 +1,6 @@
 import { indexEditions, attendanceIndex, editionMetrics, upcomingEvents, nightId, lookupNight } from './model';
 import {
-  curveBySales, groupCurve, groupCatalog, suggestionsFor, expectedEntries, projectionAccuracy,
+  curveBySales, groupCurve, groupCatalog, suggestionsFor, expectedEntries, projectionAccuracy, curveByHourBefore, hourAxis,
   accuracyFor, audienceFlow, encodeTable, decodeTable,
 } from './compare';
 import { applyDates } from '../utils/applyEventConfig';
@@ -47,6 +47,31 @@ describe('compare', () => {
     expect(c[5]).toEqual({ x: 5, y: 3 });
     expect(c[10]).toEqual({ x: 10, y: 5 });
     expect(c[11].y).toBeNull(); // the night is over: the curve stops on the event day
+  });
+
+  it('counts registrations hour by hour before the event, up to the data or the typed-in count', () => {
+    // A1 (18.10.25): registrations at -240, -200, -100, 20 and 22 hours from its midnight
+    const c = curveByHourBefore(A1, -48, 27);
+    expect(c.find((p) => p.x === -48).y).toBe(3);
+    expect(c.find((p) => p.x === 20).y).toBe(4);
+    expect(c.find((p) => p.x === 27).y).toBe(5);
+    // A3 on sale: data up to 1 Oct 14:00 (-178 h), a count of 10 typed in at -177.5 h
+    const until = new Date(a3.getTime() - 177.5 * H);
+    const live = curveByHourBefore(A3, -180, -170, until, { value: 10, at: until });
+    expect(live.find((p) => p.x === -179).y).toBe(2);
+    expect(live.find((p) => p.x === -178).y).toBe(10);
+    expect(live.find((p) => p.x === -177).y).toBeNull();
+    // Typed in 6 hours after the data ends: the hours in between stay empty
+    const later = new Date(a3.getTime() - 172 * H);
+    const gap = curveByHourBefore(A3, -180, -170, later, { value: 10, at: later }, new Date(a3.getTime() - 178 * H));
+    expect(gap.filter((p) => p.x > -178 && p.x < -172).every((p) => p.y == null)).toBe(true);
+    expect(gap.find((p) => p.x === -178).y).toBe(3);
+    expect(gap.find((p) => p.x === -172).y).toBe(10);
+    const axis = hourAxis(-48, 27);
+    expect(axis.xs.length).toBe(76);
+    expect([axis.xLabel(-48), axis.xLabel(-36), axis.xLabel(0), axis.xLabel(-5)]).toEqual(['-2 g', '12:00', 'evento', '']);
+    expect(axis.xTitle(-7)).toBe('1 giorno prima, ore 17:00');
+    expect(axis.xTitle(25)).toBe('notte della serata, ore 01:00');
   });
 
   it('draws a group as median and min–max, keeping finished nights at their final value', () => {

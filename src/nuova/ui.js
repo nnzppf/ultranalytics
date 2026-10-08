@@ -2,6 +2,8 @@ import { venueKey } from './model';
 import { useState } from 'react';
 import { fmt, pct, dshort, dmy, hm, signed, deltaClass, pctChange } from './format';
 import { LineChart, RangeBar } from './charts';
+import { curveByHourBefore, hourAxis, groupCurve } from './compare';
+import { midnight } from '../utils/eventTime';
 
 export const venueColor = (v) => `var(--nx-v-${venueKey(v)})`;
 export const compareColor = (i) => `var(--nx-c${(i % 8) + 1})`;
@@ -197,8 +199,48 @@ export function AccuracyNote({ accuracy, series }) {
   return <>Di solito a {accuracy.d} {accuracy.d === 1 ? 'giorno' : 'giorni'} la stima sbaglia del <b>±{accuracy.typical}%</b> ({accuracy.n} serate {scope}; entro ±20% nel {accuracy.within20}% dei casi). </>;
 }
 
+/** Days or hours: the scale of the curves before the event. */
+export function ScaleSeg({ value, onChange }) {
+  return <Seg value={value} onChange={onChange} label="Scala" options={[['giorni', 'giorni'], ['ore', 'ora per ora']]} />;
+}
+
+/**
+ * Registrations hour by hour in the last days before the event and during the
+ * night, against the reference nights at the same hour from their own event.
+ */
+export function HourlyCompare({ target, refs, reference, typed, projection, pointDaysBefore, color = 'var(--nx-now)', refColor = 'var(--nx-muted)', height = 220 }) {
+  const days = Math.min(6, Math.max(1, pointDaysBefore + 1));
+  const fromH = -24 * days, toH = 27;
+  const { xs, xLabel, xTitle } = hourAxis(fromH, toH);
+  const until = typed ? typed.at : reference;
+  const xNow = until ? Math.floor((until.getTime() - midnight(target.date).getTime()) / 3600000) : null;
+  // With a typed-in count the export ends earlier: the last registration it has
+  const lastReg = typed ? target.rows.reduce((m, r) => (r.purchaseDate && r.purchaseDate > m ? r.purchaseDate : m), new Date(0)) : null;
+  const mine = curveByHourBefore(target, fromH, toH, until, typed, lastReg);
+  const current = typed ? typed.value : [...mine].reverse().find((p) => p.y != null)?.y ?? null;
+  const curves = refs.map((e) => curveByHourBefore(e, fromH, toH));
+  const inRange = xNow != null && xNow >= fromH && xNow <= toH;
+  return (
+    <>
+      <LineChart
+        xs={xs} xLabel={xLabel} xTitle={xTitle} compare
+        series={[
+          { key: 't', color, label: `${target.title} ${dmy(target.date)}`, width: 3, points: mine },
+          ...(refs.length <= 4
+            ? refs.map((e, i) => ({ key: e.key, color: refColor, label: `${e.title} ${dmy(e.date)}`, width: 1.8, dashed: i > 0, points: curves[i] }))
+            : [{ key: 'med', color: refColor, label: `mediana di ${refs.length} serate`, width: 2.2, points: groupCurve(curves) }]),
+        ]}
+        projection={projection && inRange && current != null ? { x0: xNow, y0: current, x1: toH, y1: projection.value } : null}
+        now={inRange ? xNow : null} nowLabel={typed ? 'a mano' : 'dati'} height={height} width={760} yLabel="Ora per ora"
+      />
+      <p className="nx-note">Registrazioni accumulate ora per ora negli ultimi {days} {days === 1 ? 'giorno' : 'giorni'} e durante la serata (fino alle 03:00), confrontate alla stessa ora prima del loro evento. Tocca il grafico per i numeri di ogni ora.{typed ? ' Tra la fine dell’export e il numero inserito a mano la linea è interrotta: in quelle ore il dato non c’è.' : ''}</p>
+    </>
+  );
+}
+
 /** Tracker of one upcoming night: numbers + cumulative curve against past editions. */
 export function TrackerView({ item, onCompare, windowDays = 30, onSaveCount, note, onSaveNote }) {
+  const [scale, setScale] = useState(item && item.tracker.pointDaysBefore <= 2 ? 'ore' : 'giorni');
   if (!item) return null;
   const { ed, series, tracker: t, retarget, entries, accuracy, likely } = item;
   const band = item.band.filter((p) => p.d <= windowDays);
@@ -221,17 +263,22 @@ export function TrackerView({ item, onCompare, windowDays = 30, onSaveCount, not
             <div className="l">{entries.value != null ? `ingressi stimati${entries.low !== entries.high ? ` · ${fmt(entries.low)}–${fmt(entries.high)}` : ''}` : 'ingressi dai registrati di oggi'}</div></div>
         )}
       </div>
-      <LineChart
-        xs={xs}
-        xLabel={dayTick(windowDays)}
-        xTitle={prevLabel}
-        band={compared ? band.map((p) => ({ x: p.d === 0 ? 0 : -p.d, min: p.min, med: p.med, max: p.max })) : null}
-        series={[{ key: 'cur', label: `questa ${series ? 'serata' : 'edizione'}`, color: 'var(--nx-now)', width: 2.4, points: band.map((p) => ({ x: p.d === 0 ? 0 : -p.d, y: p.cur })) }]}
-        projection={t.projection && !outside ? { x0: -t.pointDaysBefore, y0: t.currentRegistrations, x1: 0, y1: t.projection.value } : null}
-        now={outside ? null : -t.pointDaysBefore}
-        nowLabel={item.manual ? 'a mano' : 'dati'}
-        yLabel="Registrazioni cumulative"
-      />
+      <div style={{ margin: '2px 0 6px' }}><ScaleSeg value={scale} onChange={setScale} /></div>
+      {scale === 'ore' ? (
+        <HourlyCompare target={ed} refs={item.refs || []} reference={t.referenceTime} typed={item.manual} projection={t.projection} pointDaysBefore={t.pointDaysBefore} />
+      ) : (
+        <LineChart
+          xs={xs}
+          xLabel={dayTick(windowDays)}
+          xTitle={prevLabel}
+          band={compared ? band.map((p) => ({ x: p.d === 0 ? 0 : -p.d, min: p.min, med: p.med, max: p.max })) : null}
+          series={[{ key: 'cur', label: `questa ${series ? 'serata' : 'edizione'}`, color: 'var(--nx-now)', width: 2.4, points: band.map((p) => ({ x: p.d === 0 ? 0 : -p.d, y: p.cur })) }]}
+          projection={t.projection && !outside ? { x0: -t.pointDaysBefore, y0: t.currentRegistrations, x1: 0, y1: t.projection.value } : null}
+          now={outside ? null : -t.pointDaysBefore}
+          nowLabel={item.manual ? 'a mano' : 'dati'}
+          yLabel="Registrazioni cumulative"
+        />
+      )}
       <div className="nx-legend">
         <span><i style={{ background: 'var(--nx-now)' }} />questa {series ? 'serata' : 'edizione'}</span>
         {compared > 0 && <><span><i style={{ background: 'var(--nx-band)', height: 8 }} />{series ? `serie ${series}` : 'edizioni passate'} (min–max)</span><span><i style={{ borderTop: '1.5px dashed var(--nx-muted)', height: 0 }} />mediana</span></>}

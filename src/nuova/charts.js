@@ -20,6 +20,20 @@ function Grid({ top, W, h, L, R, T, B }) {
   ));
 }
 
+/** Runs of consecutive points with a value: a missing value breaks the line. */
+function segments(points) {
+  const out = [];
+  let cur = [];
+  for (const p of points) {
+    if (p.y == null) {
+      if (cur.length) out.push(cur);
+      cur = [];
+    } else cur.push(p);
+  }
+  if (cur.length) out.push(cur);
+  return out;
+}
+
 /**
  * Lines over a shared x axis, with an optional band (min–max + median) and a
  * dashed projection segment. series: [{ key, color, width, label, dashed, points: [{x, y, min?, max?}] }]
@@ -86,7 +100,7 @@ export function LineChart({ series, band, projection, xs, xLabel, xTitle, yForma
           return (
             <g key={s.key}>
               {range.length > 1 && <polygon fill={s.color} opacity=".12" points={`${range.map((p) => `${X(p.x)},${Y(p.max)}`).join(' ')} ${[...range].reverse().map((p) => `${X(p.x)},${Y(p.min)}`).join(' ')}`} />}
-              {pts.length > 1 && <polyline fill="none" stroke={s.color} strokeOpacity={s.opacity ?? 1} strokeWidth={s.width || 2} strokeLinejoin="round" strokeDasharray={s.dashed ? '6 3' : undefined} points={pts.map((p) => `${X(p.x)},${Y(p.y)}`).join(' ')} />}
+              {segments(s.points).map((seg) => seg.length > 1 && <polyline key={seg[0].x} fill="none" stroke={s.color} strokeOpacity={s.opacity ?? 1} strokeWidth={s.width || 2} strokeLinejoin="round" strokeDasharray={s.dashed ? '6 3' : undefined} points={seg.map((p) => `${X(p.x)},${Y(p.y)}`).join(' ')} />)}
               {s.tip !== false && <circle cx={X(last.x)} cy={Y(last.y)} r={s.width > 2 ? 3.5 : 2.5} fill={s.color} />}
             </g>
           );

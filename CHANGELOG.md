@@ -1,5 +1,12 @@
 # Changelog - Ultranalytics
 
+## 8 Ottobre 2026 — Ora per ora
+
+- Grafici di confronto delle registrazioni con scala **giorni | ora per ora**, nel tracker (Stasera, Eventi) e nel confronto allo stesso punto di Confronta: registrazioni accumulate ora per ora negli ultimi giorni prima dell'evento e durante la notte (fino alle 03:00), contro le serate di riferimento alla stessa ora dal loro evento; tocchi il grafico e vedi i numeri di ogni ora. Parte su "ora per ora" quando mancano 2 giorni o meno (`curveByHourBefore`, `hourAxis` in `compare.js`)
+- Con un numero inserito a mano, le ore tra la fine dell'export e quel numero restano vuote invece di disegnare uno scalino; i grafici interrompono la linea dove manca il dato
+
+---
+
 ## 8 Ottobre 2026 — Confronta: serata in vendita allo stesso punto
 
 - In "In breve", per ogni serata in vendita in A (o in B): i registrati di adesso (anche inseriti a mano) contro le serate concluse dell'altro insieme nello stesso momento prima dell'evento, come il tracker di Stasera. Frase ("152 registrati: il 14% in più dell'opening del 18 ott 25 allo stesso momento"), numeri, differenza, stima finale con fascia probabile, ingressi stimati, grafico (finestra 14/30/60 giorni scelta in base alla distanza dall'evento), tabella delle serate di riferimento e campo per il numero di adesso

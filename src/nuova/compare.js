@@ -4,7 +4,7 @@
  * expected entries and how far past projections were from the final count.
  * Pure functions on the nights built by model.indexEditions.
  */
-import { dayDiff, samePointFor } from '../utils/eventTime';
+import { dayDiff, samePointFor, midnight } from '../utils/eventTime';
 import { projectFinal } from '../utils/comparisonEngine';
 import { median, curveByDays, curveByHours, peersOf, personKey, editionMetrics } from './model';
 
@@ -37,6 +37,57 @@ export function curveBySales(ed, maxDays = 60, now = new Date()) {
     run += c;
     return { x: d, y: d <= end ? run : null };
   });
+}
+
+const HOUR = 3600000;
+
+/**
+ * Registrations accumulated hour by hour, x = hours from the midnight that starts
+ * the event day (-48 = two days before at midnight, 27 = 03:00 of the night). A
+ * night on sale stops at `until` (when the data or the typed-in count is from);
+ * a typed-in count is its value there, and the hours between the end of the data
+ * (`dataUntil`) and that count stay empty: nobody knows when those people came.
+ */
+export function curveByHourBefore(ed, fromH, toH, until = null, typed = null, dataUntil = null) {
+  if (!ed.date) return [];
+  const day0 = midnight(ed.date).getTime();
+  const times = ed.rows.map((r) => r.purchaseDate?.getTime()).filter((t) => t != null).sort((a, b) => a - b);
+  const stop = until ? until.getTime() : Infinity;
+  const xStop = until ? Math.floor((stop - day0) / HOUR) : Infinity;
+  const xData = typed && dataUntil ? Math.floor((dataUntil.getTime() - day0) / HOUR) : Infinity;
+  const out = [];
+  let i = 0;
+  for (let x = fromH; x <= toH; x++) {
+    if (x > xStop || (x > xData && x < xStop)) {
+      out.push({ x, y: null });
+      continue;
+    }
+    const t = x === xStop ? stop : day0 + x * HOUR;
+    while (i < times.length && times[i] <= t) i++;
+    out.push({ x, y: x === xStop && typed ? Math.max(i, typed.value) : i });
+  }
+  return out;
+}
+
+/** Axis of curveByHourBefore: hour ticks, and "1 giorno prima, ore 17:00" when pointing. */
+export function hourAxis(fromH, toH) {
+  const xs = [];
+  for (let x = fromH; x <= toH; x++) xs.push(x);
+  const hh = (x) => String(((x % 24) + 24) % 24).padStart(2, '0');
+  const step = toH - fromH > 100 ? 24 : toH - fromH > 48 ? 12 : 6;
+  return {
+    xs,
+    xLabel: (x) => {
+      if (x === 0) return 'evento';
+      if (x % step !== 0) return '';
+      return x < 0 && x % 24 === 0 ? `-${-x / 24} g` : `${hh(x)}:00`;
+    },
+    xTitle: (x) => {
+      const d = Math.floor(x / 24);
+      const when = d >= 1 ? 'notte della serata' : d === 0 ? 'giorno della serata' : `${-d} ${d === -1 ? 'giorno' : 'giorni'} prima`;
+      return `${when}, ore ${hh(x)}:00`;
+    },
+  };
 }
 
 /** One night's curve on an axis: 'giorni' (to the event), 'apertura' (since opening), 'percentuale' (of the final), 'ore' (of the night). */
@@ -310,6 +361,7 @@ export function enrichUpcoming(items, eds, seriesIdx, acc) {
     const refs = peersOf(u.ed, eds, seriesIdx).eds.filter((p) => p.over && p.key !== u.ed.key);
     return {
       ...u,
+      refs,
       entries: expectedEntries(u.ed, refs, t.referenceTime, t.currentRegistrations, t.projection),
       accuracy: t.projection ? accuracyFor(acc, u.series || u.ed.brand, t.pointDaysBefore) : null,
       likely: t.projection ? likelyRange(acc, t.projection.value, t.pointDaysBefore) : null,

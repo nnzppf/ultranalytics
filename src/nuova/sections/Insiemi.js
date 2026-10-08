@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
-import { Seg, VenueDot, WindowSeg, daysAxis, dayTick, NoteEditor, AccuracyNote, ProjectionNote, CountEditor, Delta } from '../ui';
+import { Seg, VenueDot, WindowSeg, daysAxis, dayTick, NoteEditor, AccuracyNote, ProjectionNote, CountEditor, Delta, ScaleSeg, HourlyCompare } from '../ui';
 import { LineChart, StripPlot, TimeDots } from '../charts';
 import { projectFromSet, lookupNight, typedCount } from '../model';
 import { curveOf, groupCurve, checkpointsFor, suggestionsFor, expectedEntries, accuracyFor, likelyRange } from '../compare';
@@ -238,6 +238,7 @@ function SamePoint({ target, side, refs, refSide, refName: setLabel, records, no
   // One reference night: call it by name ("l'opening del 18 ott 25"), not by the set's letter
   const refName = refs.length === 1 ? `${refs[0].title} (${dmy(refs[0].date)})` : setLabel;
   const p = projectFromSet(target, refs, records, now, typed);
+  const [scale, setScale] = useState(p.pointDaysBefore <= 2 ? 'ore' : 'giorni');
   const proj = p.projection;
   const likely = proj ? likelyRange(accuracy, proj.value, p.pointDaysBefore) : null;
   const entries = expectedEntries(target, refs, p.reference, p.current, proj);
@@ -267,18 +268,25 @@ function SamePoint({ target, side, refs, refSide, refName: setLabel, records, no
         <div className="nx-stat"><div className="v" style={{ color: 'var(--nx-proj)' }}>{proj ? `~${fmt(proj.value)}` : '–'}</div><div className="l">{proj ? `stima finale${likely ? ` · probabile ${fmt(likely.low)}–${fmt(likely.high)}` : ''}` : 'nessuna stima'}</div></div>
         {entries && <div className="nx-stat"><div className="v">~{fmt(entries.value ?? entries.sofar)}</div><div className="l">{entries.value != null ? 'ingressi stimati' : 'ingressi dai registrati di ora'}</div></div>}
       </div>
-      <LineChart
-        xs={daysAxis(win)} xLabel={dayTick(win)} xTitle={(x) => (x === 0 ? 'giorno dell\'evento' : `${-x} ${x === -1 ? 'giorno' : 'giorni'} prima`)} compare
-        series={[
-          { key: 't', color: COLOR[side], label: `${target.title} ${dmy(target.date)}`, width: 3, points: curveNow(target, 'giorni', win, now, typed) },
-          ...(few
-            ? refs.map((e, i) => ({ key: e.key, color: COLOR[refSide], label: `${e.title} ${dmy(e.date)}`, width: 1.8, dashed: i > 0, points: curves[i] }))
-            : [{ key: 'med', color: COLOR[refSide], label: `${refSide} · mediana di ${refs.length}`, width: 2.2, points: groupCurve(curves) }]),
-        ]}
-        projection={proj && inWindow ? { x0: -p.pointDaysBefore, y0: p.current, x1: 0, y1: proj.value } : null}
-        now={inWindow ? -p.pointDaysBefore : null} nowLabel={typed ? 'a mano' : 'dati'} height={220} width={760} yLabel="Allo stesso punto"
-      />
-      {!inWindow && <p className="nx-note">Mancano {p.pointDaysBefore} giorni: il grafico mostra gli ultimi 60.</p>}
+      <div style={{ margin: '2px 0 6px' }}><ScaleSeg value={scale} onChange={setScale} /></div>
+      {scale === 'ore' ? (
+        <HourlyCompare target={target} refs={refs} reference={p.reference} typed={typed} projection={proj} pointDaysBefore={p.pointDaysBefore} color={COLOR[side]} refColor={COLOR[refSide]} />
+      ) : (
+        <>
+          <LineChart
+            xs={daysAxis(win)} xLabel={dayTick(win)} xTitle={(x) => (x === 0 ? 'giorno dell\'evento' : `${-x} ${x === -1 ? 'giorno' : 'giorni'} prima`)} compare
+            series={[
+              { key: 't', color: COLOR[side], label: `${target.title} ${dmy(target.date)}`, width: 3, points: curveNow(target, 'giorni', win, now, typed) },
+              ...(few
+                ? refs.map((e, i) => ({ key: e.key, color: COLOR[refSide], label: `${e.title} ${dmy(e.date)}`, width: 1.8, dashed: i > 0, points: curves[i] }))
+                : [{ key: 'med', color: COLOR[refSide], label: `${refSide} · mediana di ${refs.length}`, width: 2.2, points: groupCurve(curves) }]),
+            ]}
+            projection={proj && inWindow ? { x0: -p.pointDaysBefore, y0: p.current, x1: 0, y1: proj.value } : null}
+            now={inWindow ? -p.pointDaysBefore : null} nowLabel={typed ? 'a mano' : 'dati'} height={220} width={760} yLabel="Allo stesso punto"
+          />
+          {!inWindow && <p className="nx-note">Mancano {p.pointDaysBefore} giorni: il grafico mostra gli ultimi 60.</p>}
+        </>
+      )}
       <div className="nx-tw">
         <table>
           <thead><tr><th>serata di {refSide}</th><th className="n">a questo punto</th><th className="n">a fine serata</th><th className="n">conversione</th></tr></thead>
