@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
-import { Seg, VenueDot, WindowSeg, daysAxis, dayTick, NoteEditor, AccuracyNote, ProjectionNote, CountEditor } from '../ui';
+import { Seg, VenueDot, WindowSeg, daysAxis, dayTick, NoteEditor, AccuracyNote, ProjectionNote, CountEditor, Delta } from '../ui';
 import { LineChart, StripPlot, TimeDots } from '../charts';
 import { projectFromSet, lookupNight, typedCount } from '../model';
 import { curveOf, groupCurve, checkpointsFor, suggestionsFor, expectedEntries, accuracyFor, likelyRange } from '../compare';
@@ -8,7 +8,7 @@ import {
   KINDS, chipId, emptySet, chipCatalog, resolveSet, describeSet, setName, setStats, SCORE_ROWS, rowDiff,
   insights, setOverlap, setFlow, presets, encodeSets, decodeSets, readStoredSets,
 } from '../sets';
-import { fmt, pct, dmy, dshort, pctChange } from '../format';
+import { fmt, pct, dmy, dshort, hm, pctChange } from '../format';
 
 const STORE = 'nx_insiemi_v1';
 const SIDES = ['A', 'B'];
@@ -228,23 +228,114 @@ function Scorecard({ sa, sb }) {
   );
 }
 
-function Brief({ A, B, sa, sb, nameA, nameB }) {
+/**
+ * A night on sale against the other set's concluded nights at the same moment
+ * before their event, as the tracker in Stasera does: registrations now (typed in
+ * from the portal if newer than the export), the same point back then, the
+ * difference, the curves and the estimate.
+ */
+function SamePoint({ target, side, refs, refSide, refName: setLabel, records, now, typed, accuracy, onSaveCount }) {
+  // One reference night: call it by name ("l'opening del 18 ott 25"), not by the set's letter
+  const refName = refs.length === 1 ? `${refs[0].title} (${dmy(refs[0].date)})` : setLabel;
+  const p = projectFromSet(target, refs, records, now, typed);
+  const proj = p.projection;
+  const likely = proj ? likelyRange(accuracy, proj.value, p.pointDaysBefore) : null;
+  const entries = expectedEntries(target, refs, p.reference, p.current, proj);
+  const delta = p.avgAtSamePoint ? pctChange(p.current, p.avgAtSamePoint) : null;
+  const when = p.pointDaysBefore === 0 ? 'il giorno dell\'evento' : `a ${p.pointDaysBefore} ${p.pointDaysBefore === 1 ? 'giorno' : 'giorni'} dall'evento`;
+  // The window that frames today's point: 14 days close to the event, else 30 or 60
+  const win = [14, 30, 60].find((d) => d >= p.pointDaysBefore + 3) || 60;
+  const curves = refs.map((e) => curveOf(e, 'giorni', win, now));
+  const few = refs.length <= 4;
+  const comps = [...p.comps].sort((x, y) => y.ed.date - x.ed.date);
+  const inWindow = p.pointDaysBefore <= win;
+  return (
+    <div className="nx-samepoint" style={{ '--set': COLOR[side] }}>
+      <h3 className="nx-h3"><span className="nx-swatch" style={{ background: COLOR[side] }} /> {target.title} {dmy(target.date)} · {when}</h3>
+      <p className="nx-insight" style={{ '--set': COLOR[delta == null || delta >= 0 ? side : refSide] }}>
+        A questo punto {target.title} ha <b>{fmt(p.current)}</b> registrati{typed ? ` (a mano alle ${hm(typed.at)})` : ''}
+        {delta == null
+          ? <>, mentre {refName} allo stesso momento non ne aveva ancora.</>
+          : delta === 0
+            ? <>: esattamente come {refName} allo stesso momento.</>
+            : <>: il <b>{Math.abs(delta)}% {delta > 0 ? 'in più' : 'in meno'}</b> di {refName} allo stesso momento ({fmt(p.avgAtSamePoint)}{refs.length > 1 ? ' in media' : ''}).</>}
+      </p>
+      <div className="nx-stats">
+        <div className="nx-stat"><div className="v">{fmt(p.current)}</div><div className="l">registrati ora{typed ? ' · a mano' : ''}</div></div>
+        <div className="nx-stat"><div className="v">{fmt(p.avgAtSamePoint)}</div><div className="l">{refSide} allo stesso punto{refs.length > 1 ? ` · media di ${refs.length}` : ''}</div></div>
+        <div className="nx-stat"><div className="v">{delta != null ? <Delta value={delta} /> : '–'}</div><div className="l">differenza</div></div>
+        <div className="nx-stat"><div className="v" style={{ color: 'var(--nx-proj)' }}>{proj ? `~${fmt(proj.value)}` : '–'}</div><div className="l">{proj ? `stima finale${likely ? ` · probabile ${fmt(likely.low)}–${fmt(likely.high)}` : ''}` : 'nessuna stima'}</div></div>
+        {entries && <div className="nx-stat"><div className="v">~{fmt(entries.value ?? entries.sofar)}</div><div className="l">{entries.value != null ? 'ingressi stimati' : 'ingressi dai registrati di ora'}</div></div>}
+      </div>
+      <LineChart
+        xs={daysAxis(win)} xLabel={dayTick(win)} xTitle={(x) => (x === 0 ? 'giorno dell\'evento' : `${-x} ${x === -1 ? 'giorno' : 'giorni'} prima`)} compare
+        series={[
+          { key: 't', color: COLOR[side], label: `${target.title} ${dmy(target.date)}`, width: 3, points: curveNow(target, 'giorni', win, now, typed) },
+          ...(few
+            ? refs.map((e, i) => ({ key: e.key, color: COLOR[refSide], label: `${e.title} ${dmy(e.date)}`, width: 1.8, dashed: i > 0, points: curves[i] }))
+            : [{ key: 'med', color: COLOR[refSide], label: `${refSide} · mediana di ${refs.length}`, width: 2.2, points: groupCurve(curves) }]),
+        ]}
+        projection={proj && inWindow ? { x0: -p.pointDaysBefore, y0: p.current, x1: 0, y1: proj.value } : null}
+        now={inWindow ? -p.pointDaysBefore : null} nowLabel={typed ? 'a mano' : 'dati'} height={220} width={760} yLabel="Allo stesso punto"
+      />
+      {!inWindow && <p className="nx-note">Mancano {p.pointDaysBefore} giorni: il grafico mostra gli ultimi 60.</p>}
+      <div className="nx-tw">
+        <table>
+          <thead><tr><th>serata di {refSide}</th><th className="n">a questo punto</th><th className="n">a fine serata</th><th className="n">conversione</th></tr></thead>
+          <tbody>
+            {comps.slice(0, 6).map((c) => (
+              <tr key={c.ed.key}>
+                <td className="nx-name">{c.ed.title} · {dmy(c.ed.date)}</td>
+                <td className="n"><b>{fmt(c.atSamePointAdjusted)}</b></td>
+                <td className="n">{fmt(c.totalFinal)}</td>
+                <td className="n">{pct(c.ed.conv)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      <p className="nx-note"><ProjectionNote p={proj} likely={likely} /></p>
+      <CountEditor idSuffix={`-sp-${side}`} item={{ ed: target, manual: typed }} onSave={onSaveCount} />
+    </div>
+  );
+}
+
+function Brief({ A, B, sa, sb, nameA, nameB, records, now, typedOf, accuracy, onSaveCount }) {
   const found = useMemo(() => insights(sa, sb, nameA, nameB), [sa, sb, nameA, nameB]);
   const overlap = useMemo(() => (sa && sb ? setOverlap(A.done, B.done, true) : null), [A, B, sa, sb]);
-  if (!sa && !sb) return <p className="nx-empty">Nessuna serata conclusa negli insiemi: i confronti si fanno sulle serate già passate (per quelle in vendita c'è Previsione).</p>;
+  // Nights on sale against the other set's concluded nights, at the same point
+  const live = [
+    ...A.onSale.slice(0, 2).map((t) => ({ t, side: 'A', refs: B.done, refSide: 'B', refName: nameB })),
+    ...B.onSale.slice(0, 2).map((t) => ({ t, side: 'B', refs: A.done, refSide: 'A', refName: nameA })),
+  ].filter((x) => x.refs.length);
+  if (!sa && !sb && !live.length) {
+    return <p className="nx-empty">Metti in A una serata in vendita e in B le serate con cui confrontarla (come l'opening dell'anno scorso), oppure serate concluse in tutti e due.</p>;
+  }
   const few = SIDES.filter((s) => (s === 'A' ? A : B).done.length > 0 && (s === 'A' ? A : B).done.length < 3);
+  const onlySale = SIDES.find((s) => !(s === 'A' ? sa : sb) && (s === 'A' ? A : B).onSale.length);
   return (
     <>
-      {sa && sb ? (
-        <div className="nx-insights">
-          {found.map((f) => <p key={f.key} className="nx-insight" style={{ '--set': COLOR[f.side] }}>{f.text}</p>)}
-          {overlap && <p className="nx-insight neutral">Il <b>{fmt(overlap.pctOfA, 0)}%</b> di chi è entrato in A è entrato anche in B ({fmt(overlap.both)} persone); viceversa il {fmt(overlap.pctOfB, 0)}%.</p>}
-          {!found.length && <p className="nx-insight neutral">Nessuna differenza grande: A e B si comportano in modo simile.</p>}
-        </div>
-      ) : <p className="nx-note">Metti qualcosa anche in {sa ? 'B' : 'A'} per vedere cosa cambia. Intanto ecco i numeri di {sa ? 'A' : 'B'}.</p>}
-      {few.length > 0 && <p className="nx-note"><span className="nx-tag warn">pochi dati</span> {few.map((s) => `${s} ha solo ${(s === 'A' ? A : B).done.length} ${(s === 'A' ? A : B).done.length === 1 ? 'serata' : 'serate'}`).join(', ')}: le differenze possono essere casuali.</p>}
-      <Scorecard sa={sa} sb={sb} />
-      <p className="nx-note">Medie per serata delle serate concluse (conversione sul totale dei registrati delle serate con ingressi). La barra mostra chi pesa di più tra A e B.</p>
+      {live.map((x) => (
+        <SamePoint key={`${x.side}-${x.t.key}`} target={x.t} side={x.side} refs={x.refs} refSide={x.refSide} refName={x.refName}
+          records={records} now={now} typed={typedOf(x.t)} accuracy={accuracy} onSaveCount={onSaveCount} />
+      ))}
+      {(sa || sb) && (
+        <>
+          {live.length > 0 && <h3 className="nx-h3">Le serate concluse a confronto</h3>}
+          {sa && sb ? (
+            <div className="nx-insights">
+              {found.map((f) => <p key={f.key} className="nx-insight" style={{ '--set': COLOR[f.side] }}>{f.text}</p>)}
+              {overlap && <p className="nx-insight neutral">Il <b>{fmt(overlap.pctOfA, 0)}%</b> di chi è entrato in A è entrato anche in B ({fmt(overlap.both)} persone); viceversa il {fmt(overlap.pctOfB, 0)}%.</p>}
+              {!found.length && <p className="nx-insight neutral">Nessuna differenza grande: A e B si comportano in modo simile.</p>}
+            </div>
+          ) : onlySale ? (
+            <p className="nx-note">{onlySale} ha solo serate in vendita: il confronto allo stesso punto è qui sopra. Sotto, i numeri delle serate concluse di {other(onlySale)}.</p>
+          ) : <p className="nx-note">Metti qualcosa anche in {sa ? 'B' : 'A'} per vedere cosa cambia. Intanto ecco i numeri di {sa ? 'A' : 'B'}.</p>}
+          {few.length > 0 && sa && sb && <p className="nx-note"><span className="nx-tag warn">pochi dati</span> {few.map((s) => `${s} ha solo ${(s === 'A' ? A : B).done.length} ${(s === 'A' ? A : B).done.length === 1 ? 'serata' : 'serate'}`).join(', ')}: le differenze possono essere casuali.</p>}
+          <Scorecard sa={sa} sb={sb} />
+          <p className="nx-note">Medie per serata delle serate concluse (conversione sul totale dei registrati delle serate con ingressi). La barra mostra chi pesa di più tra A e B.</p>
+        </>
+      )}
     </>
   );
 }
@@ -669,7 +760,7 @@ export default function Insiemi({ ctx }) {
           <section className="nx-panel">
             <div className="nx-ph"><h2>A contro B</h2><span className="nx-spacer" /><Seg value={view} onChange={setView} label="Vista" options={VIEWS} /></div>
             <div className="nx-pb">
-              {view === 'breve' && <Brief A={A} B={B} sa={sa} sb={sb} nameA={nameA} nameB={nameB} />}
+              {view === 'breve' && <Brief A={A} B={B} sa={sa} sb={sb} nameA={nameA} nameB={nameB} records={records} now={now} typedOf={typedOf} accuracy={accuracy} onSaveCount={saveCount} />}
               {view === 'curve' && <SetCurves A={A} B={B} nameA={nameA} nameB={nameB} now={now} windowDays={windowDays} setWindowDays={setWindowDays} typedOf={typedOf} />}
               {view === 'serate' && <Nights A={A} B={B} nameA={nameA} nameB={nameB} sets={sets} onExclude={exclude} onRestoreOne={restoreOne} notes={notes} saveNote={saveNote} typedOf={typedOf} onSaveCount={saveCount} />}
               {view === 'pubblico' && <Audience A={A} B={B} sa={sa} sb={sb} nameA={nameA} nameB={nameB} eds={eds} now={now} />}

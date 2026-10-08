@@ -1,5 +1,12 @@
 # Changelog - Ultranalytics
 
+## 8 Ottobre 2026 — Confronta: serata in vendita allo stesso punto
+
+- In "In breve", per ogni serata in vendita in A (o in B): i registrati di adesso (anche inseriti a mano) contro le serate concluse dell'altro insieme nello stesso momento prima dell'evento, come il tracker di Stasera. Frase ("152 registrati: il 14% in più dell'opening del 18 ott 25 allo stesso momento"), numeri, differenza, stima finale con fascia probabile, ingressi stimati, grafico (finestra 14/30/60 giorni scelta in base alla distanza dall'evento), tabella delle serate di riferimento e campo per il numero di adesso
+- Sotto restano le frasi e la tabella sulle serate concluse
+
+---
+
 ## 6 Ottobre 2026 (v10) — Numero di adesso anche in Confronta
 
 - Le serate in vendita dentro A o B mostrano il numero di registrati (dall'export o inserito a mano) con "numero di adesso" per scriverlo dal portale; lo stesso campo è in Previsione e nella scheda della serata. È lo stesso numero del tracker (`counts` nel catalogo): si scrive una volta e vale ovunque, finché non arriva un export più recente
