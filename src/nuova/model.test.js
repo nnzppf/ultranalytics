@@ -95,6 +95,14 @@ describe('model', () => {
     expect(tonight.key).toBe('GELSI|03.09.26');
     const view = liveNight(tonight, live, records.filter((r) => r.purchaseDate <= at), at);
     expect(view.now).toMatchObject({ reg: 3, regMed: 3 });
+    // A count typed in at 21:45 from the portal is the registrations of now
+    const named = { ...tonight, rawName: 'GELSI SERA', rawNames: ['GELSI SERA'] };
+    const typedAt = new Date(2026, 8, 3, 21, 45);
+    const counts = { [nightId(named)]: { value: 9, at: typedAt.toISOString() } };
+    const withCount = liveNight(named, live, records.filter((r) => r.purchaseDate <= at), new Date(2026, 8, 3, 22, 0), null, counts);
+    expect(withCount.typed).toMatchObject({ value: 9 });
+    expect(withCount.now).toMatchObject({ reg: 9 });
+    expect(withCount.refHour).toBe(21.75);
   });
 });
 

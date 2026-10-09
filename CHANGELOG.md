@@ -1,5 +1,12 @@
 # Changelog - Ultranalytics
 
+## 9 Ottobre 2026 — Proiezione anche durante la serata
+
+- Stasera, nella vista della serata in corso (ora per ora): stima dei registrati a fine serata con fascia probabile, ingressi stimati, linea della stima fino alle 03:00 (registrati o ingressi) e come è fatta la stima; campo per il numero di adesso
+- Il numero inserito a mano vale anche ora per ora: è il punto di adesso nel grafico e nei registrati (`liveNight` con `counts`)
+
+---
+
 ## 9 Ottobre 2026 — Dati al 9/10, Giovedì Gelsi fuori dai conteggi
 
 - Caricati gli export dal 1/10 al 9/10 (365 biglietti, 106 utenti): 222 registrazioni nuove, totale 43.627, nessun doppione

@@ -85,7 +85,7 @@ export default function NewApp({ user, logout, onOpenClassic }) {
     [records, eds, now, seriesIdx, counts, accuracy]
   );
   const tonight = useMemo(() => tonightEdition(eds, now), [eds, now]);
-  const live = useMemo(() => (tonight ? liveNight(tonight, eds, records, now, seriesIdx) : null), [tonight, eds, records, now, seriesIdx]);
+  const live = useMemo(() => (tonight ? liveNight(tonight, eds, records, now, seriesIdx, counts) : null), [tonight, eds, records, now, seriesIdx, counts]);
   const { config, saveConfig, patchConfig } = data;
   const saveSeries = useCallback((name, nights) => saveConfig(withSeries(config, name, nights, eds)), [config, saveConfig, eds]);
   const deleteSeries = useCallback((name) => saveConfig(withoutSeries(config, name)), [config, saveConfig]);

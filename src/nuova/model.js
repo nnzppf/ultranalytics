@@ -382,9 +382,11 @@ const NIGHT_HOURS = [12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26,
  * Hour by hour on the event day (12:00 → 03:00): registrations and entries so far
  * against past nights of the same brand (or series) at the same hour.
  */
-export function liveNight(ed, eds, records, now = new Date(), seriesIdx = null) {
+export function liveNight(ed, eds, records, now = new Date(), seriesIdx = null, counts = null) {
   const dataAsOf = latestPurchase(records);
-  const reference = dataAsOf && dataAsOf < now ? dataAsOf : now;
+  // A count typed in from the portal, newer than the export, is the registrations of now
+  const typed = typedCount(counts, ed, dataAsOf);
+  const reference = typed ? typed.at : dataAsOf && dataAsOf < now ? dataAsOf : now;
   const day0 = midnight(ed.date).getTime();
   const peers = peersOf(ed, eds, seriesIdx);
   const past = peers.eds.filter((e) => e.over && e.key !== ed.key);
@@ -397,7 +399,7 @@ export function liveNight(ed, eds, records, now = new Date(), seriesIdx = null) 
     const mine = h <= refHour + 1e-9;
     return {
       h,
-      reg: mine ? countUntil(ed.rows, day0 + h * HOUR, 'purchaseDate') : null,
+      reg: mine ? Math.max(countUntil(ed.rows, day0 + h * HOUR, 'purchaseDate'), typed && h === refHour ? typed.value : 0) : null,
       ent: mine ? countUntil(ed.rows, day0 + h * HOUR, 'scanDate') : null,
       regMin: regs.length ? Math.min(...regs) : null, regMed: median(regs), regMax: regs.length ? Math.max(...regs) : null,
       entMin: ents.length ? Math.min(...ents) : null, entMed: median(ents), entMax: ents.length ? Math.max(...ents) : null,
@@ -405,7 +407,7 @@ export function liveNight(ed, eds, records, now = new Date(), seriesIdx = null) 
     };
   });
   const nowPoint = points.find((p) => p.h === refHour);
-  return { reference, refHour, points, past: past.length, series: peers.series, now: nowPoint, notIn: ed.reg - ed.ent };
+  return { reference, refHour, points, past: past.length, series: peers.series, now: nowPoint, notIn: Math.max(0, (nowPoint?.reg ?? ed.reg) - ed.ent), typed };
 }
 
 // ---------------------------------------------------------------- comparison table

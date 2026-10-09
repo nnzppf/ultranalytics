@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Panel, UpcomingTable, TrackerView, VenueDot, Seg, Delta, WindowSeg, NoteEditor } from '../ui';
+import { Panel, UpcomingTable, TrackerView, VenueDot, Seg, Delta, WindowSeg, NoteEditor, CountEditor, ProjectionNote } from '../ui';
 import { lookupNight } from '../model';
 import { LineChart, BarList } from '../charts';
 import { fmt, pct, dshort, hm, pctChange } from '../format';
@@ -22,26 +22,43 @@ export function Kpis({ kpis, birthdays }) {
 
 const HOUR_LABEL = { 12: '12', 15: '15', 18: '18', 21: '21', 24: '00', 27: '03' };
 
-function LiveNight({ ed, live }) {
+function LiveNight({ ed, live, item, onSaveCount }) {
   const [mode, setMode] = useState('reg');
   const k = mode === 'reg' ? ['reg', 'regMin', 'regMed', 'regMax'] : ['ent', 'entMin', 'entMed', 'entMax'];
   const n = live.now;
+  // The tracker's estimate for tonight (same point as past nights, typed-in count included)
+  const proj = item?.tracker.projection || null;
+  const likely = item?.likely || null;
+  const entries = item?.entries || null;
+  const line = mode === 'reg'
+    ? (proj ? { x0: live.refHour, y0: n.reg, x1: 27, y1: Math.max(proj.value, n.reg) } : null)
+    : (entries?.value != null ? { x0: live.refHour, y0: n.ent, x1: 27, y1: Math.max(entries.value, n.ent) } : null);
   return (
-    <Panel span={8} title={`Stasera · ${ed.title}`} hint={`${ed.venue} · confronto con ${live.past} serate ${live.series ? `della serie ${live.series}` : 'dello stesso brand'} alla stessa ora`}
+    <Panel span={8} title={`Stasera · ${ed.title}`} hint={`${ed.venue} · confronto con ${live.past} ${live.past === 1 ? 'serata' : 'serate'} ${live.series ? `della serie ${live.series}` : 'dello stesso brand'} alla stessa ora`}
       actions={<Seg value={mode} onChange={setMode} label="Grafico" options={[['reg', 'registrati'], ['ent', 'entrati']]} />}>
       <div className="nx-stats">
-        <div className="nx-stat"><div className="v">{fmt(n.reg)}</div><div className="l">registrati · <Delta value={pctChange(n.reg, n.regAvg)} /> vs {fmt(n.regAvg)}</div></div>
+        <div className="nx-stat"><div className="v">{fmt(n.reg)}</div><div className="l">registrati{live.typed ? ' (a mano)' : ''} · <Delta value={pctChange(n.reg, n.regAvg)} /> vs {fmt(n.regAvg)}</div></div>
+        <div className="nx-stat"><div className="v" style={{ color: 'var(--nx-proj)' }}>{proj ? `~${fmt(proj.value)}` : '–'}</div><div className="l">{proj ? `registrati a fine serata${likely ? ` · probabile ${fmt(likely.low)}–${fmt(likely.high)}` : ''}` : 'nessuna stima'}</div></div>
         <div className="nx-stat"><div className="v">{fmt(n.ent)}</div><div className="l">entrati · <Delta value={pctChange(n.ent, n.entMed)} /> vs {fmt(n.entMed)}</div></div>
-        <div className="nx-stat"><div className="v">{fmt(live.notIn)}</div><div className="l">registrati non entrati</div></div>
+        {entries && <div className="nx-stat"><div className="v">~{fmt(entries.value ?? entries.sofar)}</div><div className="l">{entries.value != null ? 'ingressi stimati' : 'ingressi dai registrati di ora'}</div></div>}
+        <div className="nx-stat"><div className="v">{fmt(live.notIn)}</div><div className="l">registrati non ancora entrati</div></div>
       </div>
       <LineChart
         xs={live.points.map((p) => p.h)}
         xLabel={(x) => HOUR_LABEL[x] || ''}
+        xTitle={(x) => `ore ${String(Math.floor(x) % 24).padStart(2, '0')}:${String(Math.round((x % 1) * 60)).padStart(2, '0')}`}
+        compare
         band={live.points.map((p) => ({ x: p.h, min: p[k[1]], med: p[k[2]], max: p[k[3]] }))}
         series={[{ key: 'cur', label: mode === 'reg' ? 'registrati' : 'entrati', color: 'var(--nx-now)', width: 2.4, points: live.points.map((p) => ({ x: p.h, y: p[k[0]] })) }]}
+        projection={line}
         now={live.refHour} nowLabel={hm(live.reference)} yLabel="Serata in corso"
       />
-      <p className="nx-note">Dati alle <b>{hm(live.reference)}</b>. La fascia è il minimo–massimo delle serate passate alla stessa ora, la linea tratteggiata la mediana.</p>
+      <p className="nx-note">
+        {live.typed ? <>Numero inserito a mano alle <b>{hm(live.reference)}</b>. </> : <>Dati alle <b>{hm(live.reference)}</b>. </>}
+        {live.past > 1 ? 'La fascia è il minimo–massimo delle serate passate alla stessa ora, la linea tratteggiata la mediana. ' : 'La linea tratteggiata è la serata di riferimento alla stessa ora. '}
+        {proj && <>La linea arancione porta alla stima di fine serata ({mode === 'reg' ? 'registrati' : 'ingressi'}). <ProjectionNote p={proj} likely={likely} /></>}
+      </p>
+      {item && <CountEditor idSuffix="-live" item={item} onSave={onSaveCount} />}
     </Panel>
   );
 }
@@ -62,7 +79,7 @@ export default function Stasera({ ctx }) {
       <Panel span={12} title="Prossimi eventi" hint="entro 60 giorni · tocca una riga per il suo grafico qui sotto">
         <UpcomingTable upcoming={upcoming} selectedKey={item?.ed.key} onSelect={setSelectedKey} />
       </Panel>
-      {showLive ? <LiveNight ed={tonight} live={live} /> : item ? (
+      {showLive ? <LiveNight ed={tonight} live={live} item={upcoming.find((u) => u.ed.key === tonight.key)} onSaveCount={saveCount} /> : item ? (
         <Panel span={8} title={`${selected ? 'Tracker' : 'Prossimo'} · ${item.ed.title}`} hint={`${dshort(item.ed.date)} · ${item.ed.venue}`}
           actions={<>
             <WindowSeg value={windowDays} onChange={setWindowDays} />
