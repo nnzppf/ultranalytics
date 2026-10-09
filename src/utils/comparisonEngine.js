@@ -73,6 +73,7 @@ function buildCumulativeCurve(rows) {
  * nights typically had less than 20% of their final.
  */
 const MIN_AT_POINT = 5;
+const PACE_CAP = 3;
 
 export function projectFinal(comps, current) {
   const valid = comps.filter(c => c.totalFinal > 0);
@@ -86,12 +87,15 @@ export function projectFinal(comps, current) {
   const recent = [...valid].sort((a, b) => (a.eventDate || 0) - (b.eventDate || 0)).slice(-3).map(c => c.totalFinal);
   const level = recent.reduce((s, v) => s + v, 0) / recent.length;
   const ratio = (q, fallback) => (ratios.length ? (ratios.length >= 4 ? quantile(ratios, q) : fallback) : 0);
-  const blend = (r, lvl) => Math.max(current, Math.round(w * current * r + (1 - w) * lvl));
+  // The pace never goes past 3 times the level (or today's count): a reference night of
+  // a different kind (Capodanno for Halloween: 21 then, 204 now, ×46) would run away
+  const cap = PACE_CAP * Math.max(level, current);
+  const blend = (r, lvl) => Math.max(current, Math.round(w * Math.min(current * r, cap) + (1 - w) * lvl));
   return {
     value: blend(ratio(0.5, quantile(ratios, 0.5)), level),
     low: blend(ratio(0.25, ratios[0]), Math.min(...recent)),
     high: blend(ratio(0.75, ratios[ratios.length - 1]), Math.max(...recent)),
-    pace: ratios.length ? Math.round(current * quantile(ratios, 0.5)) : null,
+    pace: ratios.length ? Math.round(Math.min(current * quantile(ratios, 0.5), cap)) : null,
     level: Math.round(level),
     paceWeight: Math.round(w * 100) / 100,
     basedOn: valid.length,

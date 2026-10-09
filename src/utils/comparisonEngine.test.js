@@ -159,6 +159,13 @@ describe('projectFinal', () => {
     expect(p).toMatchObject({ value: 971, pace: null, paceWeight: 0 });
   });
 
+  it('keeps the pace within 3 times the level', () => {
+    // Capodanno had 21 registered 22 days out and ended at 971; Halloween has 204: ×46 would give 9,400
+    const p = projectFinal([night(21, 971, 1)], 204);
+    expect(p.pace).toBe(2913);
+    expect(p.value).toBe(Math.round(Math.sqrt(21 / 971) * 2913 + (1 - Math.sqrt(21 / 971)) * 971));
+  });
+
   it('never projects below the registrations already in', () => {
     expect(projectFinal([night(0, 50, 1)], 80).value).toBe(80);
     expect(projectFinal([night(0, 50, 1)], 0)).toBeNull();

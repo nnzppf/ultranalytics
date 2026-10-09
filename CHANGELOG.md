@@ -1,5 +1,14 @@
 # Changelog - Ultranalytics
 
+## 9 Ottobre 2026 — Dati al 9/10, Giovedì Gelsi fuori dai conteggi
+
+- Caricati gli export dal 1/10 al 9/10 (365 biglietti, 106 utenti): 222 registrazioni nuove, totale 43.627, nessun doppione
+- Giovedì Gelsi escluso dal catalogo (estivo, settimanale, altre meccaniche): i dati restano salvati, non contano più in totali, medie, confronti, stime e persone (26.740 registrazioni, conversione 63,4%, 65 serate concluse). Si riattiva da Dati → Catalogo → Esclusi
+- Proiezione: il ritmo non supera 3 volte il livello delle ultime serate (o i registrati di oggi). Je Suis Mimì contro Capodanno (204 contro 21 allo stesso punto, ×46) era stimata ~2.215; i controlli sulle serate passate non cambiano
+- Nuovo evento senza data nel nome: "EUPHORIA: Halloween Edition" (data da impostare in Dati → Date degli eventi)
+
+---
+
 ## 8 Ottobre 2026 — Ora per ora
 
 - Grafici di confronto delle registrazioni con scala **giorni | ora per ora**, nel tracker (Stasera, Eventi) e nel confronto allo stesso punto di Confronta: registrazioni accumulate ora per ora negli ultimi giorni prima dell'evento e durante la notte (fino alle 03:00), contro le serate di riferimento alla stessa ora dal loro evento; tocchi il grafico e vedi i numeri di ogni ora. Parte su "ora per ora" quando mancano 2 giorni o meno (`curveByHourBefore`, `hourAxis` in `compare.js`)
